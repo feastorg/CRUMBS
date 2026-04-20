@@ -6,6 +6,12 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+## [0.12.2] - 2026-04-20
+
+### Fixed
+
+- Added `crumbs::crumbs` alias target immediately after `add_library(crumbs ...)` so that consumers using `add_subdirectory` can reference `crumbs::crumbs` consistently, matching the namespaced target provided by the installed package config.
+
 ### Added
 
 - **Raw I2C helper APIs** (`src/crumbs.h`, `src/core/crumbs_i2c_helpers.c`)

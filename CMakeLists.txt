@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 
 project(CRUMBS
-    VERSION 0.12.1
+    VERSION 0.12.2
     LANGUAGES C
 )
 
@@ -46,6 +46,7 @@ endif()
 # -----------------------------------------------------------------------------
 
 add_library(crumbs STATIC ${CRUMBS_CORE_SOURCES})
+add_library(crumbs::crumbs ALIAS crumbs)
 
 target_include_directories(crumbs
     PUBLIC
