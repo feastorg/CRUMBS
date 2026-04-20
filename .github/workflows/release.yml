@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release-linux-x86_64:
+    name: Release (linux-x86_64)
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build build-essential jq
+
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Install linux-wire from release
+        run: |
+          mkdir -p third_party/linux-wire/install
+          curl -fsSL https://github.com/feastorg/linux-wire/releases/download/v0.1.1/linux-wire-0.1.1-linux-x86_64.tar.gz \
+            | tar -xz -C third_party/linux-wire/install
+
+      - name: Configure CRUMBS (Linux HAL enabled)
+        run: |
+          cmake -S . -B build/release \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCRUMBS_ENABLE_TESTS=ON \
+            -DCRUMBS_ENABLE_LINUX_HAL=ON \
+            -DCRUMBS_BUILD_EXAMPLES=OFF \
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/third_party/linux-wire/install"
+
+      - name: Build
+        run: cmake --build build/release --parallel
+
+      - name: Test
+        run: ctest --test-dir build/release --output-on-failure
+
+      - name: Install to staging
+        run: |
+          cmake --install build/release \
+            --prefix "${{ github.workspace }}/staging"
+
+      - name: Package binary artifact
+        id: package
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARTIFACT="crumbs-${VERSION}-linux-x86_64.tar.gz"
+          tar -czf "${ARTIFACT}" -C "${{ github.workspace }}/staging" .
+          echo "artifact=${ARTIFACT}" >> "$GITHUB_OUTPUT"
+
+      - name: Package source tarball
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git archive --format=tar.gz \
+            --prefix="crumbs-${VERSION}/" \
+            -o "crumbs-${VERSION}-source.tar.gz" \
+            HEAD
+
+      - name: Generate checksums
+        run: sha256sum crumbs-*.tar.gz > SHA256SUMS
+
+      - name: Generate manifest
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARTIFACT="${{ steps.package.outputs.artifact }}"
+          SHA=$(grep "${ARTIFACT}" SHA256SUMS | awk '{print $1}')
+          jq -n \
+            --argjson schema_version 1 \
+            --arg repo "feastorg/CRUMBS" \
+            --arg component "crumbs" \
+            --arg version "${VERSION}" \
+            --arg platform "linux-x86_64" \
+            --arg asset "${ARTIFACT}" \
+            --arg sha256 "${SHA}" \
+            '{schema_version: $schema_version, repo: $repo, component: $component, version: $version, platform: $platform, asset: $asset, sha256: $sha256}' \
+            > manifest.json
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            crumbs-*.tar.gz
+            SHA256SUMS
+            manifest.json
+          generate_release_notes: true

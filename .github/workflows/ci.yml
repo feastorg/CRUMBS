@@ -38,17 +38,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: third_party/linux-wire/install
-          key: linux-wire-${{ runner.os }}-v1
+          key: linux-wire-${{ runner.os }}-0.1.1
 
-      - name: Build linux-wire
+      - name: Install linux-wire from release
         if: steps.cache-linux-wire.outputs.cache-hit != 'true'
         run: |
-          git clone --depth=1 https://github.com/feastorg/linux-wire.git third_party/linux-wire
-          cmake -S third_party/linux-wire -B third_party/linux-wire/build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/third_party/linux-wire/install
-          cmake --build third_party/linux-wire/build --parallel
-          cmake --install third_party/linux-wire/build
+          mkdir -p third_party/linux-wire/install
+          curl -fsSL https://github.com/feastorg/linux-wire/releases/download/v0.1.1/linux-wire-0.1.1-linux-x86_64.tar.gz \
+            | tar -xz -C third_party/linux-wire/install
 
       # ---------------------------------------------------------------------
       # Build & test CRUMBS

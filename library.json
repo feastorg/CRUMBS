@@ -1,6 +1,6 @@
 {
   "name": "CRUMBS",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "CRUMBS: a small, portable C-based protocol for controller/peripheral I2C messaging (Arduino + Linux HALs).",
   "keywords": "i2c,crumbs,crc,arduino,linux,protocol",
   "repository": {
