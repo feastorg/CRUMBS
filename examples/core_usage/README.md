@@ -81,7 +81,7 @@ cmake --build --preset linux
 ./build-linux/crumbs_mixed_bus_lab_validation /dev/i2c-1
 ```
 
-**Note:** Requires [linux-wire](https://github.com/FEASTorg/linux-wire) installed (recommended: `cmake --preset minimal && cmake --build --preset minimal && sudo cmake --install build/minimal --prefix /usr/local`).
+**Note:** Requires [linux-wire](https://github.com/feastorg/linux-wire) installed (recommended: `cmake --preset minimal && cmake --build --preset minimal && sudo cmake --install build/minimal --prefix /usr/local`).
 
 ### Mixed-Bus Validation Path (Pre-Release)
 

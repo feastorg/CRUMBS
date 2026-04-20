@@ -5,7 +5,7 @@
   "keywords": "i2c,crumbs,crc,arduino,linux,protocol",
   "repository": {
     "type": "git",
-    "url": "https://github.com/FEASTorg/CRUMBS.git"
+    "url": "https://github.com/feastorg/CRUMBS.git"
   },
   "authors": [
     {

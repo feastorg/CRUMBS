@@ -39,13 +39,13 @@ This project includes a PlatformIO library manifest (`library.json`) and Platfor
 ## Local development & CI fallback
 
 - While publishing the library is the recommended long-term solution, the examples should also work from the repository directly. There are two ways to make examples build before the library is published:
-  - lib_deps: set `lib_deps = https://github.com/FEASTorg/CRUMBS.git` in the example's `[env:...]` section — PlatformIO will fetch the library from the repo.
+  - lib_deps: set `lib_deps = https://github.com/feastorg/CRUMBS.git` in the example's `[env:...]` section — PlatformIO will fetch the library from the repo.
   - lib_extra_dirs: during local development you can use `lib_extra_dirs = ${PROJECT_DIR}/../../..` (in the `[platformio]` section) so the example resolves the library from your monorepo.
 
 ## Recommended workflow for CI
 
-- Publish the library to the registry and reference the published library in `platformio.ini` via `lib_deps = FEASTorg/CRUMBS` or a versioned release identifier.
-- For quick CI progress before publishing, referencing the Git URL (`lib_deps = https://github.com/FEASTorg/CRUMBS.git`) works and will let CI build examples.
+- Publish the library to the registry and reference the published library in `platformio.ini` via `lib_deps = feastorg/CRUMBS` or a versioned release identifier.
+- For quick CI progress before publishing, referencing the Git URL (`lib_deps = https://github.com/feastorg/CRUMBS.git`) works and will let CI build examples.
 
 ## Quick troubleshooting
 

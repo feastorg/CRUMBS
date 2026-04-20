@@ -258,7 +258,7 @@ CRUMBS Linux HAL requires the `linux-wire` library for I²C bus access.
 
 ```bash
 # Clone linux-wire
-git clone https://github.com/FEASTorg/linux-wire.git
+git clone https://github.com/feastorg/linux-wire.git
 cd linux-wire
 
 # Build and install (linux-wire preset flow)
@@ -325,7 +325,7 @@ Avoid linking exported or installable CRUMBS targets directly to a raw `linux_wi
 
 ```bash
 # Clone CRUMBS
-git clone https://github.com/FEASTorg/CRUMBS.git
+git clone https://github.com/feastorg/CRUMBS.git
 cd CRUMBS
 
 # Configure and build (Linux preset enables the HAL and examples)

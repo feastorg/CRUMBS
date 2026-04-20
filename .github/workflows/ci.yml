@@ -43,7 +43,7 @@ jobs:
       - name: Build linux-wire
         if: steps.cache-linux-wire.outputs.cache-hit != 'true'
         run: |
-          git clone --depth=1 https://github.com/FEASTorg/linux-wire.git third_party/linux-wire
+          git clone --depth=1 https://github.com/feastorg/linux-wire.git third_party/linux-wire
           cmake -S third_party/linux-wire -B third_party/linux-wire/build \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/third_party/linux-wire/install

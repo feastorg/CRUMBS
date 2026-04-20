@@ -24,7 +24,7 @@ Thank you for your interest in contributing to CRUMBS! This guide covers how to 
 ### Cloning the Repository
 
 ```bash
-git clone https://github.com/FEASTorg/CRUMBS.git
+git clone https://github.com/feastorg/CRUMBS.git
 cd CRUMBS
 ```
 

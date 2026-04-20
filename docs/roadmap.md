@@ -82,7 +82,7 @@ bus.send(0x20, type_id=0x01, opcode=0x01, data=[0xFF])
 
 ## Linux Peripheral Support
 
-**Status:** I²C slave mode requires kernel driver development ([technical details](https://github.com/FEASTorg/linux-wire/blob/main/docs/slave-mode-investigation.md)). Alternative transports needed for Linux peripheral support.
+**Status:** I²C slave mode requires kernel driver development ([technical details](https://github.com/feastorg/linux-wire/blob/main/docs/slave-mode-investigation.md)). Alternative transports needed for Linux peripheral support.
 
 **Value:** Medium — Enables Raspberry Pi as peripheral, but microcontrollers better suited for this role  
 **Feasibility:** Low (I²C) / Medium (Serial) — Kernel driver required OR new transport layer  
