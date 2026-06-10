@@ -25,6 +25,7 @@
 
 #include "crumbs.h"
 #include "crumbs_message_helpers.h"
+#include "crumbs_ops.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -133,6 +134,8 @@ extern "C"
     static inline int calc_send_add(const crumbs_device_t *dev, uint32_t a, uint32_t b)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, CALC_TYPE_ID, CALC_OP_ADD);
         crumbs_msg_add_u32(&msg, a);
         crumbs_msg_add_u32(&msg, b);
@@ -150,6 +153,8 @@ extern "C"
     static inline int calc_send_sub(const crumbs_device_t *dev, uint32_t a, uint32_t b)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, CALC_TYPE_ID, CALC_OP_SUB);
         crumbs_msg_add_u32(&msg, a);
         crumbs_msg_add_u32(&msg, b);
@@ -167,6 +172,8 @@ extern "C"
     static inline int calc_send_mul(const crumbs_device_t *dev, uint32_t a, uint32_t b)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, CALC_TYPE_ID, CALC_OP_MUL);
         crumbs_msg_add_u32(&msg, a);
         crumbs_msg_add_u32(&msg, b);
@@ -185,6 +192,8 @@ extern "C"
     static inline int calc_send_div(const crumbs_device_t *dev, uint32_t a, uint32_t b)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, CALC_TYPE_ID, CALC_OP_DIV);
         crumbs_msg_add_u32(&msg, a);
         crumbs_msg_add_u32(&msg, b);
@@ -202,6 +211,8 @@ extern "C"
     static inline int calc_query_result(const crumbs_device_t *dev)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, 0, CRUMBS_CMD_SET_REPLY);
         crumbs_msg_add_u8(&msg, CALC_OP_GET_RESULT);
         return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
@@ -218,6 +229,8 @@ extern "C"
     static inline int calc_query_hist_meta(const crumbs_device_t *dev)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, 0, CRUMBS_CMD_SET_REPLY);
         crumbs_msg_add_u8(&msg, CALC_OP_GET_HIST_META);
         return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
@@ -236,9 +249,9 @@ extern "C"
     {
         crumbs_message_t msg;
 
-        if (entry_idx > 11)
+        if (!crumbs_ops_can_send(dev) || entry_idx > 11)
         {
-            return -1; /* Invalid index */
+            return -1; /* Invalid device or index */
         }
 
         crumbs_msg_init(&msg, 0, CRUMBS_CMD_SET_REPLY);
@@ -293,7 +306,7 @@ extern "C"
     {
         crumbs_message_t reply;
         int rc;
-        if (!out)
+        if (!out || !crumbs_ops_can_get(dev))
             return -1;
         rc = calc_query_result(dev);
         if (rc != 0)
@@ -318,7 +331,7 @@ extern "C"
     {
         crumbs_message_t reply;
         int rc;
-        if (!out)
+        if (!out || !crumbs_ops_can_get(dev))
             return -1;
         rc = calc_query_hist_meta(dev);
         if (rc != 0)
@@ -352,7 +365,7 @@ extern "C"
     {
         crumbs_message_t reply;
         int rc;
-        if (!out || entry_idx > 11)
+        if (!out || !crumbs_ops_can_get(dev) || entry_idx > 11)
             return -1;
         rc = calc_query_hist_entry(dev, entry_idx);
         if (rc != 0)

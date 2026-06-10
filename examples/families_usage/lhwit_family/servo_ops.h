@@ -23,6 +23,7 @@
 
 #include "crumbs.h"
 #include "crumbs_message_helpers.h"
+#include "crumbs_ops.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -107,6 +108,8 @@ extern "C"
                                          uint8_t position)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, SERVO_TYPE_ID, SERVO_OP_SET_POS);
         crumbs_msg_add_u8(&msg, servo_idx);
         crumbs_msg_add_u8(&msg, position);
@@ -126,6 +129,8 @@ extern "C"
                                            uint8_t speed)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, SERVO_TYPE_ID, SERVO_OP_SET_SPEED);
         crumbs_msg_add_u8(&msg, servo_idx);
         crumbs_msg_add_u8(&msg, speed);
@@ -151,6 +156,8 @@ extern "C"
                                        uint8_t step)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, SERVO_TYPE_ID, SERVO_OP_SWEEP);
         crumbs_msg_add_u8(&msg, servo_idx);
         crumbs_msg_add_u8(&msg, enable);
@@ -171,6 +178,8 @@ extern "C"
     static inline int servo_query_pos(const crumbs_device_t *dev)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, 0, CRUMBS_CMD_SET_REPLY);
         crumbs_msg_add_u8(&msg, SERVO_OP_GET_POS);
         return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
@@ -187,6 +196,8 @@ extern "C"
     static inline int servo_query_speed(const crumbs_device_t *dev)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, 0, CRUMBS_CMD_SET_REPLY);
         crumbs_msg_add_u8(&msg, SERVO_OP_GET_SPEED);
         return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
@@ -227,7 +238,7 @@ extern "C"
     {
         crumbs_message_t reply;
         int rc;
-        if (!out)
+        if (!out || !crumbs_ops_can_get(dev))
             return -1;
         rc = servo_query_pos(dev);
         if (rc != 0)
@@ -255,7 +266,7 @@ extern "C"
     {
         crumbs_message_t reply;
         int rc;
-        if (!out)
+        if (!out || !crumbs_ops_can_get(dev))
             return -1;
         rc = servo_query_speed(dev);
         if (rc != 0)

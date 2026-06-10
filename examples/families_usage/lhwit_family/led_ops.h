@@ -23,6 +23,7 @@
 
 #include "crumbs.h"
 #include "crumbs_message_helpers.h"
+#include "crumbs_ops.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -102,6 +103,8 @@ extern "C"
     static inline int led_send_set_all(const crumbs_device_t *dev, uint8_t mask)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, LED_TYPE_ID, LED_OP_SET_ALL);
         crumbs_msg_add_u8(&msg, mask);
         return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
@@ -120,6 +123,8 @@ extern "C"
                                        uint8_t state)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, LED_TYPE_ID, LED_OP_SET_ONE);
         crumbs_msg_add_u8(&msg, led_idx);
         crumbs_msg_add_u8(&msg, state);
@@ -141,6 +146,8 @@ extern "C"
                                      uint16_t period_ms)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, LED_TYPE_ID, LED_OP_BLINK);
         crumbs_msg_add_u8(&msg, led_idx);
         crumbs_msg_add_u8(&msg, enable);
@@ -159,6 +166,8 @@ extern "C"
     static inline int led_query_state(const crumbs_device_t *dev)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, 0, CRUMBS_CMD_SET_REPLY);
         crumbs_msg_add_u8(&msg, LED_OP_GET_STATE);
         return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
@@ -175,6 +184,8 @@ extern "C"
     static inline int led_query_blink(const crumbs_device_t *dev)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, 0, CRUMBS_CMD_SET_REPLY);
         crumbs_msg_add_u8(&msg, LED_OP_GET_BLINK);
         return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
@@ -219,7 +230,7 @@ extern "C"
     {
         crumbs_message_t reply;
         int rc;
-        if (!out)
+        if (!out || !crumbs_ops_can_get(dev))
             return -1;
         rc = led_query_state(dev);
         if (rc != 0)
@@ -244,7 +255,7 @@ extern "C"
     {
         crumbs_message_t reply;
         int rc;
-        if (!out)
+        if (!out || !crumbs_ops_can_get(dev))
             return -1;
         rc = led_query_blink(dev);
         if (rc != 0)

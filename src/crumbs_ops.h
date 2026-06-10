@@ -40,6 +40,16 @@
 #include "crumbs.h"
 #include "crumbs_message_helpers.h"
 
+static inline int crumbs_ops_can_send(const crumbs_device_t *dev)
+{
+    return dev && dev->ctx && dev->write_fn;
+}
+
+static inline int crumbs_ops_can_get(const crumbs_device_t *dev)
+{
+    return crumbs_ops_can_send(dev) && dev->read_fn && dev->delay_fn;
+}
+
 /* -----------------------------------------------------------------------
  * CRUMBS_DEFINE_GET_OP
  *
@@ -55,14 +65,15 @@
  *   result_t  Typedef name of the result struct, e.g. therm_temp_result_t
  *   parse_fn  int parse_fn(const uint8_t *data, size_t len, result_t *out)
  * ----------------------------------------------------------------------- */
-#define CRUMBS_DEFINE_GET_OP(family, name, type_id, opcode, result_t, parse_fn)        \
+#define CRUMBS_DEFINE_GET_OP(family, name, type_id_value, opcode_value, result_t, parse_fn) \
     /** @internal Used by family##_get_##name(); prefer that for              */        \
     /** combined query+read.                                                  */        \
     static inline int family##_query_##name(const crumbs_device_t *dev)                \
     {                                                                                   \
         crumbs_message_t _m;                                                            \
+        if (!crumbs_ops_can_send(dev)) return -1;                                      \
         crumbs_msg_init(&_m, 0, CRUMBS_CMD_SET_REPLY);                                 \
-        crumbs_msg_add_u8(&_m, (uint8_t)(opcode));                                     \
+        crumbs_msg_add_u8(&_m, (uint8_t)(opcode_value));                               \
         return crumbs_controller_send(dev->ctx, dev->addr, &_m,                        \
                                       dev->write_fn, dev->io);                         \
     }                                                                                   \
@@ -70,15 +81,15 @@
     {                                                                                   \
         crumbs_message_t _r;                                                            \
         int _rc;                                                                        \
-        if (!out) return -1;                                                            \
+        if (!out || !crumbs_ops_can_get(dev)) return -1;                               \
         _rc = family##_query_##name(dev);                                               \
         if (_rc != 0) return _rc;                                                       \
         dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);                                   \
         _rc = crumbs_controller_read(dev->ctx, dev->addr, &_r,                         \
                                      dev->read_fn, dev->io);                           \
         if (_rc != 0) return _rc;                                                       \
-        if (_r.type_id != (uint8_t)(type_id) ||                                        \
-            _r.opcode  != (uint8_t)(opcode))  return -1;                               \
+        if (_r.type_id != (uint8_t)(type_id_value) ||                                  \
+            _r.opcode  != (uint8_t)(opcode_value))  return -1;                         \
         return parse_fn(_r.data, _r.data_len, out);                                    \
     }
 
@@ -105,11 +116,12 @@
  *   param_decl  Single typed parameter, e.g. uint8_t mask
  *   pack_stmt   Expression packing param into _m (no semicolon)
  * ----------------------------------------------------------------------- */
-#define CRUMBS_DEFINE_SEND_OP(family, name, type_id, opcode, param_decl, pack_stmt)   \
+#define CRUMBS_DEFINE_SEND_OP(family, name, type_id_value, opcode_value, param_decl, pack_stmt) \
     static inline int family##_send_##name(const crumbs_device_t *dev, param_decl)    \
     {                                                                                  \
         crumbs_message_t _m;                                                           \
-        crumbs_msg_init(&_m, (uint8_t)(type_id), (uint8_t)(opcode));                  \
+        if (!crumbs_ops_can_send(dev)) return -1;                                     \
+        crumbs_msg_init(&_m, (uint8_t)(type_id_value), (uint8_t)(opcode_value));      \
         pack_stmt;                                                                     \
         return crumbs_controller_send(dev->ctx, dev->addr, &_m,                       \
                                       dev->write_fn, dev->io);                        \
@@ -123,11 +135,12 @@
  *
  * Use for operations that carry no payload, e.g. display_send_clear.
  * ----------------------------------------------------------------------- */
-#define CRUMBS_DEFINE_SEND_OP_0(family, name, type_id, opcode)                        \
+#define CRUMBS_DEFINE_SEND_OP_0(family, name, type_id_value, opcode_value)            \
     static inline int family##_send_##name(const crumbs_device_t *dev)                \
     {                                                                                  \
         crumbs_message_t _m;                                                           \
-        crumbs_msg_init(&_m, (uint8_t)(type_id), (uint8_t)(opcode));                  \
+        if (!crumbs_ops_can_send(dev)) return -1;                                     \
+        crumbs_msg_init(&_m, (uint8_t)(type_id_value), (uint8_t)(opcode_value));      \
         return crumbs_controller_send(dev->ctx, dev->addr, &_m,                       \
                                       dev->write_fn, dev->io);                        \
     }

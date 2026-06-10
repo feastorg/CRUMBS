@@ -177,6 +177,14 @@ if(CRUMBS_ENABLE_TESTS)
     add_executable(test_reply_handler tests/test_reply_handler.c)
     target_link_libraries(test_reply_handler PRIVATE crumbs)
     add_test(NAME reply_handler_test COMMAND test_reply_handler)
+
+    add_executable(test_ops_validation tests/test_ops_validation.c)
+    target_link_libraries(test_ops_validation PRIVATE crumbs)
+    target_include_directories(test_ops_validation PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/handlers_usage
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/families_usage/lhwit_family
+    )
+    add_test(NAME ops_validation_test COMMAND test_ops_validation)
 endif()
 
 # -----------------------------------------------------------------------------
@@ -237,4 +245,3 @@ install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/crumbsConfigVersion.cmake"
     DESTINATION ${config_install_dir}
 )
-

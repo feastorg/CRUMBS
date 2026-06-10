@@ -22,6 +22,7 @@
 
 #include "crumbs.h"
 #include "crumbs_message_helpers.h"
+#include "crumbs_ops.h"
 
 #include <string.h> /* memcpy */
 
@@ -98,6 +99,8 @@ extern "C"
                                      uint8_t len)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev) || (len > 0 && !data))
+            return -1;
         crumbs_msg_init(&msg, MOCK_TYPE_ID, MOCK_OP_ECHO);
         for (uint8_t i = 0; i < len; i++)
         {
@@ -116,6 +119,8 @@ extern "C"
     static inline int mock_send_heartbeat(const crumbs_device_t *dev, uint16_t period_ms)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, MOCK_TYPE_ID, MOCK_OP_SET_HEARTBEAT);
         crumbs_msg_add_u16(&msg, period_ms);
         return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
@@ -130,6 +135,8 @@ extern "C"
     static inline int mock_send_toggle(const crumbs_device_t *dev)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, MOCK_TYPE_ID, MOCK_OP_TOGGLE);
         return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
     }
@@ -145,6 +152,8 @@ extern "C"
     static inline int mock_query_echo(const crumbs_device_t *dev)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, MOCK_TYPE_ID, CRUMBS_CMD_SET_REPLY);
         crumbs_msg_add_u8(&msg, MOCK_OP_GET_ECHO);
         return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
@@ -161,6 +170,8 @@ extern "C"
     static inline int mock_query_status(const crumbs_device_t *dev)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, MOCK_TYPE_ID, CRUMBS_CMD_SET_REPLY);
         crumbs_msg_add_u8(&msg, MOCK_OP_GET_STATUS);
         return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
@@ -177,6 +188,8 @@ extern "C"
     static inline int mock_query_info(const crumbs_device_t *dev)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, MOCK_TYPE_ID, CRUMBS_CMD_SET_REPLY);
         crumbs_msg_add_u8(&msg, MOCK_OP_GET_INFO);
         return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
@@ -227,7 +240,7 @@ extern "C"
     {
         crumbs_message_t reply;
         int rc;
-        if (!out)
+        if (!out || !crumbs_ops_can_get(dev))
             return -1;
         rc = mock_query_echo(dev);
         if (rc != 0)
@@ -255,7 +268,7 @@ extern "C"
     {
         crumbs_message_t reply;
         int rc;
-        if (!out)
+        if (!out || !crumbs_ops_can_get(dev))
             return -1;
         rc = mock_query_status(dev);
         if (rc != 0)
@@ -283,7 +296,7 @@ extern "C"
     {
         crumbs_message_t reply;
         int rc;
-        if (!out)
+        if (!out || !crumbs_ops_can_get(dev))
             return -1;
         rc = mock_query_info(dev);
         if (rc != 0)

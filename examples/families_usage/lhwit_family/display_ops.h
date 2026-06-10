@@ -23,6 +23,7 @@
 
 #include "crumbs.h"
 #include "crumbs_message_helpers.h"
+#include "crumbs_ops.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -253,6 +254,8 @@ extern "C"
                                               uint8_t decimal_pos)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, DISPLAY_TYPE_ID, DISPLAY_OP_SET_NUMBER);
         crumbs_msg_add_u16(&msg, number);
         crumbs_msg_add_u8(&msg, decimal_pos);
@@ -271,6 +274,8 @@ extern "C"
     {
         crumbs_message_t msg;
         int i;
+        if (!crumbs_ops_can_send(dev) || !segments)
+            return -1;
         crumbs_msg_init(&msg, DISPLAY_TYPE_ID, DISPLAY_OP_SET_SEGMENTS);
         for (i = 0; i < 4; i++)
             crumbs_msg_add_u8(&msg, segments[i]);
@@ -287,6 +292,8 @@ extern "C"
     static inline int display_send_set_brightness(const crumbs_device_t *dev, uint8_t level)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, DISPLAY_TYPE_ID, DISPLAY_OP_SET_BRIGHTNESS);
         crumbs_msg_add_u8(&msg, level);
         return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
@@ -301,6 +308,8 @@ extern "C"
     static inline int display_send_clear(const crumbs_device_t *dev)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, DISPLAY_TYPE_ID, DISPLAY_OP_CLEAR);
         return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
     }
@@ -320,6 +329,8 @@ extern "C"
     static inline int display_query_value(const crumbs_device_t *dev)
     {
         crumbs_message_t msg;
+        if (!crumbs_ops_can_send(dev))
+            return -1;
         crumbs_msg_init(&msg, 0, CRUMBS_CMD_SET_REPLY);
         crumbs_msg_add_u8(&msg, DISPLAY_OP_GET_VALUE);
         return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
@@ -346,7 +357,7 @@ extern "C"
     {
         crumbs_message_t reply;
         int rc;
-        if (!out)
+        if (!out || !crumbs_ops_can_get(dev))
             return -1;
         rc = display_query_value(dev);
         if (rc != 0)
