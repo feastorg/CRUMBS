@@ -220,6 +220,55 @@ static int test_truncated_frame(void)
     return 0;
 }
 
+static int test_trailing_bytes_rejected(void)
+{
+    crumbs_context_t ctx;
+    crumbs_init(&ctx, CRUMBS_ROLE_CONTROLLER, 0);
+
+    crumbs_message_t m;
+    memset(&m, 0, sizeof(m));
+    m.type_id = 0x33;
+    m.opcode = 0x44;
+    m.data_len = 2;
+    m.data[0] = 0x55;
+    m.data[1] = 0x66;
+
+    uint8_t buf[CRUMBS_MESSAGE_MAX_SIZE + 1u];
+    size_t w = crumbs_encode_message(&m, buf, sizeof(buf));
+    if (w == 0u)
+    {
+        fprintf(stderr, "trailing bytes setup encode failed\n");
+        return 1;
+    }
+
+    crumbs_message_t out;
+    memset(&out, 0, sizeof(out));
+
+    int rc = crumbs_decode_message(buf, w, &out, &ctx);
+    if (rc != 0 || !crumbs_last_crc_ok(&ctx))
+    {
+        fprintf(stderr, "trailing bytes setup decode failed (rc=%d)\n", rc);
+        return 1;
+    }
+
+    buf[w] = 0x99;
+    rc = crumbs_decode_message(buf, w + 1u, &out, &ctx);
+    if (rc != -1)
+    {
+        fprintf(stderr, "decode with trailing bytes should fail with -1, got %d\n", rc);
+        return 1;
+    }
+
+    if (crumbs_last_crc_ok(&ctx))
+    {
+        fprintf(stderr, "trailing bytes should clear last_crc_ok\n");
+        return 1;
+    }
+
+    printf("  trailing bytes rejection: PASS\n");
+    return 0;
+}
+
 static int test_malformed_data_len_in_frame(void)
 {
     crumbs_context_t ctx;
@@ -324,6 +373,7 @@ int main(void)
     failures += test_max_length_payload();
     failures += test_oversized_data_len();
     failures += test_truncated_frame();
+    failures += test_trailing_bytes_rejected();
     failures += test_malformed_data_len_in_frame();
     failures += test_decode_minimum_valid_frame();
     failures += test_decode_buffer_len_too_short();

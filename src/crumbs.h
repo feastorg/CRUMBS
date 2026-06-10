@@ -363,7 +363,7 @@ extern "C"
      * @param buffer_len Length in bytes of @p buffer (must be 4 + data_len).
      * @param msg Output message struct (must not be NULL).
      * @param ctx Optional context updated with CRC stats (may be NULL).
-     * @return 0 on success, -1 if buffer too small or invalid, -2 on CRC mismatch.
+     * @return 0 on success, -1 if frame length/contents are invalid, -2 on CRC mismatch.
      */
     int crumbs_decode_message(const uint8_t *buffer,
                               size_t buffer_len,

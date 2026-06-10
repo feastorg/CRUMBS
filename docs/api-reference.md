@@ -184,7 +184,7 @@ Decode a wire-format frame into a message structure.
 **Returns:**
 
 - `0` — Success
-- `-1` — Invalid frame (too short, bad data_len, truncated)
+- `-1` — Invalid frame (too short, too long, bad data_len, truncated)
 - `-2` — CRC mismatch
 
 If `ctx` is non-NULL, CRC statistics are updated.

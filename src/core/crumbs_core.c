@@ -354,6 +354,16 @@ int crumbs_decode_message(const uint8_t *buffer,
         }
         return -1; /* truncated frame */
     }
+    if (buffer_len > expected_len)
+    {
+        CRUMBS_DBG("decode: trailing bytes (%u > %u)\n",
+                   (unsigned)buffer_len, (unsigned)expected_len);
+        if (ctx)
+        {
+            ctx->last_crc_ok = 0u;
+        }
+        return -1; /* extra bytes after complete frame */
+    }
 
     /* CRC is computed over header + payload (bytes 0 through header+data_len-1). */
     size_t crc_span = k_header_len + data_len;

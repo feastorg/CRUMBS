@@ -369,7 +369,7 @@ On Linux, the HAL helper `crumbs_linux_read_message()` wraps the low-level reads
 
 ### CRC Validation
 
-Use `crumbs_decode_message(buffer, bytesRead, &out, ctx)` which returns 0 on success, -1 if too small and -2 on CRC mismatch.
+Use `crumbs_decode_message(buffer, bytesRead, &out, ctx)` which returns 0 on success, -1 for an invalid frame length/content and -2 on CRC mismatch.
 
 ### I2C Scanning
 
