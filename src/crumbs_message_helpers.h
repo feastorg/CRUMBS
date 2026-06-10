@@ -59,6 +59,8 @@ extern "C"
                                        uint8_t type_id,
                                        uint8_t opcode)
     {
+        if (!msg)
+            return;
         memset(msg, 0, sizeof(*msg));
         msg->type_id = type_id;
         msg->opcode = opcode;
@@ -73,6 +75,8 @@ extern "C"
      */
     static inline int crumbs_msg_add_u8(crumbs_message_t *msg, uint8_t val)
     {
+        if (!msg)
+            return -1;
         if (msg->data_len >= CRUMBS_MAX_PAYLOAD)
             return -1;
         msg->data[msg->data_len++] = val;
@@ -88,6 +92,8 @@ extern "C"
      */
     static inline int crumbs_msg_add_u16(crumbs_message_t *msg, uint16_t val)
     {
+        if (!msg)
+            return -1;
         if ((size_t)msg->data_len + 2 > CRUMBS_MAX_PAYLOAD)
             return -1;
         msg->data[msg->data_len++] = (uint8_t)(val & 0xFF);
@@ -104,6 +110,8 @@ extern "C"
      */
     static inline int crumbs_msg_add_u32(crumbs_message_t *msg, uint32_t val)
     {
+        if (!msg)
+            return -1;
         if ((size_t)msg->data_len + 4 > CRUMBS_MAX_PAYLOAD)
             return -1;
         msg->data[msg->data_len++] = (uint8_t)(val);
@@ -162,6 +170,8 @@ extern "C"
      */
     static inline int crumbs_msg_add_float(crumbs_message_t *msg, float val)
     {
+        if (!msg)
+            return -1;
         if ((size_t)msg->data_len + sizeof(float) > CRUMBS_MAX_PAYLOAD)
             return -1;
         memcpy(&msg->data[msg->data_len], &val, sizeof(float));
@@ -180,8 +190,12 @@ extern "C"
     static inline int crumbs_msg_add_bytes(crumbs_message_t *msg,
                                            const void *data, uint8_t len)
     {
+        if (!msg || (len > 0u && !data))
+            return -1;
         if ((size_t)msg->data_len + len > CRUMBS_MAX_PAYLOAD)
             return -1;
+        if (len == 0u)
+            return 0;
         memcpy(&msg->data[msg->data_len], data, len);
         msg->data_len += len;
         return 0;
@@ -203,6 +217,8 @@ extern "C"
     static inline int crumbs_msg_read_u8(const uint8_t *data, uint8_t len,
                                          uint8_t offset, uint8_t *out)
     {
+        if (!data || !out)
+            return -1;
         if (offset >= len)
             return -1;
         *out = data[offset];
@@ -221,6 +237,8 @@ extern "C"
     static inline int crumbs_msg_read_u16(const uint8_t *data, uint8_t len,
                                           uint8_t offset, uint16_t *out)
     {
+        if (!data || !out)
+            return -1;
         if ((size_t)offset + 2u > (size_t)len)
             return -1;
         *out = (uint16_t)data[offset] | ((uint16_t)data[offset + 1] << 8);
@@ -239,6 +257,8 @@ extern "C"
     static inline int crumbs_msg_read_u32(const uint8_t *data, uint8_t len,
                                           uint8_t offset, uint32_t *out)
     {
+        if (!data || !out)
+            return -1;
         if ((size_t)offset + 4u > (size_t)len)
             return -1;
         *out = (uint32_t)data[offset] |
@@ -261,6 +281,8 @@ extern "C"
                                          uint8_t offset, int8_t *out)
     {
         uint8_t tmp;
+        if (!out)
+            return -1;
         if (crumbs_msg_read_u8(data, len, offset, &tmp) != 0)
             return -1;
         *out = (int8_t)tmp;
@@ -280,6 +302,8 @@ extern "C"
                                           uint8_t offset, int16_t *out)
     {
         uint16_t tmp;
+        if (!out)
+            return -1;
         if (crumbs_msg_read_u16(data, len, offset, &tmp) != 0)
             return -1;
         *out = (int16_t)tmp;
@@ -299,6 +323,8 @@ extern "C"
                                           uint8_t offset, int32_t *out)
     {
         uint32_t tmp;
+        if (!out)
+            return -1;
         if (crumbs_msg_read_u32(data, len, offset, &tmp) != 0)
             return -1;
         *out = (int32_t)tmp;
@@ -319,6 +345,8 @@ extern "C"
     static inline int crumbs_msg_read_float(const uint8_t *data, uint8_t len,
                                             uint8_t offset, float *out)
     {
+        if (!data || !out)
+            return -1;
         if ((size_t)offset + sizeof(float) > (size_t)len)
             return -1;
         memcpy(out, &data[offset], sizeof(float));
@@ -338,8 +366,12 @@ extern "C"
     static inline int crumbs_msg_read_bytes(const uint8_t *data, uint8_t len,
                                             uint8_t offset, void *out, uint8_t count)
     {
+        if ((count > 0u && (!data || !out)) || (count == 0u && offset > len))
+            return -1;
         if ((size_t)offset + (size_t)count > (size_t)len)
             return -1;
+        if (count == 0u)
+            return 0;
         memcpy(out, &data[offset], count);
         return 0;
     }

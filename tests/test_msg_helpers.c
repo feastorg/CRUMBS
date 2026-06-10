@@ -220,6 +220,62 @@ static int test_add_bytes(void)
     return 0;
 }
 
+static int test_add_invalid_args(void)
+{
+    crumbs_message_t msg;
+    crumbs_msg_init(&msg, 0x01, 0x02);
+    uint8_t data[] = {0xAA};
+
+    /* Should be a safe no-op. */
+    crumbs_msg_init(NULL, 0x01, 0x02);
+
+    if (crumbs_msg_add_u8(NULL, 0x11) != -1)
+    {
+        fprintf(stderr, "add_invalid: add_u8 NULL msg should fail\n");
+        return 1;
+    }
+    if (crumbs_msg_add_u16(NULL, 0x1122) != -1)
+    {
+        fprintf(stderr, "add_invalid: add_u16 NULL msg should fail\n");
+        return 1;
+    }
+    if (crumbs_msg_add_u32(NULL, 0x11223344) != -1)
+    {
+        fprintf(stderr, "add_invalid: add_u32 NULL msg should fail\n");
+        return 1;
+    }
+    if (crumbs_msg_add_i8(NULL, -1) != -1 ||
+        crumbs_msg_add_i16(NULL, -1) != -1 ||
+        crumbs_msg_add_i32(NULL, -1) != -1)
+    {
+        fprintf(stderr, "add_invalid: signed add NULL msg should fail\n");
+        return 1;
+    }
+    if (crumbs_msg_add_float(NULL, 1.0f) != -1)
+    {
+        fprintf(stderr, "add_invalid: add_float NULL msg should fail\n");
+        return 1;
+    }
+    if (crumbs_msg_add_bytes(NULL, data, sizeof(data)) != -1)
+    {
+        fprintf(stderr, "add_invalid: add_bytes NULL msg should fail\n");
+        return 1;
+    }
+    if (crumbs_msg_add_bytes(&msg, NULL, 1) != -1)
+    {
+        fprintf(stderr, "add_invalid: add_bytes NULL data with len should fail\n");
+        return 1;
+    }
+    if (crumbs_msg_add_bytes(&msg, NULL, 0) != 0 || msg.data_len != 0)
+    {
+        fprintf(stderr, "add_invalid: add_bytes NULL data len 0 should be no-op success\n");
+        return 1;
+    }
+
+    printf("  add invalid args: PASS\n");
+    return 0;
+}
+
 static int test_add_overflow(void)
 {
     crumbs_message_t msg;
@@ -479,6 +535,68 @@ static int test_read_bytes(void)
     return 0;
 }
 
+static int test_read_invalid_args(void)
+{
+    uint8_t payload[] = {0x11, 0x22, 0x33, 0x44};
+    uint8_t u8;
+    uint16_t u16;
+    uint32_t u32;
+    int8_t i8;
+    int16_t i16;
+    int32_t i32;
+    float f;
+    uint8_t out[2];
+
+    if (crumbs_msg_read_u8(NULL, sizeof(payload), 0, &u8) != -1 ||
+        crumbs_msg_read_u8(payload, sizeof(payload), 0, NULL) != -1)
+    {
+        fprintf(stderr, "read_invalid: read_u8 invalid args should fail\n");
+        return 1;
+    }
+    if (crumbs_msg_read_u16(NULL, sizeof(payload), 0, &u16) != -1 ||
+        crumbs_msg_read_u16(payload, sizeof(payload), 0, NULL) != -1)
+    {
+        fprintf(stderr, "read_invalid: read_u16 invalid args should fail\n");
+        return 1;
+    }
+    if (crumbs_msg_read_u32(NULL, sizeof(payload), 0, &u32) != -1 ||
+        crumbs_msg_read_u32(payload, sizeof(payload), 0, NULL) != -1)
+    {
+        fprintf(stderr, "read_invalid: read_u32 invalid args should fail\n");
+        return 1;
+    }
+    if (crumbs_msg_read_i8(NULL, sizeof(payload), 0, &i8) != -1 ||
+        crumbs_msg_read_i8(payload, sizeof(payload), 0, NULL) != -1 ||
+        crumbs_msg_read_i16(NULL, sizeof(payload), 0, &i16) != -1 ||
+        crumbs_msg_read_i16(payload, sizeof(payload), 0, NULL) != -1 ||
+        crumbs_msg_read_i32(NULL, sizeof(payload), 0, &i32) != -1 ||
+        crumbs_msg_read_i32(payload, sizeof(payload), 0, NULL) != -1)
+    {
+        fprintf(stderr, "read_invalid: signed read invalid args should fail\n");
+        return 1;
+    }
+    if (crumbs_msg_read_float(NULL, sizeof(payload), 0, &f) != -1 ||
+        crumbs_msg_read_float(payload, sizeof(payload), 0, NULL) != -1)
+    {
+        fprintf(stderr, "read_invalid: read_float invalid args should fail\n");
+        return 1;
+    }
+    if (crumbs_msg_read_bytes(NULL, sizeof(payload), 0, out, sizeof(out)) != -1 ||
+        crumbs_msg_read_bytes(payload, sizeof(payload), 0, NULL, sizeof(out)) != -1)
+    {
+        fprintf(stderr, "read_invalid: read_bytes invalid args should fail\n");
+        return 1;
+    }
+    if (crumbs_msg_read_bytes(NULL, 0, 0, NULL, 0) != 0)
+    {
+        fprintf(stderr, "read_invalid: read_bytes NULL len/count 0 should be no-op success\n");
+        return 1;
+    }
+
+    printf("  read invalid args: PASS\n");
+    return 0;
+}
+
 static int test_roundtrip(void)
 {
     /* Build a message, encode it, decode it, read it back */
@@ -550,6 +668,7 @@ int main(void)
     failures += test_add_signed();
     failures += test_add_float();
     failures += test_add_bytes();
+    failures += test_add_invalid_args();
     failures += test_add_overflow();
     failures += test_add_u16_overflow();
     failures += test_add_u32_overflow();
@@ -562,6 +681,7 @@ int main(void)
     failures += test_read_signed();
     failures += test_read_float();
     failures += test_read_bytes();
+    failures += test_read_invalid_args();
 
     printf("  Integration:\n");
 
