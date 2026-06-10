@@ -54,7 +54,7 @@ Upload [hello examples](examples/core_usage/arduino/hello_peripheral/) to two Ar
 
 ```ini
 [env]
-lib_deps = cameronbrooks11/CRUMBS@^0.12.0
+lib_deps = cameronbrooks11/CRUMBS@^0.12.2
 ```
 
 **Arduino IDE:** Tools → Manage Libraries → "CRUMBS" → Install, or copy to `~/Arduino/libraries/`
@@ -118,4 +118,3 @@ Details: [platform-setup.md](docs/platform-setup.md)
 ## License
 
 AGPL-3.0-or-later - see [LICENSE](LICENSE) file for details.
-

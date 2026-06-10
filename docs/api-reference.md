@@ -63,7 +63,7 @@ typedef struct crumbs_context_t {
 #define CRUMBS_MAX_PAYLOAD      27    // Maximum payload bytes
 #define CRUMBS_MESSAGE_MAX_SIZE 31    // Maximum serialized frame size
 #define CRUMBS_CMD_SET_REPLY    0xFE  // Reserved opcode for SET_REPLY command
-#define CRUMBS_VERSION          1200  // Library version (1200 = v0.12.0, formula: major*10000 + minor*100 + patch)
+#define CRUMBS_VERSION          1202  // Library version (1202 = v0.12.2, formula: major*10000 + minor*100 + patch)
 ```
 
 ### Bound-Device Handle
