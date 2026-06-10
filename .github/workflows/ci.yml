@@ -14,21 +14,18 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      LINUX_WIRE_VERSION: "0.1.1"
+      LINUX_WIRE_SHA256: "ad15ff7742e4b4108014096386ee01e2f89a9f74c77b2e42f4591c5371479bda"
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Cache APT packages
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: build-essential cmake ninja-build git pkg-config libi2c-dev libudev-dev
-          version: 1.0
-
-      - name: Install Python
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-pip
+          sudo apt-get install -y build-essential cmake ninja-build git pkg-config libi2c-dev libudev-dev python3-pip
 
       # ---------------------------------------------------------------------
       # Build & install linux-wire
@@ -38,14 +35,16 @@ jobs:
         uses: actions/cache@v5
         with:
           path: third_party/linux-wire/install
-          key: linux-wire-${{ runner.os }}-0.1.1
+          key: linux-wire-${{ runner.os }}-${{ env.LINUX_WIRE_VERSION }}-${{ env.LINUX_WIRE_SHA256 }}
 
       - name: Install linux-wire from release
         if: steps.cache-linux-wire.outputs.cache-hit != 'true'
         run: |
           mkdir -p third_party/linux-wire/install
-          curl -fsSL https://github.com/feastorg/linux-wire/releases/download/v0.1.1/linux-wire-0.1.1-linux-x86_64.tar.gz \
-            | tar -xz -C third_party/linux-wire/install
+          curl -fsSL "https://github.com/feastorg/linux-wire/releases/download/v${LINUX_WIRE_VERSION}/linux-wire-${LINUX_WIRE_VERSION}-linux-x86_64.tar.gz" \
+            -o linux-wire.tar.gz
+          echo "${LINUX_WIRE_SHA256}  linux-wire.tar.gz" | sha256sum -c -
+          tar -xzf linux-wire.tar.gz -C third_party/linux-wire/install
 
       # ---------------------------------------------------------------------
       # Build & test CRUMBS
