@@ -197,16 +197,25 @@ install(TARGETS crumbs
     INCLUDES DESTINATION include/crumbs
 )
 
-install(FILES
+set(CRUMBS_PUBLIC_HEADERS
     src/crumbs.h
     src/crumbs_arduino.h
     src/crumbs_crc.h
     src/crumbs_i2c.h
-    src/crumbs_linux.h
     src/crumbs_message.h
     src/crumbs_message_helpers.h
     src/crumbs_ops.h
     src/crumbs_version.h
+)
+
+if(CRUMBS_ENABLE_LINUX_HAL)
+    list(APPEND CRUMBS_PUBLIC_HEADERS
+        src/crumbs_linux.h
+    )
+endif()
+
+install(FILES
+    ${CRUMBS_PUBLIC_HEADERS}
     DESTINATION include/crumbs
 )
 
