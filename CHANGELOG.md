@@ -6,6 +6,24 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+## [0.12.4] - 2026-06-10
+
+### Fixed
+
+- Hardened message helper APIs so NULL message/output pointers and invalid byte buffers fail cleanly instead of risking undefined behavior.
+- Made `crumbs_decode_message()` enforce the documented exact frame length contract; trailing bytes now return `-1` and clear `last_crc_ok`.
+- Installed `crumbs_linux.h` only when `CRUMBS_ENABLE_LINUX_HAL=ON`, keeping core-only CMake installs free of Linux HAL headers without matching implementation/dependencies.
+
+### Added
+
+- Added regression coverage for message helper invalid-argument handling and decode trailing-byte rejection.
+- Added a minimal Dependabot configuration for GitHub Actions updates.
+
+### Changed
+
+- CI and release workflows now verify the pinned `linux-wire` release artifact checksum before extraction.
+- CI dependency installation no longer relies on an unpinned `@latest` apt-cache action.
+
 ## [0.12.3] - 2026-06-10
 
 ### Fixed

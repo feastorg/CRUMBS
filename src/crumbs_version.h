@@ -3,8 +3,8 @@
 
 #define CRUMBS_VERSION_MAJOR 0
 #define CRUMBS_VERSION_MINOR 12
-#define CRUMBS_VERSION_PATCH 3
-#define CRUMBS_VERSION_STRING "0.12.3"
-#define CRUMBS_VERSION 1203 // major*10000 + minor*100 + patch
+#define CRUMBS_VERSION_PATCH 4
+#define CRUMBS_VERSION_STRING "0.12.4"
+#define CRUMBS_VERSION 1204 // major*10000 + minor*100 + patch
 
 #endif // CRUMBS_VERSION_H

@@ -160,7 +160,7 @@ board = nanoatmega328new
 framework = arduino
 
 lib_deps =
-    cameronbrooks11/CRUMBS@^0.12.3
+    cameronbrooks11/CRUMBS@^0.12.4
 
 build_flags =
     -DCRUMBS_MAX_HANDLERS=8  ; optional: reduce handler table size
@@ -175,7 +175,7 @@ board = esp32dev
 framework = arduino
 
 lib_deps =
-    cameronbrooks11/CRUMBS@^0.12.3
+    cameronbrooks11/CRUMBS@^0.12.4
 
 build_flags =
     -DCRUMBS_MAX_HANDLERS=8  ; optional
