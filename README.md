@@ -54,7 +54,7 @@ Upload [hello examples](examples/core_usage/arduino/hello_peripheral/) to two Ar
 
 ```ini
 [env]
-lib_deps = cameronbrooks11/CRUMBS@^0.12.2
+lib_deps = cameronbrooks11/CRUMBS@^0.12.3
 ```
 
 **Arduino IDE:** Tools → Manage Libraries → "CRUMBS" → Install, or copy to `~/Arduino/libraries/`

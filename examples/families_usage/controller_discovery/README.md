@@ -72,9 +72,9 @@ make
 ```sh
 lhwit> scan
 Scanning for CRUMBS devices...
-Found Calculator at 0x10 (CRUMBS 0.12.2, Module 1.0.0) - Compatible
-Found LED Array at 0x20 (CRUMBS 0.12.2, Module 1.0.0) - Compatible
-Found Servo Controller at 0x30 (CRUMBS 0.12.2, Module 1.0.0) - Compatible
+Found Calculator at 0x10 (CRUMBS 0.12.3, Module 1.0.0) - Compatible
+Found LED Array at 0x20 (CRUMBS 0.12.3, Module 1.0.0) - Compatible
+Found Servo Controller at 0x30 (CRUMBS 0.12.3, Module 1.0.0) - Compatible
 
 Found 3 CRUMBS device(s):
   [0] Address 0x10, Type 0x03 (Calculator)

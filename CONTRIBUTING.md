@@ -84,7 +84,7 @@ CRUMBS is designed to work seamlessly with Arduino IDE and PlatformIO:
 ```ini
 # platformio.ini
 lib_deps =
-    cameronbrooks11/CRUMBS@^0.12.2
+    cameronbrooks11/CRUMBS@^0.12.3
 ```
 
 Or for local development (see [Local Development](#local-development-with-platformio) below).
@@ -229,7 +229,7 @@ When developing changes to CRUMBS itself, test locally before publishing:
    ```ini
    # Change from registry version
    lib_deps =
-       cameronbrooks11/CRUMBS@^0.12.2
+       cameronbrooks11/CRUMBS@^0.12.3
 
    # To local symlink
    lib_deps =
@@ -249,7 +249,7 @@ When developing changes to CRUMBS itself, test locally before publishing:
 
    ```ini
    lib_deps =
-       cameronbrooks11/CRUMBS@^0.12.2
+       cameronbrooks11/CRUMBS@^0.12.3
    ```
 
 **Path explanation:**

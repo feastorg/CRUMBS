@@ -6,6 +6,17 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+## [0.12.3] - 2026-06-10
+
+### Fixed
+
+- Added validation for `crumbs_device_t` handles in generated ops macros and example family ops wrappers so invalid bound devices fail cleanly instead of dereferencing NULL fields.
+- Renamed `CRUMBS_DEFINE_*` macro parameters internally to avoid accidental preprocessor substitution of struct fields such as `_r.type_id` and `_r.opcode`.
+
+### Added
+
+- Added `ops_validation_test` coverage for generated ops macros and representative hand-written ops wrappers.
+
 ## [0.12.2] - 2026-04-20
 
 ### Fixed
