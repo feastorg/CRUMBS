@@ -12,6 +12,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  core-only-install:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build
+
+      - name: Configure CRUMBS (core only)
+        run: |
+          cmake -S . -B build-core-only \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCRUMBS_ENABLE_TESTS=ON \
+            -DCRUMBS_BUILD_EXAMPLES=OFF \
+            -DCRUMBS_ENABLE_LINUX_HAL=OFF
+
+      - name: Build CRUMBS (core only)
+        run: cmake --build build-core-only --parallel
+
+      - name: Run CRUMBS tests (core only)
+        run: ctest --test-dir build-core-only --output-on-failure
+
+      - name: Install CRUMBS (core only)
+        run: cmake --install build-core-only --prefix "${{ github.workspace }}/install-core-only"
+
+      - name: Verify core-only install boundary
+        run: |
+          test -f "${{ github.workspace }}/install-core-only/include/crumbs/crumbs.h"
+          test ! -e "${{ github.workspace }}/install-core-only/include/crumbs/crumbs_linux.h"
+
+      - name: Build installed core package consumer
+        run: |
+          cmake -S tests/cmake/core_only_consumer -B build-smoke-core-only \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install-core-only"
+          cmake --build build-smoke-core-only --parallel
+          ./build-smoke-core-only/core_only_consumer
+
   build-and-test:
     runs-on: ubuntu-latest
     env:
