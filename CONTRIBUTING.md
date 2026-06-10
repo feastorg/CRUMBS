@@ -194,9 +194,9 @@ This runs Doxygen and reports warnings for missing/incomplete documentation.
 
 **CI behavior:**
 
-- Documentation check runs on all PRs (non-blocking)
-- Warnings reported but don't fail build
-- Goal: Incrementally improve documentation quality
+- Documentation check runs on pushes and PRs to `dev` and `main`
+- Doxygen warnings are printed in the workflow log but do not fail the check today
+- Goal: Keep public API documentation complete as the library evolves
 
 ### User Documentation
 
@@ -391,7 +391,7 @@ Fixes #123
 
 ```bash
 # Run unit tests
-cmake -S . -B build -DCRUMBS_BUILD_TESTS=ON
+cmake -S . -B build -DCRUMBS_ENABLE_TESTS=ON
 cmake --build build
 ctest --test-dir build --output-on-failure
 
@@ -476,35 +476,45 @@ python scripts/generate_crc8.py  # --no-stage to skip
 ### Release Process
 
 1. **Update version numbers:**
+   - `CMakeLists.txt` — CMake project/package version
    - `library.json` — PlatformIO registry
    - `library.properties` — Arduino registry
    - `src/crumbs_version.h` — C macros
+   - docs and PlatformIO examples that reference the published version
 
 2. **Update CHANGELOG.md:**
    - List all changes since last release
    - Categorize: Added, Changed, Fixed, Removed
    - Note breaking changes prominently
 
-3. **Tag release:**
+3. **Publish PlatformIO package:**
+   - Publish the matching `library.json` version to the PlatformIO registry
+   - Keep example `lib_deps` pinned to the newly published compatible range
+
+4. **Tag release:**
 
    ```bash
    git tag -a vX.Y.Z -m "Release vX.Y.Z"
    git push origin vX.Y.Z
    ```
 
-4. **Publish to registries:**
-   - GitHub releases (automatic from tag)
-   - PlatformIO registry (via library.json)
-   - Arduino Library Manager (via library.properties)
+5. **Verify release automation:**
+   - GitHub release is created automatically from the tag
+   - Linux binary/source tarballs, manifest, and checksums are attached
+   - CI and release workflows are green
+   - Arduino Library Manager consumes `library.properties` from GitHub tags
 
 ### CI/CD Pipeline
 
 **Automated checks:**
 
-- CMake build (Linux, macOS, Windows)
-- Unit test execution
-- Documentation generation
-- Arduino library validation
+- Core-only CMake build/test/install plus an installed-package smoke consumer
+- Linux HAL CMake build/test/install using checksum-verified `linux-wire`
+- Out-of-tree Linux example builds against the installed CRUMBS package
+- PlatformIO builds for AVR Nano and ESP32 examples
+- Doxygen documentation check
+- Repository metrics artifact generation
+- Tagged release packaging for Linux x86_64
 
 **Future additions:**
 
