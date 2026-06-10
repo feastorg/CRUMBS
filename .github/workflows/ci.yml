@@ -234,3 +234,37 @@ jobs:
 
       - name: Build display peripheral (families_usage, ESP32)
         run: pio run -d examples/families_usage/lhwit_family/display -e esp32dev
+
+  # ---------------------------------------------------------------------------
+  # Doc Check
+  # ---------------------------------------------------------------------------
+  doxygen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y doxygen
+
+      - name: Run doc-check script
+        run: bash ./scripts/doccheck.sh
+
+  # ─── Unified gate ─────────────────────────────────────────────────────────
+  # Branch protection requires only: CI / ok
+  ok:
+    name: ok
+    if: always()
+    needs: [core-only-install, build-and-test, platformio, doxygen]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any upstream job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - name: Pass
+        run: echo 'All checks passed or were skipped'
