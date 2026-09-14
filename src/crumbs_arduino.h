@@ -61,12 +61,23 @@ extern "C"
                                   size_t len);
 
     /**
-     * @brief Scan the I2C bus using the provided TwoWire instance (or default Wire when user_ctx==NULL).
+     * @brief Probe an address range for any I2C device (not CRUMBS-specific).
+     *
+     * Reports every address that acknowledges. No frame is read or decoded;
+     * for CRUMBS-aware discovery use crumbs_controller_scan_for_crumbs()
+     * with crumbs_arduino_read as the read function.
+     *
+     * Same probe semantics as crumbs_linux_scan():
+     * - strict != 0: one-byte read. Present if the target ACKs a read and
+     *   clocks a byte out. Writes nothing, but consumes one byte from
+     *   register-addressed or stream-style devices.
+     * - strict == 0: address-only write with no data phase. Present if the
+     *   target ACKs its address. Writes nothing.
      *
      * @param user_ctx     Pointer to TwoWire instance or NULL to use &Wire
      * @param start_addr   Start address (inclusive) to probe, typically 0x03
      * @param end_addr     End address (inclusive) to probe, typically 0x77
-     * @param strict       Non-zero to require a data-phase ACK (stricter), 0 for address-only probe
+     * @param strict       Non-zero for the read probe, 0 for the address-only probe
      * @param found        Output buffer to receive found addresses
      * @param max_found    Capacity of @p found buffer
      * @return number of addresses found (>=0) or negative on error

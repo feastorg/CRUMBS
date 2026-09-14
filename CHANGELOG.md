@@ -14,6 +14,7 @@ All notable changes to CRUMBS are documented in this file.
 
 ### Changed
 
+- `crumbs_arduino_scan()` `strict` mode now performs a one-byte read (present if the target ACKs a read), matching `crumbs_linux_scan()`; it previously wrote a `0x00` data byte, the opposite of the Linux HAL and the one variant that put data on the bus. Non-strict is unchanged (address-only ACK). Neither mode reads or validates a CRUMBS frame; the API reference now says so and points at `crumbs_controller_scan_for_crumbs()`. (#22, #23)
 - `CRUMBS_DEFINE_GET_OP` getters now call `crumbs_controller_read_expect()`; on a reply identity mismatch they return `CRUMBS_RX_REPLY_MISMATCH` (`-7`) instead of `-1`. Callers that only test for non-zero are unaffected. (#35)
 
 ## [0.12.5] - 2026-07-13

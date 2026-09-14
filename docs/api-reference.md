@@ -728,28 +728,31 @@ Wire-based read function for scanner and diagnostics.
 - Number of bytes read (0–31)
 - Negative values on error
 
-### Bus Scanner
+### Bus Scanner (any I²C device)
 
 ```c
-int crumbs_arduino_scan(TwoWire *wire, uint8_t start_addr, uint8_t end_addr,
-                       int strict, uint8_t *found, size_t max_found);
+int crumbs_arduino_scan(void *user_ctx, uint8_t start_addr, uint8_t end_addr,
+                        int strict, uint8_t *found, size_t max_found);
 ```
 
-Scan I²C bus for CRUMBS-compatible devices.
+Address probe. Reports **every** address that acknowledges — register-addressed sensors, EEPROMs, anything — with no CRUMBS frame read or decoded in either mode. For discovery that validates a CRUMBS frame, use `crumbs_controller_scan_for_crumbs()` (Core Scanner below) with `crumbs_arduino_read`.
+
+`crumbs_linux_scan()` has the same two modes, so portable code gets the same bus behaviour from the same argument.
 
 **Parameters:**
 
-- `strict` — Non-zero: requires valid CRUMBS frame. Zero: ACK-based detection.
+- `user_ctx` — `TwoWire *` to use, or `NULL` for `&Wire`
+- `strict` — Non-zero: **one-byte read** probe; present if the target ACKs a read and clocks a byte out. Writes nothing, but consumes one byte from a register-addressed or stream-style device (advances an auto-increment pointer; takes an EZO's pending response). Zero: **address-only write**, no data phase; present if the address ACKs. Writes nothing.
 - `found` — Output array for discovered addresses
 - `max_found` — Size of found array
 
-**Returns:** Number of devices found
+**Returns:** Number of addresses that acknowledged (may exceed `max_found`; only the first `max_found` are stored), or `-1` on bad arguments.
 
 **Example:**
 
 ```c
 uint8_t devices[10];
-int count = crumbs_arduino_scan(&Wire, 0x08, 0x77, 1, devices, 10);
+int count = crumbs_arduino_scan(NULL, 0x08, 0x77, 0, devices, 10);  // address-only probe on Wire
 ```
 
 ---
@@ -858,8 +861,8 @@ Platform-independent bus scanner for CRUMBS-compatible devices.
 **Parameters:**
 
 - `start_addr`/`end_addr` — Inclusive probe range (0x08–0x77 typical)
-- `strict` — Non-zero: read-only scan (no probe writes).
-- `strict == 0` — Attempts read first; if no valid CRUMBS frame and `ctx`+`write_fn` are available, sends a small probe frame and reads again.
+- `strict` — Non-zero: read-only scan (no probe writes). Each probe clocks up to 31 bytes out of every address, which advances a register-addressed device's auto-increment pointer and consumes an Atlas EZO's pending response.
+- `strict == 0` — Attempts read first; if no valid CRUMBS frame and `ctx`+`write_fn` are available, sends the probe frame `00 00 00 00` (type `0x00`, opcode `0x00`, empty payload, CRC) and reads again. A CRUMBS peripheral sees that as an ordinary opcode-`0x00` SET. **A 24Cxx-style EEPROM sees it as a page write at address 0** — do not use non-strict mode on a bus that may carry one.
 - `write_fn`/`read_fn` — Platform primitives
 - `found` — Output array for discovered addresses
 - `max_found` — Size of found array

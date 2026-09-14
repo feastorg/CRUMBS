@@ -261,14 +261,27 @@ extern "C" int crumbs_arduino_scan(void *user_ctx,
     size_t count = 0;
     for (int addr = start_addr; addr <= end_addr; ++addr)
     {
-        wire->beginTransmission(static_cast<uint8_t>(addr));
+        bool present;
         if (strict)
         {
-            // Optionally write a single dummy byte to force data-phase ACK.
-            wire->write((uint8_t)0x00);
+            // Strict probe: a one-byte read, as the Linux HAL does. Present if
+            // the target ACKs its address for a read and clocks a byte out.
+            // Puts no data on the bus, but does consume one byte from a
+            // register-addressed or stream-style device.
+            uint8_t got = wire->requestFrom(static_cast<uint8_t>(addr), static_cast<uint8_t>(1));
+            while (wire->available())
+                (void)wire->read();
+            present = (got > 0);
         }
-        uint8_t err = wire->endTransmission();
-        if (err == 0)
+        else
+        {
+            // Non-strict probe: address-only write, no data phase. Present if
+            // the target ACKs its address. Nothing is written to the device.
+            wire->beginTransmission(static_cast<uint8_t>(addr));
+            present = (wire->endTransmission() == 0);
+        }
+
+        if (present)
         {
             if (count < max_found)
                 found[count] = (uint8_t)addr;
