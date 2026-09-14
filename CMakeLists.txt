@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 
 project(CRUMBS
-    VERSION 0.12.5
+    VERSION 0.13.0
     LANGUAGES C
 )
 
@@ -250,7 +250,7 @@ install(FILES
 set(config_install_dir "${CMAKE_INSTALL_LIBDIR}/cmake/crumbs")
 
 if(CRUMBS_ENABLE_LINUX_HAL)
-    set(CRUMBS_PACKAGE_DEPENDENCIES "find_dependency(linux_wire CONFIG REQUIRED)")
+    set(CRUMBS_PACKAGE_DEPENDENCIES "find_dependency(linux_wire 0.1.3 CONFIG REQUIRED)")
 else()
     set(CRUMBS_PACKAGE_DEPENDENCIES "# no extra dependencies")
 endif()

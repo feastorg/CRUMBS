@@ -6,7 +6,7 @@ it. Peripheral firmware and controller programs both include it, so the two
 sides cannot disagree about the vocabulary. This walks through a two-channel
 thermometer, `therm`; every snippet below compiles as shown (the peripheral
 needs the library release that ships `crumbs_set_type_id()` and
-`crumbs_controller_read_expect()`, i.e. newer than 0.12.5).
+`crumbs_controller_read_expect()`, i.e. 0.13.0 or newer).
 `examples/families_usage/lhwit_family/` is a complete four-device family;
 it predates `crumbs_ops.h` and writes its wrappers by hand, in the shape of
 [section 5](#5-when-the-macros-do-not-fit).

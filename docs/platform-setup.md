@@ -40,7 +40,7 @@ Depend on the registry package:
 platform = atmelavr
 board = nanoatmega328new
 framework = arduino
-lib_deps = cameronbrooks11/CRUMBS@^0.12.5
+lib_deps = cameronbrooks11/CRUMBS@^0.13.0
 build_flags = -DCRUMBS_MAX_HANDLERS=8   ; optional; applies to library and sketch alike
 ```
 

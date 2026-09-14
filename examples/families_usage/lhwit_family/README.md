@@ -34,7 +34,7 @@ pio run -d examples/families_usage/lhwit_family/led -e nanoatmega328new -t uploa
 ```
 
 The projects depend on the published library (`lib_deps =
-cameronbrooks11/CRUMBS@^0.12.5`),
+cameronbrooks11/CRUMBS@^0.13.0`),
 set `-DCRUMBS_MAX_HANDLERS=8` (6 for the display) and add `-I ..` so the ops
 headers resolve. Each peripheral prints a banner and a ready line on its
 serial port at 115200 baud; after that the LED array is silent, the
@@ -100,7 +100,7 @@ Scanning I2C bus for CRUMBS devices (0x08-0x77)...
 Found 4 device(s):
 --------------------------------------------
 [0x10] Calculator
-       CRUMBS: v0.12.5 (controller: v0.12.5)
+       CRUMBS: v0.13.0 (controller: v0.13.0)
        Module: v1.0.0 (expected: v1.0.x)
        OK Compatible
 ...
