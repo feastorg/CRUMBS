@@ -25,7 +25,7 @@ extern "C"
      * The implementation parameters (polynomial, reflect options, etc.) are
      * supplied by the generated crc8 implementation (pycrc).
      *
-     * @param data Pointer to input buffer (may not be NULL when len > 0).
+     * @param data Pointer to input buffer. NULL or len == 0 yields 0.
      * @param len Number of bytes to process.
      * @return CRC-8 value for provided bytes.
      */

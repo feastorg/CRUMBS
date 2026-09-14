@@ -190,7 +190,7 @@ extern "C" void crumbs_arduino_init_peripheral(crumbs_context_t *ctx, uint8_t ad
     // Initialize CRUMBS context as peripheral.
     crumbs_init(ctx, CRUMBS_ROLE_PERIPHERAL, address);
 
-    // Configure TwoWire as an I2C slave at the given address.
+    // Configure TwoWire as an I2C target (peripheral) at the given address.
     Wire.begin(address);
 #if defined(TWI_FREQ) || defined(TWBR)
     Wire.setClock(CRUMBS_DEFAULT_TWI_FREQ);

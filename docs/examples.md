@@ -315,7 +315,7 @@ void setup() {
 }
 ```
 
-See [API Reference - Message Helpers](api-reference.md#message-helpers) for complete API documentation.
+See [API Reference - Message Helpers](api-reference.md#payload-helpers--crumbs_message_helpersh) for complete API documentation.
 
 ---
 

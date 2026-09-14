@@ -42,7 +42,7 @@ typedef struct crumbs_linux_i2c_s
      * @param ctx          Pointer to CRUMBS context (will be initialized).
      * @param i2c          Pointer to Linux I2C handle (will be initialized).
      * @param device_path  Path to I2C device, e.g. "/dev/i2c-1".
-     * @param timeout_us   Optional timeout hint in microseconds (0 = no timeout).
+     * @param timeout_us   Stored on the bus handle; linux-wire does not enforce it.
      *
      * @return 0 on success.
      *        -1 if arguments are invalid.
@@ -69,7 +69,7 @@ typedef struct crumbs_linux_i2c_s
      *
      * This uses linux-wire to:
      *   - select the target address with lw_set_target()
-     *   - write the frame with lw_write(..., send_stop=1)
+     *   - write the frame with lw_write() (one write(); linux-wire always ends it with STOP)
      *
      * @param user_ctx     Must be a (crumbs_linux_i2c_t*).
      * @param target_addr  7-bit I2C address.
@@ -78,7 +78,7 @@ typedef struct crumbs_linux_i2c_s
      *
      * @return 0 on success.
      *        -1 invalid args
-     *        -2 failed to set slave address
+     *        -2 failed to select the target address
      *        -3 low-level write error
      *        -4 partial write
      */
@@ -126,8 +126,9 @@ typedef struct crumbs_linux_i2c_s
      * @param addr       7-bit I2C address of the target peripheral.
      * @param buffer     Output buffer to receive data.
      * @param len        Maximum number of bytes to read.
-     * @param timeout_us Timeout hint in microseconds (0 = no timeout).
-     * @return Number of bytes read (>=0) or negative on error.
+     * @param timeout_us Stored on the bus handle; not enforced.
+     * @return Number of bytes read (>=0); -1 bad arguments or closed bus, -2 address
+     *         select failed, -3 read failed.
      */
     int crumbs_linux_read(void *user_ctx,
                           uint8_t addr,
@@ -147,9 +148,10 @@ typedef struct crumbs_linux_i2c_s
      * @param tx_len                  Number of write-phase bytes.
      * @param rx                      Read buffer (may be NULL if rx_len==0).
      * @param rx_len                  Number of bytes to read.
-     * @param timeout_us              Timeout hint in microseconds.
-     * @param require_repeated_start  Non-zero requires a combined transaction.
-     * @return Number of bytes read (>=0) or negative on error.
+     * @param timeout_us              Stored on the bus handle; not enforced.
+     * @param require_repeated_start  Non-zero performs one I2C_RDWR transaction (no STOP between phases).
+     * @return Number of bytes read (>=0); -1 bad arguments or closed bus, -2 address
+     *         select failed, -3 transfer failed, -4 short write.
      */
     int crumbs_linux_write_then_read(void *user_ctx,
                                      uint8_t addr,
@@ -256,7 +258,7 @@ typedef struct crumbs_linux_i2c_s
     /**
      * @brief Linux platform microsecond delay (conforms to crumbs_delay_fn).
      *
-     * Wraps POSIX usleep(). On non-Linux builds this is a no-op stub.
+     * Wraps nanosleep(). On non-Linux builds this is a no-op stub.
      *
      * @param us Microseconds to delay.
      */
