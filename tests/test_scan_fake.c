@@ -72,8 +72,10 @@ static int fake_read_noncrumbs(void *user_ctx, uint8_t addr, uint8_t *buf, size_
    "9.560" (dissolved oxygen in mg/L), NUL-terminated. Byte 2 is '.' (0x2E =
    46), above CRUMBS_MAX_PAYLOAD, so the header itself is rejected - and even
    with that bound removed the declared 50-byte frame is longer than the 7
-   bytes read. Every ASCII digit and '.' exceeds 27, so no EZO reading can
-   pass the header check; the CRC is never consulted. */
+   bytes read. Every ASCII digit and '.' exceeds 27, so no reading of two or
+   more characters can pass the header check; the CRC is never consulted for
+   this frame. (A device with no reading pending answers 0xFF and then
+   whatever it clocks out - not modelled here.) */
 static int fake_read_ezo(void *user_ctx, uint8_t addr, uint8_t *buf, size_t len, uint32_t to)
 {
     (void)user_ctx;
@@ -88,7 +90,8 @@ static int fake_read_ezo(void *user_ctx, uint8_t addr, uint8_t *buf, size_t len,
 }
 
 /* Bosch BMP280 read with the register pointer at 0xD0: chip id 0x58, then the
-   reserved registers 0xD1.. which read as zero. As a CRUMBS header this is
+   reserved registers 0xD1.., modelled as zero (the datasheet guarantees no
+   value for reserved registers). As a CRUMBS header this is
    type 0x58, opcode 0x00, data_len 0 - well-formed, declaring a 4-byte frame -
    so the only thing that can reject it is the CRC: crc8(58 00 00) = 0x75, and
    the device supplies 0x00. */
@@ -184,13 +187,13 @@ static int test_scan_rejects_noncrumbs(void)
     return 0;
 }
 
-static int run_scan_expect(const char *name, crumbs_i2c_read_fn read_fn, int expect_n)
+static int run_scan_expect(const char *name, crumbs_i2c_read_fn read_fn, int strict, int expect_n)
 {
     crumbs_context_t ctx;
     crumbs_init(&ctx, CRUMBS_ROLE_CONTROLLER, 0);
 
     uint8_t found[16];
-    int n = crumbs_controller_scan_for_crumbs(&ctx, DEV_A, DEV_A, 0 /* non-strict */,
+    int n = crumbs_controller_scan_for_crumbs(&ctx, DEV_A, DEV_A, strict,
                                               fake_write, read_fn, NULL, found, sizeof(found), 10000);
     if (n < 0)
     {
@@ -208,20 +211,24 @@ static int run_scan_expect(const char *name, crumbs_i2c_read_fn read_fn, int exp
 
 static int test_scan_rejects_ezo_ascii(void)
 {
-    return run_scan_expect("scan rejects EZO ASCII reply (header)", fake_read_ezo, 0);
+    return run_scan_expect("scan rejects EZO ASCII reply (header)", fake_read_ezo, 0, 0);
 }
 
 static int test_scan_rejects_bmp280_dump(void)
 {
-    return run_scan_expect("scan rejects BMP280 register dump (crc)", fake_read_bmp280, 0);
+    return run_scan_expect("scan rejects BMP280 register dump (crc)", fake_read_bmp280, 0, 0);
 }
 
 static int test_scan_crc_is_the_discriminator(void)
 {
     /* Documents the real property: a foreign device whose bytes happen to
-       carry a valid CRC is indistinguishable from a CRUMBS peripheral. */
+       carry a valid CRC is indistinguishable from a CRUMBS peripheral. This
+       is a deliberate tripwire - if the scanner grows a stricter identity
+       check (a required payload, a type check), this control is expected to
+       change with it, with the new reason named. Strict mode so the result
+       comes from the direct read alone and the probe path cannot rescue it. */
     return run_scan_expect("scan accepts BMP280 dump with a lucky CRC (control)",
-                           fake_read_bmp280_lucky_crc, 1);
+                           fake_read_bmp280_lucky_crc, 1 /* strict */, 1);
 }
 
 static int test_scan_empty_range(void)
