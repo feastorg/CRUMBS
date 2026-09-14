@@ -35,6 +35,7 @@ static void test_on_message(crumbs_context_t *ctx, const crumbs_message_t *msg)
     g_last_msg_opcode = msg->opcode;
 }
 
+#if CRUMBS_MAX_HANDLERS > 0
 static void test_handler(crumbs_context_t *ctx,
                          uint8_t opcode,
                          const uint8_t *data,
@@ -48,6 +49,7 @@ static void test_handler(crumbs_context_t *ctx,
     g_handler_call_count++;
     g_handler_last_opcode = opcode;
 }
+#endif /* CRUMBS_MAX_HANDLERS > 0 */
 
 /**
  * @brief Build a SET_REPLY frame for testing.
@@ -178,6 +180,7 @@ static int test_set_reply_not_dispatched_to_on_message(void)
 /**
  * Test: SET_REPLY is NOT dispatched to registered handlers.
  */
+#if CRUMBS_MAX_HANDLERS > 0
 static int test_set_reply_not_dispatched_to_handlers(void)
 {
     const char *test_name = "set_reply_no_handler";
@@ -202,6 +205,7 @@ static int test_set_reply_not_dispatched_to_handlers(void)
     printf("  %s: PASS\n", test_name);
     return 0;
 }
+#endif /* CRUMBS_MAX_HANDLERS > 0 */
 
 /**
  * Test: SET_REPLY with empty payload is gracefully ignored.
@@ -233,6 +237,7 @@ static int test_set_reply_empty_payload(void)
 /**
  * Test: Normal messages (non-SET_REPLY) still dispatch correctly.
  */
+#if CRUMBS_MAX_HANDLERS > 0
 static int test_normal_message_still_dispatches(void)
 {
     const char *test_name = "normal_msg_dispatches";
@@ -265,6 +270,7 @@ static int test_normal_message_still_dispatches(void)
     printf("  %s: PASS\n", test_name);
     return 0;
 }
+#endif /* CRUMBS_MAX_HANDLERS > 0 */
 
 /**
  * Test: SET_REPLY constant is 0xFE.
@@ -293,9 +299,17 @@ int main(void)
     failures += test_set_reply_stores_opcode();
     failures += test_set_reply_overwrites();
     failures += test_set_reply_not_dispatched_to_on_message();
+#if CRUMBS_MAX_HANDLERS > 0
     failures += test_set_reply_not_dispatched_to_handlers();
+#else
+    printf("  set_reply_no_handler: SKIP (handler table compiled out)\n");
+#endif
     failures += test_set_reply_empty_payload();
+#if CRUMBS_MAX_HANDLERS > 0
     failures += test_normal_message_still_dispatches();
+#else
+    printf("  normal_msg_dispatches: SKIP (handler table compiled out)\n");
+#endif
 
     printf("\n");
     if (failures == 0)

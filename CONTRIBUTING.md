@@ -524,6 +524,8 @@ python scripts/generate_crc8.py  # --no-stage to skip
 - Linux HAL CMake build/test/install using checksum-verified `linux-wire`
 - Out-of-tree Linux example builds against the installed CRUMBS package
 - PlatformIO builds for AVR Nano and ESP32 examples
+- Core-only build and test under ASan+UBSan, and with `CRUMBS_MAX_HANDLERS=0` (`test_handlers` and `test_reply_handler` report as skipped there; `test_set_reply` compiles out its two table-dependent subtests)
+- `arduino-cli` compile of the two Arduino-IDE mixed-bus sketches, with ezo-driver and SparkFun BME280 pinned by tag
 - Doxygen documentation check
 - CRC-8 source regeneration check (pycrc pinned to the version in the committed banner; the committed `src/crc` must match the generator output)
 - Repository metrics artifact generation

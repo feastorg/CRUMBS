@@ -259,6 +259,99 @@ jobs:
       - name: Run doc-check script
         run: bash ./scripts/doccheck.sh
 
+  # ─── Build configurations the default build never exercises ──────────────
+  build-configs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: asan-ubsan
+            c_flags: "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+            link_flags: "-fsanitize=address,undefined"
+          - name: no-handler-table
+            c_flags: "-DCRUMBS_MAX_HANDLERS=0"
+            link_flags: ""
+    name: build-configs (${{ matrix.name }})
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build
+
+      - name: Configure (core only, ${{ matrix.name }})
+        run: |
+          cmake -S . -B build-${{ matrix.name }} \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCRUMBS_ENABLE_TESTS=ON \
+            -DCRUMBS_BUILD_EXAMPLES=OFF \
+            -DCRUMBS_ENABLE_LINUX_HAL=OFF \
+            -DCMAKE_C_FLAGS="${{ matrix.c_flags }}" \
+            -DCMAKE_EXE_LINKER_FLAGS="${{ matrix.link_flags }}"
+
+      - name: Build
+        run: cmake --build build-${{ matrix.name }} --parallel
+
+      # test_handlers and test_reply_handler exit with the CTest skip code when
+      # the table is compiled out (Skipped, not Passed); test_set_reply compiles
+      # out its two table-dependent subtests and runs the rest.
+      - name: Test
+        run: ctest --test-dir build-${{ matrix.name }} --output-on-failure
+
+  # ─── Arduino-IDE sketches (no platformio.ini) ─────────────────────────────
+  arduino-cli:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EZO_DRIVER_TAG: v0.5.1
+      EZO_DRIVER_SHA: e54bfc2bebdbed63aa997d907c9737747004e011
+      SPARKFUN_BME280_TAG: v2.0.11
+      SPARKFUN_BME280_SHA: 870c17da1f4c76561e14b8ffcc7cdffd63136e10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up arduino-cli
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Install AVR core
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:avr
+
+      # Third-party libraries the vendor sketch needs, pinned by tag and
+      # checked against the expected commit, in the spirit of the linux-wire
+      # checksum in build-and-test.
+      - name: Fetch vendor libraries
+        run: |
+          git -c advice.detachedHead=false clone --depth 1 --branch "$EZO_DRIVER_TAG" \
+            https://github.com/feastorg/ezo-driver third_party/ezo-driver
+          test "$(git -C third_party/ezo-driver rev-parse HEAD)" = "$EZO_DRIVER_SHA"
+          git -c advice.detachedHead=false clone --depth 1 --branch "$SPARKFUN_BME280_TAG" \
+            https://github.com/sparkfun/SparkFun_BME280_Arduino_Library third_party/SparkFun_BME280
+          test "$(git -C third_party/SparkFun_BME280 rev-parse HEAD)" = "$SPARKFUN_BME280_SHA"
+
+      - name: Compile mixed_bus_controller (Nano)
+        run: |
+          arduino-cli compile --fqbn arduino:avr:nano --warnings more \
+            --library "$PWD" \
+            examples/core_usage/arduino/mixed_bus_controller
+
+      - name: Compile mixed_bus_controller_vendor (Nano)
+        run: |
+          arduino-cli compile --fqbn arduino:avr:nano --warnings more \
+            --library "$PWD" \
+            --library "$PWD/third_party/ezo-driver" \
+            --library "$PWD/third_party/SparkFun_BME280" \
+            examples/core_usage/arduino/mixed_bus_controller_vendor
+
   # ─── CRC source is generated; the committed copy must match the generator ──
   crc-regen:
     runs-on: ubuntu-latest
@@ -297,7 +390,7 @@ jobs:
   ok:
     name: ok
     if: always()
-    needs: [core-only-install, build-and-test, platformio, doxygen, crc-regen]
+    needs: [core-only-install, build-and-test, platformio, doxygen, crc-regen, build-configs, arduino-cli]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
