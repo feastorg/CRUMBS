@@ -29,6 +29,7 @@ static void on_message(crumbs_context_t *ctx, const crumbs_message_t *msg)
     g_on_message_calls++;
 }
 
+#if CRUMBS_MAX_HANDLERS > 0
 static void handler(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data,
                     uint8_t data_len, void *user_data)
 {
@@ -39,6 +40,7 @@ static void handler(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data,
     (void)user_data;
     g_handler_calls++;
 }
+#endif
 
 static void setup(crumbs_context_t *ctx, uint8_t declared_type)
 {
@@ -153,6 +155,24 @@ static int test_set_reply_wrong_type_ignored(void)
                   "SET_REPLY addressed to another type must not change requested_opcode");
 }
 
+static int test_clearing_type_restores_acceptance(void)
+{
+    crumbs_context_t ctx;
+    setup(&ctx, MY_TYPE);
+    int rc1 = deliver(&ctx, OTHER_TYPE, 0x42, 1);
+    crumbs_set_type_id(&ctx, 0u);
+    int rc2 = deliver(&ctx, OTHER_TYPE, 0x42, 1);
+    return expect("set_type_id(0) clears the declaration",
+                  rc1 == CRUMBS_RX_TYPE_MISMATCH && rc2 == 0 && g_on_message_calls == 1,
+                  "after clearing, the same foreign frame must dispatch");
+}
+
+static int test_setter_tolerates_null(void)
+{
+    crumbs_set_type_id(NULL, MY_TYPE); /* must not crash */
+    return expect("set_type_id(NULL) is a no-op", 1, "");
+}
+
 static int test_mismatch_is_not_a_crc_error(void)
 {
     crumbs_context_t ctx;
@@ -175,6 +195,8 @@ int main(void)
     failures += test_set_reply_wildcard_honoured();
     failures += test_set_reply_wrong_type_ignored();
     failures += test_mismatch_is_not_a_crc_error();
+    failures += test_clearing_type_restores_acceptance();
+    failures += test_setter_tolerates_null();
     if (failures)
     {
         fprintf(stderr, "FAILED %d test(s)\n", failures);

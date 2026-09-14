@@ -309,6 +309,16 @@ The ops header covers the **controller side**. On the **peripheral side** you wr
 that receives commands and responds to read requests. CRUMBS provides symmetrical per-opcode
 dispatch for both SET and GET operations.
 
+First, declare the device type once after initialisation:
+
+```c
+crumbs_set_type_id(&ctx, THERM_TYPE_ID);
+```
+
+From then on a frame carrying any other non-zero `type_id` is dropped before any callback or
+handler runs (a misaddressed command from another family cannot execute as one of yours).
+`type_id 0x00` is a wildcard and always passes; the generated getters' SET_REPLY frames use it.
+
 ### SET operations — per-opcode handler table
 
 Register one handler per opcode. The library dispatches automatically:
@@ -404,7 +414,7 @@ When both reply handlers and `on_request` are configured, reply handlers take pr
 | `crumbs_register_handler()`       | SET operations               | One per opcode; preferred for all incoming writes                                  |
 | `crumbs_register_reply_handler()` | GET operations               | One per opcode; preferred for all read replies                                     |
 | `on_request` callback             | GET operations (alternative) | Single switch; backward-compatible; used as fallback when no reply handler matches |
-| `on_message` callback             | Advanced use only            | Fires before handler table for every write; for logging/monitors, not device logic |
+| `on_message` callback             | Advanced use only            | Fires before handler table for every accepted write (after the type check, never for SET_REPLY); for logging/monitors, not device logic |
 
 `hello_peripheral.ino` uses `on_message` for brevity (one callback, no handler table). For a real
 family peripheral, use `crumbs_register_handler()` for each SET opcode and
@@ -452,6 +462,7 @@ Maximum payload is `CRUMBS_MAX_PAYLOAD` bytes (27). All multi-byte values are li
 - [ ] Header guard (`#ifndef / #define / #endif`) in place
 - [ ] `#ifdef __cplusplus extern "C"` wrapper present for C++ compatibility
 - [ ] Works with both Linux and Arduino function pointer combinations
+- [ ] Peripheral: `crumbs_set_type_id(&ctx, MY_TYPE_ID)` after init, so frames for other device types are dropped before dispatch
 - [ ] Peripheral: one `crumbs_register_handler()` call per SET opcode
 - [ ] Peripheral: one `crumbs_register_reply_handler()` call per GET opcode (or `on_request` with `default:` fallback)
 - [ ] Peripheral: `on_message` not used for device logic (handler table used instead)

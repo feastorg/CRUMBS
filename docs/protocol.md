@@ -23,7 +23,7 @@ Variable-length I²C messaging with CRC-8 validation
 
 | Field      | Size       | Range         | Available | Description                      |
 | ---------- | ---------- | ------------- | --------- | -------------------------------- |
-| `type_id`  | 1 byte     | `0x01`-`0xFF` | 255       | Device type identifier           |
+| `type_id`  | 1 byte     | `0x00`-`0xFF` | 255       | Device type; `0x00` = wildcard   |
 | `opcode`   | 1 byte     | `0x01`-`0xFD` | 253       | Command identifier (per type_id) |
 | `data_len` | 1 byte     | `0`-`27`      | 28        | Payload byte count               |
 | `data[]`   | 0–27 bytes | N/A           | N/A       | Opaque payload                   |
@@ -130,8 +130,9 @@ The SET_REPLY command allows a controller to specify which data a peripheral sho
 #### Properties
 
 - SET_REPLY is NOT dispatched to user handlers or callbacks
-- `type_id` in a SET_REPLY frame is normally `0x00` (wildcard); a non-zero
-  value is subject to the peripheral's type check like any other frame
+- `type_id` in a SET_REPLY frame is `0x00` (wildcard; what the generated getters
+  send) or the target's type; either passes the peripheral's type check. Any
+  other non-zero value is dropped like any other frame
 - `requested_opcode` persists until another SET_REPLY is received
 - Initial value is `0x00` (by convention: device/version info)
 - Empty payload is ignored (no change to requested_opcode)

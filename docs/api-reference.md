@@ -155,8 +155,10 @@ Declare the peripheral's device type. Afterwards `crumbs_peripheral_handle_recei
 **Callback Execution Order:**
 
 1. Message decoded and CRC validated
-2. `on_message` callback invoked (if registered)
-3. Handler dispatch (if registered for this opcode)
+2. Type check: if the peripheral declared a type (`crumbs_set_type_id()`) and the frame carries a different non-zero `type_id`, stop here (`CRUMBS_RX_TYPE_MISMATCH`)
+3. SET_REPLY (`0xFE`) intercepted: `requested_opcode` stored, nothing below runs
+4. `on_message` callback invoked (if registered)
+5. Handler dispatch (if registered for this opcode)
 
 ### Encoding and Decoding
 
