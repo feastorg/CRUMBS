@@ -638,7 +638,7 @@ CRUMBS_DEFINE_GET_OP(family, name, type_id, opcode, result_t, parse_fn)
 Generates:
 
 - `static inline int family_query_name(const crumbs_device_t *dev)` — internal, sends the SET_REPLY frame only
-- `static inline int family_get_name(const crumbs_device_t *dev, result_t *out)` — public: query → `delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US)` → `crumbs_controller_read_expect(type_id, opcode)` → `parse_fn`. Returns `CRUMBS_RX_REPLY_MISMATCH` (`-4`) if the reply is well-formed but not the requested `(type_id, opcode)`; other non-zero codes pass through from the read and the parser
+- `static inline int family_get_name(const crumbs_device_t *dev, result_t *out)` — public: query → `delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US)` → `crumbs_controller_read_expect(type_id, opcode)` → `parse_fn`. Returns `CRUMBS_RX_REPLY_MISMATCH` (`-4`) if the reply is well-formed but not the requested `(type_id, opcode)`; other non-zero codes pass through from the query's `crumbs_controller_send` (i.e. from `write_fn`), the read, and the parser. Note the Linux HAL's `crumbs_linux_i2c_write` also returns `-4` for an incomplete write, so from a Linux-bound getter `-4` is not unambiguous; treat it as "query/reply failed" unless you call `crumbs_controller_read_expect` yourself
 
 Use for standard 1:1 opcode→result GETs. Multi-opcode GETs must still be written by hand.
 

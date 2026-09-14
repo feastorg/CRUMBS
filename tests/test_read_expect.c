@@ -152,6 +152,7 @@ static int test_decode_errors_pass_through(void)
     fake_dev_t d;
     crumbs_message_t out;
     setup(&ctx, &d, DEV_TYPE, OP_GET_VALUE);
+    memset(&out, 0, sizeof(out)); /* decode does not write out_msg on CRC failure */
     d.corrupt_crc = 1;
     int rc = crumbs_controller_read_expect(&ctx, DEV_ADDR, DEV_TYPE, OP_GET_VALUE, &out, fake_read, &d);
     TEST_ASSERT_EQ(t, rc, -2, "CRC failure must keep crumbs_decode_message's -2");

@@ -6,8 +6,8 @@
  * @brief Helper macros for defining family ops-header functions.
  *
  * These macros generate the boilerplate query/get/send wrapper functions
- * that every CRUMBS family ops header requires. They produce identical
- * code to hand-written equivalents and carry no runtime overhead.
+ * that every CRUMBS family ops header requires. They expand to the same
+ * calls a hand-written wrapper would make and carry no runtime overhead.
  *
  * Usage — in your family's ops header (e.g. therm_ops.h):
  *
@@ -55,7 +55,8 @@ static inline int crumbs_ops_can_get(const crumbs_device_t *dev)
  *
  * Generates:
  *   family_query_name(dev)           — @internal, sends SET_REPLY probe
- *   family_get_name(dev, result_t*)  — public, full query+delay+read+parse
+ *   family_get_name(dev, result_t*)  — public: query, delay,
+ *                                       crumbs_controller_read_expect, parse
  *
  * Parameters:
  *   family    Token prefix, e.g. therm
