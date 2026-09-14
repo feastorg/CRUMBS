@@ -11,6 +11,11 @@ staging script) into a single, repeatable script. The generator will:
 Defaults: The common project uses the nibble (table-driven, 4-bit index)
 variant - staging defaults to ['nibble'] to match current project usage.
 
+CI (the crc-regen job) regenerates with pycrc pinned to the version named in
+the committed banner (see "by pycrc v..." in src/crc/crc8_nibble.h) and diffs
+the result against src/crc. Regenerate with that same version, or the banner
+line alone will fail the check.
+
 Usage examples:
   # generate c99 variants (default set) and stage the nibble variant
   python scripts/generate_crc8.py

@@ -114,6 +114,7 @@ ctest --test-dir build --output-on-failure
 
 - `test_encode_decode` — Frame encoding/decoding
 - `test_crc_failure` — CRC validation and error handling
+- `test_crc_kat` — CRC-8 known-answer vectors (pins the algorithm to CRC-8/SMBUS)
 - `test_handlers` — Handler registration and dispatch
 - `test_msg_helpers` — Message builder/reader helpers
 - `test_version` — Version macro validation
@@ -524,6 +525,7 @@ python scripts/generate_crc8.py  # --no-stage to skip
 - Out-of-tree Linux example builds against the installed CRUMBS package
 - PlatformIO builds for AVR Nano and ESP32 examples
 - Doxygen documentation check
+- CRC-8 source regeneration check (pycrc pinned to the version in the committed banner; the committed `src/crc` must match the generator output)
 - Repository metrics artifact generation
 - Tagged release packaging for Linux x86_64
 
