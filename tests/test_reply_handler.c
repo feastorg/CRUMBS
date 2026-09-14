@@ -407,6 +407,13 @@ static int test_table_full(void)
 
 int main(void)
 {
+#if CRUMBS_MAX_HANDLERS == 0
+    /* The handler table is compiled out; nothing here can run. Exit with the
+       CTest skip code (see SKIP_RETURN_CODE in CMakeLists.txt) so the
+       configuration reports "skipped", not a vacuous pass. */
+    printf("SKIP: CRUMBS_MAX_HANDLERS == 0, handler table compiled out\n");
+    return 77;
+#else
     int failures = 0;
 
     printf("Running reply handler tests:\n");
@@ -436,4 +443,5 @@ int main(void)
         fprintf(stderr, "FAILED %d test(s)\n", failures);
         return 1;
     }
+#endif /* CRUMBS_MAX_HANDLERS == 0 */
 }
