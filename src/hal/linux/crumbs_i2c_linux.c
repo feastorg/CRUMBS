@@ -7,7 +7,7 @@
  * included in non-Linux builds.
  */
 
-/* Enable POSIX functions like clock_gettime on older glibc */
+/* clock_gettime, CLOCK_MONOTONIC and nanosleep are hidden under -std=c11 without this */
 #if !defined(_POSIX_C_SOURCE) || _POSIX_C_SOURCE < 199309L
 #undef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 199309L
@@ -88,7 +88,7 @@ int crumbs_linux_i2c_write(void *user_ctx,
         return -1;
     }
 
-    /* Select the slave. */
+    /* Select the target. */
     if (lw_set_target(bus, target_addr) != 0)
     {
         return -2;

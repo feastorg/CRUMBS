@@ -189,10 +189,11 @@ Before submitting a PR, run the documentation checker:
 
 ```bash
 ./scripts/doccheck.sh
+python3 scripts/check_api_index.py
 python3 scripts/check_docs_links.py
 ```
 
-The first runs Doxygen over the public headers and fails on any undocumented symbol or malformed comment. The second fails on any relative Markdown link or `#anchor` that does not resolve. CI runs both.
+The first runs Doxygen over the public headers and fails on any undocumented symbol or malformed comment. The second (which needs the first's XML output) fails if any public symbol is missing from `docs/api-reference.md`. The third fails on any relative Markdown link or `#anchor` that does not resolve. CI runs all three.
 
 **CI behavior:**
 
@@ -528,7 +529,7 @@ python scripts/generate_crc8.py  # --no-stage to skip
 - PlatformIO builds for AVR Nano and ESP32 examples
 - Core-only build and test under ASan+UBSan, and with `CRUMBS_MAX_HANDLERS=0` (`test_handlers` and `test_reply_handler` report as skipped there; `test_set_reply` compiles out its two table-dependent subtests)
 - `arduino-cli` compile of the two Arduino-IDE mixed-bus sketches, with ezo-driver and SparkFun BME280 pinned by tag
-- Doxygen documentation check (fails on any undocumented public symbol)
+- Doxygen documentation check (fails on any undocumented public symbol, or one missing from `docs/api-reference.md`)
 - Markdown link check (`scripts/check_docs_links.py`; fails on any broken relative link or anchor)
 - CRC-8 source regeneration check (pycrc pinned to the version in the committed banner; the committed `src/crc` must match the generator output)
 - Repository metrics artifact generation

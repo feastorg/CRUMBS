@@ -280,6 +280,9 @@ jobs:
       - name: Run doc-check script
         run: bash ./scripts/doccheck.sh
 
+      - name: Every public symbol is in docs/api-reference.md
+        run: python3 scripts/check_api_index.py
+
   # ─── Build configurations the default build never exercises ──────────────
   build-configs:
     runs-on: ubuntu-latest

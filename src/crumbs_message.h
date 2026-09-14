@@ -37,7 +37,7 @@ extern "C"
         uint8_t opcode;                   /**< Command or opcode identifier */
         uint8_t data_len;                 /**< Number of payload bytes (0-27) */
         uint8_t data[CRUMBS_MAX_PAYLOAD]; /**< Opaque payload bytes */
-        uint8_t crc8;                     /**< CRC-8 over serialized payload (filled by encoder) */
+        uint8_t crc8;                     /**< CRC-8 over the header and payload bytes; set by the decoder, ignored by the encoder */
     } crumbs_message_t;
 
 #ifdef __cplusplus

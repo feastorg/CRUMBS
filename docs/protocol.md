@@ -215,5 +215,5 @@ The controller-side scanners take one of two probes:
   answers; non-strict mode is an address-only ACK check. Neither decodes a
   frame.
 
-See [api-reference.md](api-reference.md#discovery-and-scanning) for the signatures and
+See [api-reference.md](api-reference.md#discovery) for the signatures and
 return values.

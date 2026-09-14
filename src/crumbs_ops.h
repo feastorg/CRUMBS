@@ -33,7 +33,7 @@
  *     Parameterized queries (e.g. "get history entry N") require a custom
  *     _query_* that packs the index into the message payload.
  *
- * Requires: crumbs.h (includes crumbs_i2c.h for crumbs_device_t),
+ * Requires: crumbs.h (crumbs_device_t, crumbs_controller_*),
  *           crumbs_message_helpers.h (for crumbs_msg_init, crumbs_msg_add_*)
  */
 
