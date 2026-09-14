@@ -20,7 +20,7 @@ wired as in [Wiring](#wiring). Both default to address `0x10`
 (`config.h` in each sketch); the controller's serial monitor at 115200 baud
 shows the exchange.
 
-With `arduino-cli`, the same compile CI runs:
+With `arduino-cli`, in the form CI uses for the mixed-bus sketches:
 
 ```sh
 arduino-cli compile --fqbn arduino:avr:nano --library "$PWD" examples/core_usage/arduino/hello_peripheral
@@ -49,8 +49,8 @@ GitHub organisation. To build against a working copy instead, point
 `lib_deps` at it: `lib_deps = symlink:///path/to/CRUMBS`.
 
 The shipped projects under `examples/*/platformio/` and
-`examples/families_usage/lhwit_family/` build for `nanoatmega328new` and
-`esp32dev`:
+`examples/families_usage/lhwit_family/` build for `nanoatmega328new`
+(default), `nanoatmega328old` and `esp32dev`:
 
 ```sh
 pio run -d examples/core_usage/platformio/simple_peripheral -e nanoatmega328new -t upload
@@ -72,13 +72,15 @@ Build from source on any architecture (the only prebuilt tarball is x86_64):
 
 ```sh
 git clone --branch v0.1.3 https://github.com/feastorg/linux-wire.git
-cmake -S linux-wire --preset minimal
-cmake --build --preset minimal
-sudo cmake --install linux-wire/build/minimal          # to /usr/local
+cmake -S linux-wire -B linux-wire/build -DCMAKE_BUILD_TYPE=Release
+cmake --build linux-wire/build
+sudo cmake --install linux-wire/build                  # to /usr/local
 ```
 
 Use `--prefix <dir>` on the install to keep it local; a linux-wire *build*
-tree is not a usable prefix (it exports nothing until installed).
+tree is not a usable prefix (it exports nothing until installed). linux-wire's
+own `cmake --preset` flow needs `ninja-build`; the lines above work with the
+default Makefiles generator.
 
 ### Build CRUMBS
 
@@ -138,6 +140,8 @@ a read; do not run it on a bus with an EEPROM at an unknown address
 ## Wiring
 
 SDA to SDA, SCL to SCL, and a common ground; one pair of pull-ups per bus.
+Default `Wire` pins: Uno and Nano A4 (SDA) / A5 (SCL); Mega 20 / 21; ESP32
+GPIO 21 / 22; Raspberry Pi GPIO 2 / 3 (header pins 3 / 5).
 
 - Arduino-only buses: 4.7 kΩ from SDA and SCL to the boards' logic voltage.
   The AVR `Wire` core turns on the chip's internal pull-ups, but those are
@@ -153,9 +157,9 @@ SDA to SDA, SCL to SCL, and a common ground; one pair of pull-ups per bus.
 | Symptom | Check |
 | --- | --- |
 | Controller sends, peripheral silent | Same address in both sketches; SDA/SCL not swapped; common ground; pull-ups present. `i2cdetect` (Linux) or `crumbs_arduino_scan` sees the peripheral? |
-| `crumbs_controller_read` returns `-1` | The peripheral had nothing staged (no reply handler for the requested opcode) — see [protocol.md](protocol.md#the-read). |
+| `crumbs_controller_read` returns `-1` | Nothing decodable came back: the address did not answer, or the peripheral had nothing staged for the requested opcode — see [protocol.md](protocol.md#the-read). |
 | `-2` (CRC) on most reads from a Pi | The Pi's I²C controller does not honour clock stretching; a peripheral whose interrupt is late returns `0xFF`s. Keep handlers short; see [protocol.md](protocol.md#when-the-reply-is-built). |
 | `CRUMBS_MAX_HANDLERS mismatch` at boot | The value was set in the sketch, not as a build flag for the library too. |
-| `linux_wire not found` at configure | Install linux-wire ≥ 0.1.3 (a build tree is not enough) or pass its install prefix in `CMAKE_PREFIX_PATH`. |
+| `Could not find a package configuration file provided by "linux_wire"` at configure | Install linux-wire ≥ 0.1.3 (a build tree is not enough) or pass its install prefix in `CMAKE_PREFIX_PATH`. |
 | `crumbs_linux_scan` returns `-2` | The adapter cannot do an SMBus Quick Write; use strict mode. |
-| `/dev/i2c-1: Permission denied` | Add yourself to the `i2c` group and log in again. |
+| `lw_open_bus: open: Permission denied` | Add yourself to the `i2c` group and log in again. |

@@ -49,7 +49,7 @@ typedef struct
     uint8_t          mod_minor;
     uint8_t          mod_patch;
     int              compat;  /**< 0=OK, <0=error */
-    crumbs_device_t  dev;     /**< Fully bound handle — populated after compat check. */
+    crumbs_device_t  dev;     /**< Fully bound handle - populated after compat check. */
 } device_info_t;
 
 static device_info_t g_devices[16];
@@ -183,8 +183,8 @@ static void cmd_list(void)
  * @brief Resolve a device by type from a command-line selector string.
  *
  * Accepts two forms:
- *   - "@0x42 rest..."  — match by I2C address
- *   - "0 rest..."      — match by index among compatible devices of @p type_id
+ *   - "@0x42 rest..."  - match by I2C address
+ *   - "0 rest..."      - match by index among compatible devices of @p type_id
  *
  * Only devices with compat == 0 are considered.
  *

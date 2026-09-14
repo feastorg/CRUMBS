@@ -50,7 +50,7 @@ typedef struct
     uint8_t          type_id;
     const char      *name;
     int              index;  /* Index among devices of same type */
-    crumbs_device_t  dev;    /* Fully bound handle — populated at startup */
+    crumbs_device_t  dev;    /* Fully bound handle - populated at startup */
 } device_info_t;
 
 static device_info_t g_devices[16];

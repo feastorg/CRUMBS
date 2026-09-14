@@ -45,10 +45,12 @@ python3 scripts/check_api_index.py    # every public symbol is in docs/api-refer
 python3 scripts/check_docs_links.py   # every relative Markdown link and #anchor resolves
 ```
 
-All three run in CI. Every public symbol in `src/*.h` needs a Doxygen comment
-(`@brief`, `@param` for each parameter, `@return` with the codes); each header
-needs a `@file` block or its members are not checked. Internal `static`
-functions in `.c` files get ordinary comments that say why, not what.
+All three run in CI. The gate fails on a public symbol with no Doxygen
+comment, a malformed one, or a header without a `@file` block. The
+convention it does not enforce: `@brief`, `@param` for every parameter,
+`@return` listing the codes, and a note wherever a pointer may be `NULL`.
+Internal `static` functions in `.c` files get ordinary comments that say why,
+not what.
 
 The docs follow one rule: **one home per fact**. Signatures and return codes
 live in the headers; the wire format lives in `docs/protocol.md`; everything
@@ -61,13 +63,12 @@ else links to them. A number in a doc carries the command that produced it.
 - 4-space indent, Allman braces as in the existing files, `crumbs_` prefix on
   every public symbol, `snake_case`. Return `0` on success and a negative code
   on failure; scanners return a count.
-- Code, comments, string literals and config files are plain ASCII: `I2C` not
-  `I²C`, `-` not `–`. Markdown may use typography (`I²C`, en/em dashes, box
-  drawing); no emoji outside README badges.
+- C, C++ and sketch files are plain ASCII, comments and strings included:
+  `I2C` not `I²C`, `-` not `–`. Markdown may use typography.
 - `src/crc/crc8_nibble.{c,h}` is generated: `python3 scripts/generate_crc8.py`
   (pycrc 0.11.0) regenerates it and CI diffs the result against the tree.
-  Other variants (`--algos bit,nibble,nibblem,byte`) go to `dist/` and are
-  not built.
+  Other variants (`--algos bit,nibble,nibblem,byte --no-stage`) go to `dist/`
+  and are not built.
 
 ## Commits and pull requests
 

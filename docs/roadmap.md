@@ -14,7 +14,7 @@ Work that is planned is tracked in [GitHub issues](https://github.com/feastorg/C
 **Feasibility:** Very high — Arduino Wire API compatible, minimal validation needed  
 **Effort:** Low — Primarily documentation and testing
 
-**Done:** CI builds every PlatformIO example (core, handlers, and all four lhwit peripherals) for `esp32dev`; default I²C pins and a `platformio.ini` are in [platform-setup.md](platform-setup.md).
+**Done:** CI builds every PlatformIO example (core, handlers, and all four lhwit peripherals) for `esp32dev`; the default I²C pins are in [platform-setup.md](platform-setup.md#wiring) and every project ships an `esp32dev` env.
 
 **Remaining:**
 
