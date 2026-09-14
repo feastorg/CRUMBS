@@ -53,7 +53,7 @@ See `config.h`:
 
 Defaults:
 
-- CRUMBS candidates: `0x08`, `0x09`, `0x0A`
+- CRUMBS candidates: `0x10`, `0x11`, `0x12`
 - EZO pH: `0x63`
 - EZO DO: `0x61`
 - Bosch sensors: `0x76`, `0x77`
@@ -63,7 +63,7 @@ Defaults:
 ### Minimal
 
 - 1x controller running `mixed_bus_controller_vendor`
-- 1x CRUMBS peripheral running `basic_peripheral` at `0x08`
+- 1x CRUMBS peripheral running `basic_peripheral` at `0x10`
 - 1x EZO pH at `0x63`
 - 1x EZO DO at `0x61`
 - 1x BMP/BME280 at `0x76`
@@ -73,7 +73,7 @@ Set `BOSCH_SENSOR_COUNT = 1` for this profile.
 ### Max Validation
 
 - 1x controller running `mixed_bus_controller_vendor`
-- 3x CRUMBS peripherals at `0x08`, `0x09`, `0x0A`
+- 3x CRUMBS peripherals at `0x10`, `0x11`, `0x12`
 - 1x EZO pH at `0x63`
 - 1x EZO DO at `0x61`
 - 2x BMP/BME280 at `0x76`, `0x77`
@@ -89,9 +89,9 @@ Set `BOSCH_SENSOR_COUNT = 1` for this profile.
 
 Use `basic_peripheral` for all CRUMBS nodes:
 
-1. Flash board #1 with `DEVICE_ADDR = 0x08`
-2. Flash board #2 with `DEVICE_ADDR = 0x09`
-3. Flash board #3 with `DEVICE_ADDR = 0x0A`
+1. Flash board #1 with `DEVICE_ADDR = 0x10`
+2. Flash board #2 with `DEVICE_ADDR = 0x11`
+3. Flash board #3 with `DEVICE_ADDR = 0x12`
 4. Flash this vendor controller sketch on the controller board
 
 ## Expected Serial Patterns
@@ -101,12 +101,12 @@ Validation pass once at startup:
 ```text
 === Validation pass (once at startup) ===
 CRUMBS scan result: 3
-  addr=0x08 type=0x01
-  addr=0x09 type=0x01
-  addr=0x0A type=0x01
-CRUMBS addr=0x08 type=0x01 reply_op=0x00 len=5 data=...
-CRUMBS addr=0x09 type=0x01 reply_op=0x00 len=5 data=...
-CRUMBS addr=0x0A type=0x01 reply_op=0x00 len=5 data=...
+  addr=0x10 type=0x01
+  addr=0x11 type=0x01
+  addr=0x12 type=0x01
+CRUMBS addr=0x10 type=0x01 reply_op=0x00 len=5 data=...
+CRUMBS addr=0x11 type=0x01 reply_op=0x00 len=5 data=...
+CRUMBS addr=0x12 type=0x01 reply_op=0x00 len=5 data=...
 EZO pH addr=0x63 read_rc=0 read_name=EZO_OK status=EZO_STATUS_SUCCESS ph=...
 EZO DO addr=0x61 output_mask=0x.. read_rc=0 read_name=EZO_OK status=EZO_STATUS_SUCCESS present_mask=0x.. mg_l=... sat_pct=...
 Bosch addr=0x76 temp_c=... pressure_pa=... pressure_hpa=... humidity_pct=... model_hint=...

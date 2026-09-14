@@ -10,7 +10,7 @@
  *
  * Hardware:
  * - Arduino Nano (or compatible)
- * - I2C address: 0x08
+ * - I2C address: 0x10
  * - Built-in LED pulses at configurable heartbeat rate when enabled
  *
  * Operations:
@@ -43,7 +43,7 @@
  * Configuration
  * ============================================================================ */
 
-#define PERIPHERAL_ADDR 0x08
+#define PERIPHERAL_ADDR 0x10
 
 /* ============================================================================
  * State
