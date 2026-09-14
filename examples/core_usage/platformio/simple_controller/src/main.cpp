@@ -50,7 +50,7 @@ void loop()
   // Help
   if (strcmp(start, "help") == 0)
   {
-    Serial.println(F("Usage: addr,type_id,opcode,byte0,byte1,.. (e.g. 0x08,1,1,0x12,0x34)"));
+    Serial.println(F("Usage: addr,type_id,opcode,byte0,byte1,.. (e.g. 0x10,1,1,0x12,0x34)"));
     return;
   }
 
