@@ -35,6 +35,7 @@ static void test_on_message(crumbs_context_t *ctx, const crumbs_message_t *msg)
     g_last_msg_opcode = msg->opcode;
 }
 
+#if CRUMBS_MAX_HANDLERS > 0
 static void test_handler(crumbs_context_t *ctx,
                          uint8_t opcode,
                          const uint8_t *data,
@@ -48,6 +49,7 @@ static void test_handler(crumbs_context_t *ctx,
     g_handler_call_count++;
     g_handler_last_opcode = opcode;
 }
+#endif /* CRUMBS_MAX_HANDLERS > 0 */
 
 /**
  * @brief Build a SET_REPLY frame for testing.

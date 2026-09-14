@@ -298,8 +298,9 @@ jobs:
       - name: Build
         run: cmake --build build-${{ matrix.name }} --parallel
 
-      # Tests that need the handler table exit with the CTest skip code when
-      # it is compiled out, so they show as Skipped here rather than Passed.
+      # test_handlers and test_reply_handler exit with the CTest skip code when
+      # the table is compiled out (Skipped, not Passed); test_set_reply compiles
+      # out its two table-dependent subtests and runs the rest.
       - name: Test
         run: ctest --test-dir build-${{ matrix.name }} --output-on-failure
 
@@ -311,7 +312,7 @@ jobs:
       EZO_DRIVER_TAG: v0.5.1
       EZO_DRIVER_SHA: e54bfc2bebdbed63aa997d907c9737747004e011
       SPARKFUN_BME280_TAG: v2.0.11
-      SPARKFUN_BME280_SHA: 870c17d
+      SPARKFUN_BME280_SHA: 870c17da1f4c76561e14b8ffcc7cdffd63136e10
 
     steps:
       - name: Checkout
@@ -335,17 +336,17 @@ jobs:
           test "$(git -C third_party/ezo-driver rev-parse HEAD)" = "$EZO_DRIVER_SHA"
           git -c advice.detachedHead=false clone --depth 1 --branch "$SPARKFUN_BME280_TAG" \
             https://github.com/sparkfun/SparkFun_BME280_Arduino_Library third_party/SparkFun_BME280
-          test "$(git -C third_party/SparkFun_BME280 rev-parse --short=7 HEAD)" = "$SPARKFUN_BME280_SHA"
+          test "$(git -C third_party/SparkFun_BME280 rev-parse HEAD)" = "$SPARKFUN_BME280_SHA"
 
       - name: Compile mixed_bus_controller (Nano)
         run: |
-          arduino-cli compile --fqbn arduino:avr:nano --warnings default \
+          arduino-cli compile --fqbn arduino:avr:nano --warnings more \
             --library "$PWD" \
             examples/core_usage/arduino/mixed_bus_controller
 
       - name: Compile mixed_bus_controller_vendor (Nano)
         run: |
-          arduino-cli compile --fqbn arduino:avr:nano --warnings default \
+          arduino-cli compile --fqbn arduino:avr:nano --warnings more \
             --library "$PWD" \
             --library "$PWD/third_party/ezo-driver" \
             --library "$PWD/third_party/SparkFun_BME280" \
