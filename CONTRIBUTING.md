@@ -19,7 +19,7 @@ Thank you for your interest in contributing to CRUMBS! This guide covers how to 
 
 **For Linux development:**
 
-- linux-wire library ([installation guide](platform-setup.md#install-linux-wire-dependency))
+- linux-wire library ([installation guide](docs/platform-setup.md#install-linux-wire-dependency))
 
 ### Cloning the Repository
 
@@ -189,9 +189,10 @@ Before submitting a PR, run the documentation checker:
 
 ```bash
 ./scripts/doccheck.sh
+python3 scripts/check_docs_links.py
 ```
 
-This runs Doxygen over the public headers and fails on any undocumented symbol or malformed comment.
+The first runs Doxygen over the public headers and fails on any undocumented symbol or malformed comment. The second fails on any relative Markdown link or `#anchor` that does not resolve. CI runs both.
 
 **CI behavior:**
 
@@ -398,6 +399,7 @@ ctest --test-dir build --output-on-failure
 
 # Check documentation
 ./scripts/doccheck.sh
+python3 scripts/check_docs_links.py
 
 # Test on target platform (Arduino/Linux)
 # ... build and run examples ...

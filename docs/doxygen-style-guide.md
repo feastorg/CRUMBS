@@ -4,7 +4,7 @@ This file defines the concise, idiomatic in-source documentation style for CRUMB
 
 ## Key rules
 
-- Public API comments (headers and exported symbols) use Doxygen-style block comments (/\*_ ... _/) with a short @brief and tags for @param and @return when useful.
+- Public API comments (headers and exported symbols) use Doxygen-style block comments (`/** ... */`) with a short @brief and tags for @param and @return when useful.
 - Keep @brief to 1 short sentence (max ~120 characters). If more explanation is required, use one short additional sentence in the block.
 - Avoid repeating the function name or obvious implementation details. Focus on what the function does, its inputs/outputs, and failure conditions.
 - Internal helpers (static functions) get small inline comments that explain the reasoning/algorithmic intent ("why"), not literal line-by-line descriptions of "how".

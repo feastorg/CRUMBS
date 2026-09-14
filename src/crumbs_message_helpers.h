@@ -384,7 +384,7 @@ extern "C"
      * @brief Build standard version reply for opcode 0x00.
      *
      * Builds a reply message following the opcode 0x00 convention defined in
-     * versioning.md:
+     * docs/protocol.md:
      *   [CRUMBS_VERSION:u16][module_major:u8][module_minor:u8][module_patch:u8]
      *
      * Total payload: 5 bytes

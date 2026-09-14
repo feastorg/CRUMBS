@@ -37,7 +37,7 @@ extern "C"
 /** @brief Type ID for LED array device. */
 #define LED_TYPE_ID 0x01
 
-/* Module protocol version (per versioning.md convention) */
+/* Module protocol version (opcode 0x00 convention, docs/protocol.md) */
 #define LED_MODULE_VER_MAJOR 1
 #define LED_MODULE_VER_MINOR 0
 #define LED_MODULE_VER_PATCH 0

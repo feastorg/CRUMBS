@@ -37,7 +37,7 @@ extern "C"
 /** @brief Type ID for quad 7-segment display device. */
 #define DISPLAY_TYPE_ID 0x04
 
-/* Module protocol version (per versioning.md convention) */
+/* Module protocol version (opcode 0x00 convention, docs/protocol.md) */
 #define DISPLAY_MODULE_VER_MAJOR 1
 #define DISPLAY_MODULE_VER_MINOR 0
 #define DISPLAY_MODULE_VER_PATCH 0

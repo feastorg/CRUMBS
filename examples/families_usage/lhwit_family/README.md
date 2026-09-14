@@ -358,7 +358,7 @@ All operation definitions live in shared headers:
 
 ## Further Documentation
 
-- **Comprehensive Guide:** [../../docs/lhwit-family.md](../../docs/lhwit-family.md)
+- **Comprehensive Guide:** [docs/lhwit-family.md](../../../docs/lhwit-family.md)
 - **Discovery Controller:** [../controller_discovery/README.md](../controller_discovery/README.md)
 - **Manual Controller:** [../controller_manual/README.md](../controller_manual/README.md)
 - **Calculator Peripheral:** [calculator/README.md](calculator/README.md)

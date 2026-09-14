@@ -383,7 +383,7 @@ for (uint8_t addr = 8; addr < 120; addr++) {
 }
 ```
 
-For protocol-aware discovery (find devices that actually speak CRUMBS) use the core helper `crumbs_controller_scan_for_crumbs()` which performs a read-and-decode probe. See the Getting Started guide for short Arduino and Linux examples.
+For protocol-aware discovery (find devices that actually speak CRUMBS) use the core helper `crumbs_controller_scan_for_crumbs()` which performs a read-and-decode probe. See [platform-setup.md](platform-setup.md) for short Arduino and Linux examples.
 
 ---
 

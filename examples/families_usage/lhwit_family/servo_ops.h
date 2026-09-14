@@ -37,7 +37,7 @@ extern "C"
 /** @brief Type ID for servo controller device. */
 #define SERVO_TYPE_ID 0x02
 
-/* Module protocol version (per versioning.md convention) */
+/* Module protocol version (opcode 0x00 convention, docs/protocol.md) */
 #define SERVO_MODULE_VER_MAJOR 1
 #define SERVO_MODULE_VER_MINOR 0
 #define SERVO_MODULE_VER_PATCH 0
