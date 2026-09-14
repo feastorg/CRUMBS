@@ -2,7 +2,7 @@
 
 Work that is planned is tracked in [GitHub issues](https://github.com/feastorg/CRUMBS/issues). This file holds only what is *not* being worked on: directions that may be worth taking someday, and decisions not to take a direction, with the reasoning so they are not re-litigated by accident.
 
-**Note:** Items ordered by value/feasibility. No commitment is made regarding timing or whether any specific item will be implemented.
+**Note:** No commitment is made regarding timing or whether any specific item will be implemented.
 
 ---
 
@@ -14,7 +14,7 @@ Work that is planned is tracked in [GitHub issues](https://github.com/feastorg/C
 **Feasibility:** Very high — Arduino Wire API compatible, minimal validation needed  
 **Effort:** Low — Primarily documentation and testing
 
-**Done:** CI builds the `simple_controller` / `simple_peripheral` PlatformIO examples for `esp32dev`; default I²C pins and a `platformio.ini` are in [platform-setup.md](platform-setup.md).
+**Done:** CI builds every PlatformIO example (core, handlers, and all four lhwit peripherals) for `esp32dev`; default I²C pins and a `platformio.ini` are in [platform-setup.md](platform-setup.md).
 
 **Remaining:**
 
