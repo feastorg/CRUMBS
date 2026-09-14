@@ -530,6 +530,8 @@ extern "C"
      * @param start_addr Address range start (inclusive).
      * @param end_addr Address range end (inclusive).
      * @param strict Non-zero for strict read-only; 0 to also try probe writes.
+     *        The probe frame is 00 00 00 00: harmless to CRUMBS peripherals, but a
+     *        24Cxx-style EEPROM takes it as a page write at address 0.
      * @param write_fn Write function for probe writes (may be NULL if strict).
      * @param read_fn Read function to use for reading frames.
      * @param io_ctx Opaque I/O context forwarded to read/write callbacks.
@@ -563,6 +565,8 @@ extern "C"
      * @param start_addr Address range start (inclusive).
      * @param end_addr Address range end (inclusive).
      * @param strict Non-zero for strict read-only; 0 to also try probe writes.
+     *        The probe frame is 00 00 00 00: harmless to CRUMBS peripherals, but a
+     *        24Cxx-style EEPROM takes it as a page write at address 0.
      * @param write_fn Write function for probe writes (may be NULL if strict).
      * @param read_fn Read function to use for reading frames.
      * @param io_ctx Opaque I/O context forwarded to read/write callbacks.
@@ -596,6 +600,8 @@ extern "C"
      * @param candidates Input list of candidate 7-bit addresses.
      * @param candidate_count Number of entries in @p candidates.
      * @param strict Non-zero for strict read-only; 0 to also try probe writes.
+     *        The probe frame is 00 00 00 00: harmless to CRUMBS peripherals, but a
+     *        24Cxx-style EEPROM takes it as a page write at address 0.
      * @param write_fn Write function for probe writes (may be NULL if strict).
      * @param read_fn Read function to use for reading frames.
      * @param io_ctx Opaque I/O context forwarded to read/write callbacks.

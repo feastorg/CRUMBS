@@ -157,8 +157,8 @@ for (int i = 0; i < count; i++) {
 
 **Scan modes:**
 
-- **Strict mode** (`strict=1`): Read-only probes, safer for sensitive devices
-- **Non-strict mode** (`strict=0`): May send probe write to stimulate response
+- **Strict mode** (`strict=1`): Read-only probes. Nothing is written, but each probe clocks up to 31 bytes out of every address, which advances a register-addressed device's pointer and consumes a stream device's pending response.
+- **Non-strict mode** (`strict=0`): Also sends the probe frame `00 00 00 00` to stimulate a response — a page write at address 0 to a 24Cxx-style EEPROM. Do not use on a bus that may carry one.
 
 On mixed buses (CRUMBS + non-CRUMBS), avoid broad address-range scans and prefer explicit candidate address lists.
 
@@ -515,7 +515,7 @@ typedef int (*crumbs_i2c_read_fn)(
 **Two-layer scanning:**
 
 1. **Generic scanner** (`crumbs_arduino_scan`, `crumbs_linux_scan`):
-   - Address-level probing (ACK detection)
+   - Address-level probing (address ACK, or a one-byte read in strict mode)
    - Finds any I²C device
    - Fast but non-specific
 

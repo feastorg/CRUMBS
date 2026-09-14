@@ -19,6 +19,7 @@ All notable changes to CRUMBS are documented in this file.
 ### Changed
 
 - The Linux HAL requires **linux-wire 0.1.3 or newer** (`lw_probe`, `lw_set_target`); `find_package(linux_wire 0.1.3 ...)` enforces it, and both the CI and release workflows pin the 0.1.3 release tarball. `crumbs_linux_scan()` returns `-2` in non-strict mode if the adapter cannot perform an SMBus Quick Write, instead of reporting an empty bus. The seven `lw_set_slave` calls are now `lw_set_target`. (#65)
+- `crumbs_arduino_scan()` `strict` mode now performs a one-byte read (present if the target ACKs a read), matching `crumbs_linux_scan()`; it previously wrote a `0x00` data byte, the opposite of the Linux HAL and the one variant that put data on the bus. Non-strict is unchanged (address-only ACK). There is no replacement for the old data-byte write; if the intent was to stimulate a reply, use `crumbs_controller_scan_for_crumbs()` in non-strict mode instead. Neither HAL scanner reads or validates a CRUMBS frame; the API reference now says so and points at the core scanner. (#22, #23)
 - `CRUMBS_DEFINE_GET_OP` getters now call `crumbs_controller_read_expect()`; on a reply identity mismatch they return `CRUMBS_RX_REPLY_MISMATCH` (`-7`) instead of `-1`. Callers that only test for non-zero are unaffected. (#35)
 
 ## [0.12.5] - 2026-07-13

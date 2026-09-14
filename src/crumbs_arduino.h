@@ -61,12 +61,30 @@ extern "C"
                                   size_t len);
 
     /**
-     * @brief Scan the I2C bus using the provided TwoWire instance (or default Wire when user_ctx==NULL).
+     * @brief Probe an address range for any I2C device (not CRUMBS-specific).
+     *
+     * Reports every address that acknowledges. No frame is read or decoded;
+     * for CRUMBS-aware discovery use crumbs_controller_scan_for_crumbs()
+     * with crumbs_arduino_read as the read function.
+     *
+     * The two probes put the same transactions on the wire as
+     * crumbs_linux_scan() (linux-wire 0.1.3+):
+     * - strict != 0: one-byte read. Present if the target ACKs a read and
+     *   clocks a byte out. Writes nothing, but consumes one byte from
+     *   register-addressed or stream-style devices.
+     * - strict == 0: address + write bit, then STOP, no data phase (Linux
+     *   does this as an SMBus Quick Write). Present if the address ACKs.
+     *   Writes nothing.
+     * Two differences remain: Linux also reports an address a kernel driver
+     * owns as present (there is no such notion here), and this function
+     * keeps counting past @p max_found while Linux stops there. Linux can
+     * also return -2 when the adapter cannot perform a Quick Write; this
+     * function has no equivalent failure.
      *
      * @param user_ctx     Pointer to TwoWire instance or NULL to use &Wire
      * @param start_addr   Start address (inclusive) to probe, typically 0x03
      * @param end_addr     End address (inclusive) to probe, typically 0x77
-     * @param strict       Non-zero to require a data-phase ACK (stricter), 0 for address-only probe
+     * @param strict       Non-zero for the read probe, 0 for the address-only probe
      * @param found        Output buffer to receive found addresses
      * @param max_found    Capacity of @p found buffer
      * @return number of addresses found (>=0) or negative on error
