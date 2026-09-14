@@ -1,4 +1,3 @@
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,8 +58,9 @@ int main(int argc, char **argv)
     int rc = crumbs_linux_init_controller(&ctx, &lw, device_path, 25000);
     if (rc != 0)
     {
-        fprintf(stderr, "ERROR: crumbs_linux_init_controller failed (%d) opening %s: %s\n",
-                rc, device_path, strerror(errno));
+        /* lw_open_bus already reports the errno; add the path it was given. */
+        fprintf(stderr, "ERROR: crumbs_linux_init_controller failed (%d) for device %s\n",
+                rc, device_path);
         return 1;
     }
 
