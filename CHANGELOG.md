@@ -18,7 +18,7 @@ All notable changes to CRUMBS are documented in this file.
 
 ### Changed
 
-- The Linux HAL requires **linux-wire 0.1.3 or newer** (`lw_probe`, `lw_set_target`); `find_package(linux_wire 0.1.3 ...)` enforces it, and CI pins the 0.1.3 release tarball. The seven `lw_set_slave` calls are now `lw_set_target`. (#65)
+- The Linux HAL requires **linux-wire 0.1.3 or newer** (`lw_probe`, `lw_set_target`); `find_package(linux_wire 0.1.3 ...)` enforces it, and both the CI and release workflows pin the 0.1.3 release tarball. `crumbs_linux_scan()` returns `-2` in non-strict mode if the adapter cannot perform an SMBus Quick Write, instead of reporting an empty bus. The seven `lw_set_slave` calls are now `lw_set_target`. (#65)
 - `CRUMBS_DEFINE_GET_OP` getters now call `crumbs_controller_read_expect()`; on a reply identity mismatch they return `CRUMBS_RX_REPLY_MISMATCH` (`-7`) instead of `-1`. Callers that only test for non-zero are unaffected. (#35)
 
 ## [0.12.5] - 2026-07-13

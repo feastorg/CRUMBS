@@ -257,8 +257,8 @@ CRUMBS Linux HAL requires the `linux-wire` library (**0.1.3 or newer**) for I²C
 #### System-wide installation (recommended)
 
 ```bash
-# Clone linux-wire
-git clone https://github.com/feastorg/linux-wire.git
+# Clone linux-wire (0.1.3 or newer is required)
+git clone --branch v0.1.3 https://github.com/feastorg/linux-wire.git
 cd linux-wire
 
 # Build and install (linux-wire preset flow)

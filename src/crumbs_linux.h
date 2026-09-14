@@ -179,7 +179,10 @@ typedef struct crumbs_linux_i2c_s
      * @param strict      Non-zero = strict read probe, 0 = non-strict probe.
      * @param found       Buffer to receive discovered addresses.
      * @param max_found   Maximum number of entries the buffer can hold.
-     * @return Number of found addresses (>=0), or negative on error.
+     * @return Number of found addresses (>=0); -1 on invalid arguments or a
+     *         closed bus; -2 if the adapter cannot perform an SMBus Quick
+     *         Write (non-strict mode only; errno EOPNOTSUPP) - use strict
+     *         mode on that adapter.
      */
     int crumbs_linux_scan(void *user_ctx,
                           uint8_t start_addr,

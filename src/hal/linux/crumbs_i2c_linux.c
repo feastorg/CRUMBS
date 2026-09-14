@@ -223,7 +223,15 @@ int crumbs_linux_scan(void *user_ctx,
         {
             /* Non-strict probe: address-only SMBus Quick Write, no data on the
                bus. 0 = acknowledged, 1 = owned by a kernel driver; both present. */
-            present = (lw_probe(bus, (uint8_t)addr) >= 0);
+            int rc = lw_probe(bus, (uint8_t)addr);
+            if (rc < 0 && errno == EOPNOTSUPP)
+            {
+                /* The adapter cannot do SMBus Quick: every address would read
+                   as absent. Report the failure instead of an empty bus. */
+                lw_set_error_logging(bus, prev_log);
+                return -2;
+            }
+            present = (rc >= 0);
         }
 
         if (present)
