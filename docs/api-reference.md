@@ -42,6 +42,7 @@ CRC is computed over: `type_id + opcode + data_len + data[0..data_len-1]`
 typedef struct crumbs_context_t {
     crumbs_role_t role;           // CONTROLLER or PERIPHERAL
     uint8_t address;              // Device I²C address (peripherals only)
+    uint8_t type_id;              // Declared device type; 0 = not declared (see crumbs_set_type_id)
 
     // CRC statistics
     uint32_t crc_error_count;     // Cumulative CRC failures
@@ -145,11 +146,19 @@ Install callbacks for message handling.
 - `on_request` — Invoked when peripheral receives an I²C read request. May be NULL.
 - `user_data` — Opaque pointer passed to callbacks.
 
+```c
+void crumbs_set_type_id(crumbs_context_t *ctx, uint8_t type_id);
+```
+
+Declare the peripheral's device type. Afterwards `crumbs_peripheral_handle_receive()` drops frames whose `type_id` is neither this value nor `CRUMBS_TYPE_ID_ANY` (`0x00`), returning `CRUMBS_RX_TYPE_MISMATCH` before any callback or handler runs. Default is `0` (not declared: every frame is dispatched); passing `0` restores that.
+
 **Callback Execution Order:**
 
 1. Message decoded and CRC validated
-2. `on_message` callback invoked (if registered)
-3. Handler dispatch (if registered for this opcode)
+2. Type check: if the peripheral declared a type (`crumbs_set_type_id()`) and the frame carries a different non-zero `type_id`, stop here (`CRUMBS_RX_TYPE_MISMATCH`)
+3. SET_REPLY (`0xFE`) intercepted: `requested_opcode` stored, nothing below runs
+4. `on_message` callback invoked (if registered)
+5. Handler dispatch (if registered for this opcode)
 
 ### Encoding and Decoding
 
@@ -238,7 +247,7 @@ int crumbs_peripheral_handle_receive(crumbs_context_t *ctx,
 
 Process incoming data on a peripheral device. Decodes the message, validates CRC, and invokes callbacks/handlers.
 
-**Returns:** `0`=success, `-1`=invalid/decode fail, `-2`=CRC error (check wiring, use `crumbs_get_crc_error_count()`)
+**Returns:** `0`=success, `-1`=invalid/decode fail, `-2`=CRC error (check wiring, use `crumbs_get_crc_error_count()`), `CRUMBS_RX_TYPE_MISMATCH` (`-3`)=valid frame for another declared type (see `crumbs_set_type_id()`; not counted as a CRC error)
 
 Called from Wire `onReceive()` on Arduino.
 
@@ -929,7 +938,7 @@ All CRUMBS functions use consistent conventions:
 | `crumbs_encode_message()`            | `>0` (frame length) | `0` (buffer too small)                                    |
 | `crumbs_decode_message()`            | `0`                 | `-1` (frame error), `-2` (CRC mismatch)                   |
 | `crumbs_controller_send()`           | `0`                 | `-1` (args), `-2` (role), `-3` (encode), `>0` (I2C error) |
-| `crumbs_peripheral_handle_receive()` | `0`                 | `-1` (args/decode), `-2` (CRC)                            |
+| `crumbs_peripheral_handle_receive()` | `0`                 | `-1` (args/decode), `-2` (CRC), `-3` (type mismatch)      |
 | `crumbs_peripheral_build_reply()`    | `0`                 | `-1` (args/role), `-2` (encode)                           |
 | `crumbs_controller_read()`           | `0`                 | `-1` (args/short read), decode error codes                |
 | `crumbs_register_handler()`          | `0`                 | `-1` (NULL ctx or table full)                             |

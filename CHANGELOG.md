@@ -6,6 +6,11 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `crumbs_set_type_id()` and `crumbs_context_t.type_id`: a peripheral can declare its device type, after which `crumbs_peripheral_handle_receive()` drops frames carrying any other non-zero `type_id` before dispatch and returns `CRUMBS_RX_TYPE_MISMATCH` (`-3`). Default is undeclared, so existing targets behave exactly as before. The LHWIT example peripherals will declare their types once the release carrying this API is on the PlatformIO registry, since their `platformio.ini` pins the published version. (#37)
+- `CRUMBS_TYPE_ID_ANY` (`0x00`): `type_id 0x00` in a frame is now defined as a wildcard that the type check never rejects. The library's own SET_REPLY frames and the scan probe already sent it. (#46)
+
 ## [0.12.5] - 2026-07-13
 
 ### Fixed

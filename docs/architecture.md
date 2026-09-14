@@ -362,9 +362,11 @@ void setup() {
 **Dispatch flow:**
 
 1. Message decoded, CRC validated
-2. `on_message` callback invoked (if registered)
-3. Handler lookup by opcode
-4. Handler invoked (if registered)
+2. Type check: a declared type (`crumbs_set_type_id()`) drops frames for any other non-zero type
+3. SET_REPLY (`0xFE`) intercepted; not dispatched further
+4. `on_message` callback invoked (if registered)
+5. Handler lookup by opcode
+6. Handler invoked (if registered)
 
 **Benefits:**
 

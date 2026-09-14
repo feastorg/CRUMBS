@@ -88,6 +88,23 @@ extern "C"
      */
 #define CRUMBS_CMD_SET_REPLY 0xFE
 
+/**
+ * @brief Wildcard type_id.
+ *
+ * A frame whose type_id is 0x00 is never rejected by a peripheral's type
+ * check, whatever type the peripheral has declared. The library's own
+ * SET_REPLY frames and the scan probe carry this value.
+ */
+#define CRUMBS_TYPE_ID_ANY 0x00
+
+/**
+ * @brief crumbs_peripheral_handle_receive() result: valid frame, wrong type.
+ *
+ * The frame decoded correctly but its type_id is neither the peripheral's
+ * declared type_id nor CRUMBS_TYPE_ID_ANY. Nothing was dispatched.
+ */
+#define CRUMBS_RX_TYPE_MISMATCH (-3)
+
     /**
      * @brief Role of a CRUMBS endpoint on the I2C bus.
      */
@@ -172,6 +189,15 @@ extern "C"
     {
         uint8_t address;    /**< I2C address for peripheral role; 0 for controller. */
         crumbs_role_t role; /**< Controller or peripheral. */
+
+        /**
+         * @brief Declared device type for the peripheral role; 0 = not declared.
+         *
+         * When non-zero, crumbs_peripheral_handle_receive() rejects frames whose
+         * type_id is neither this value nor CRUMBS_TYPE_ID_ANY, before any
+         * callback or handler runs. Set with crumbs_set_type_id().
+         */
+        uint8_t type_id;
 
         uint32_t crc_error_count; /**< Number of CRC failures seen during decode. */
         uint8_t last_crc_ok;      /**< Non-zero if the last decode had a valid CRC. */
@@ -262,6 +288,19 @@ extern "C"
                               crumbs_message_cb_t on_message,
                               crumbs_request_cb_t on_request,
                               void *user_data);
+
+    /**
+     * @brief Declare the peripheral's device type.
+     *
+     * After this call, incoming frames whose type_id is neither @p type_id nor
+     * CRUMBS_TYPE_ID_ANY are dropped by crumbs_peripheral_handle_receive()
+     * with CRUMBS_RX_TYPE_MISMATCH. Passing 0 clears the declaration and
+     * restores the default (every frame is dispatched).
+     *
+     * @param ctx Active CRUMBS context.
+     * @param type_id Device type, or 0 to disable the check.
+     */
+    void crumbs_set_type_id(crumbs_context_t *ctx, uint8_t type_id);
 
     /**
      * @brief Get the size of crumbs_context_t as compiled in the library.
@@ -652,7 +691,10 @@ extern "C"
      * @param ctx Active CRUMBS context (peripheral role).
      * @param buffer Raw bytes received.
      * @param len Number of bytes in @p buffer.
-     * @return 0 on success, negative on decode error.
+     * @return 0 on success; -1 on invalid arguments or a malformed frame;
+     *         -2 on CRC mismatch; CRUMBS_RX_TYPE_MISMATCH (-3) when the frame
+     *         is valid but its type_id is neither the declared type nor
+     *         CRUMBS_TYPE_ID_ANY (see crumbs_set_type_id()).
      */
     int crumbs_peripheral_handle_receive(crumbs_context_t *ctx,
                                          const uint8_t *buffer,
