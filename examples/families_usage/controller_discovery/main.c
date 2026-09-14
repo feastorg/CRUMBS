@@ -17,9 +17,9 @@
  * Usage:
  *   ./controller_discovery [/dev/i2c-1]
  *   > scan
- *   > calculator add 10 20
- *   > led set_all 0x0F
- *   > servo set_pos 0 90
+ *   > calculator 0 add 10 20      (or: calculator @0x10 add 10 20)
+ *   > led 0 set_all 0x0F
+ *   > servo 0 set_pos 0 90
  */
 
 #define _DEFAULT_SOURCE  /* expose usleep() under -std=c11 */

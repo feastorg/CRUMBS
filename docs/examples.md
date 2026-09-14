@@ -63,7 +63,7 @@ See [handlers_usage/README.md](../examples/handlers_usage/README.md) for detaile
 - Discovery vs manual addressing patterns
 - Four interaction patterns: function-style (Calculator), state-query (LED), position-control (Servo), display-control (Display)
 
-See [families_usage/README.md](../examples/families_usage/README.md) for overview and [lhwit-family.md](lhwit-family.md) for comprehensive guide.
+See [families_usage/README.md](../examples/families_usage/README.md) for overview and [lhwit_family/README.md](../examples/families_usage/lhwit_family/README.md) for the family.
 
 ---
 

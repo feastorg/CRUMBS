@@ -1,366 +1,130 @@
-# LHWIT Family - Low Hardware Implementation Test
+# LHWIT family
 
-Four-device reference family demonstrating different handler patterns with minimal hardware requirements.
+The reference CRUMBS family: four Arduino Nano peripherals with trivial
+hardware and two Linux controllers that drive them. Each device has its own
+README with its opcodes and pins; this page is the bus, the build and the
+controllers. The family's vocabulary lives in the four `*_ops.h` headers here
+plus `lhwit_ops.h`, which includes them all and adds the version-check helpers.
 
-## Overview
+| Device | `type_id` | Address | Project | Hardware | README |
+| --- | --- | --- | --- | --- | --- |
+| LED array | `0x01` | `0x20` | `led/` | 4 LEDs on D4–D7 | [led/README.md](led/README.md) |
+| Servo | `0x02` | `0x30` | `servo/` | 2 servos on D9, D10 | [servo/README.md](servo/README.md) |
+| Calculator | `0x03` | `0x10` | `calculator/` | none | [calculator/README.md](calculator/README.md) |
+| Display | `0x04` | `0x40` | `display/` | 5641AS 4-digit 7-segment | [display/README.md](display/README.md) |
 
-The LHWIT family consists of four devices showcasing different interaction patterns:
+All four report module version 1.0.0 to opcode `0x00`. Addresses are
+`PERIPHERAL_ADDR` in each `src/main.cpp`.
 
-| Device         | Type ID | Pattern          | Description                                                       |
-| -------------- | ------- | ---------------- | ----------------------------------------------------------------- |
-| **Calculator** | 0x03    | Function-style   | Executes operations (ADD/SUB/MUL/DIV), returns results on request |
-| **LED Array**  | 0x01    | State-query      | Controls 4 LEDs, reports current state on request                 |
-| **Servo**      | 0x02    | Position-control | Moves 2 servos, reports positions on request                      |
-| **Display**    | 0x04    | Display-control  | 4-digit 7-segment display, shows numbers and custom patterns      |
+## Bus
 
-**Why four patterns?** Each represents a common device interaction model:
+Every Nano joins the same I²C bus: A4 (SDA), A5 (SCL), common ground. The
+controller is a Raspberry Pi or any Linux host with `i2c-dev`; the Pi's
+onboard pull-ups are enough, and the bus runs at 3.3 V — do not add pull-ups
+to 5 V. Servos need their own 5 V supply sharing ground with the Nano; the
+Nano's 5 V pin cannot source them.
 
-- **Function-style:** Device performs computation, stores result (like sensors with processing)
-- **State-query:** Device manages output state, reports on demand (like GPIO expanders)
-- **Position-control:** Device controls physical actuators with feedback (like motor controllers)
-- **Display-control:** Device manages visual output with multiplexing (like displays and indicators)
+## Build and flash the peripherals
 
-## Hardware Requirements
+Each device is a PlatformIO project with envs `nanoatmega328new` (default),
+`nanoatmega328old` (57600-baud bootloader) and `esp32dev`:
 
-### Components
-
-- **1x Linux SBC** - Raspberry Pi, Orange Pi, etc. (for controllers)
-- **4x Arduino Nano** - ATmega328P boards (for peripherals)
-- **4x LEDs** - Standard 5mm LEDs (any color)
-- **4x 220Ω resistors** - For LED current limiting
-- **2x Servo motors** - SG90 or similar (180° range)
-- **1x 5641AS display** - Quad 7-segment display (common cathode)
-- **1x External 5V power supply** - At least 2A capacity (for servos)
-- **1x Breadboard** - For connections
-- **Jumper wires** - Male-to-male and male-to-female
-
-### Wiring Overview
-
-All four Arduino Nano boards connect to the same I²C bus:
-
-- **SDA** → A4 (Arduino Nano)
-- **SCL** → A5 (Arduino Nano)
-- **GND** → Common ground
-
-**LED connections** (LED peripheral only):
-
-- D4-D7 → LEDs → 220Ω resistors → GND
-
-**Servo connections** (Servo peripheral only):
-
-- D9 → Servo 0 signal
-- D10 → Servo 1 signal
-- Servo power: **EXTERNAL 5V supply** (NOT from Arduino!)
-
-**Display connections** (Display peripheral only):
-
-- D2-D9 → 5641AS segments (a, b, c, d, e, f, g, dp)
-- D10-D13 → 5641AS digit select (D1, D2, D3, D4)
-
-⚠️ **Critical:** Servos draw significant current. Never power servos from Arduino's 5V pin. Use external 5V power supply with common ground.
-
-## Quick Start
-
-### 1. Flash Peripherals
-
-```bash
-cd calculator && pio run -t upload
-cd ../led && pio run -t upload
-cd ../servo && pio run -t upload
-cd ../display && pio run -t upload
+```sh
+pio run -d examples/families_usage/lhwit_family/led -e nanoatmega328new -t upload
 ```
 
-**Addresses:**
-
-- Calculator: 0x10
-- LED: 0x20
-- Servo: 0x30
-- Display: 0x40
-
-### 2. Build Controllers
-
-```bash
-# Discovery controller (auto-finds devices)
-cd ../../controller_discovery
-mkdir -p build && cd build
-cmake ..
-make
-
-# Manual controller (uses config.h addresses)
-cd ../../controller_manual
-mkdir -p build && cd build
-cmake ..
-make
-```
-
-### 3. Test System
-
-**With discovery controller:**
-
-```bash
-./controller_discovery /dev/i2c-1
-lhwit> scan
-lhwit> calculator 0 add 10 20
-lhwit> calculator 0 result
-lhwit> led 0 set_all 0x0F
-lhwit> servo 0 set_pos 0 90
-lhwit> display 0 set_number 1234 0
-```
-
-**With manual controller:**
-
-```bash
-./controller_manual /dev/i2c-1
-lhwit> calculator 0 add 5 3
-lhwit> led 0 get_state
-lhwit> servo 0 get_pos
-lhwit> display 0 set_number 42 0
-```
-
-## Module Details
-
-### Calculator (Type 0x03)
-
-32-bit integer calculator with operation history.
-
-**Operations:**
-
-- `ADD` (0x01) - Add two u32 values
-- `SUB` (0x02) - Subtract (a - b)
-- `MUL` (0x03) - Multiply two u32 values
-- `DIV` (0x04) - Divide (a / b)
-
-**Queries:**
-
-- `GET_RESULT` (0x80) - Last calculation result
-- `GET_HIST_META` (0x81) - History metadata (count + position)
-- `GET_HIST_0` to `GET_HIST_11` (0x82–0x8D) - Individual history entries
-
-**State:**
-
-- Last result (32-bit)
-- 12-entry history buffer (192 bytes total)
-- Each entry: operation, operands, result, timestamp
-
-**Example usage:**
-
-```c
-#include "calculator_ops.h"
-
-uint8_t msg[32];
-int len = calculator_send_add(&ctx, 0x10, 100, 200, msg);
-crumbs_linux_i2c_write(&lw, 0x10, msg, len);
-
-// Later: get result
-len = calculator_send_get_result(&ctx, 0x10, msg);
-crumbs_linux_i2c_write(&lw, 0x10, msg, len);
-
-uint8_t reply[32];
-int reply_len = crumbs_linux_read_message(&ctx, &lw, 0x10, reply, sizeof(reply), 100);
-
-int32_t result;
-calculator_parse_result_reply(reply, reply_len, &result);
-printf("Result: %d\n", result);
-```
-
-### LED Array (Type 0x01)
-
-Controls 4 LEDs (D4-D7) with individual and blink control.
-
-**Operations:**
-
-- `SET_ALL` (0x01) - Set all LEDs via bitmask
-- `SET_ONE` (0x02) - Set single LED on/off
-- `BLINK` (0x03) - Configure LED blinking
-
-**Queries:**
-
-- `GET_STATE` (0x80) - Current LED state (bitmask)
-- `GET_BLINK` (0x81) - Blink configuration
-
-**State:**
-
-- LED bitmask (bits 0–3 for LEDs 0–3)
-- Blink timers (per-LED)
-
-**Hardware:**
-
-- D4 → LED 0
-- D5 → LED 1
-- D6 → LED 2
-- D7 → LED 3
-- All through 220Ω resistors to GND
-
-### Servo Controller (Type 0x02)
-
-Controls 2 hobby servos (D9-D10) with speed and sweep.
-
-**Operations:**
-
-- `SET_POS` (0x01) - Set servo position (0–180°)
-- `SET_SPEED` (0x02) - Set movement speed (0=instant, 1–20=slow)
-- `SWEEP` (0x03) - Configure sweep pattern
-
-**Queries:**
-
-- `GET_POS` (0x80) - Current positions (both servos)
-- `GET_SPEED` (0x81) - Speed settings
-
-**State:**
-
-- Servo positions (uint8_t[2], degrees)
-- Speed settings (uint8_t[2])
-- Sweep state (enabled, min, max, step per servo)
-
-**Hardware:**
-
-- D9 → Servo 0 signal (PWM)
-- D10 → Servo 1 signal (PWM)
-- **External 5V supply required** (NOT from Arduino)
-- Common ground between Arduino and servo power supply
-
-⚠️ **Servo Power Warning:** Each servo can draw 500mA+ under load. Arduino's 5V regulator cannot supply this. Use dedicated 5V supply (2A minimum for 2 servos). Connect grounds together.
-
-### Display (Type 0x04)
-
-Controls 4-digit 7-segment display (5641AS or compatible) with multiplexing.
-
-**Operations:**
-
-- `SET_NUMBER` (0x01) - Display number (0–9999) with optional decimal point
-- `SET_SEGMENTS` (0x02) - Set custom segment patterns for all 4 digits
-- `SET_BRIGHTNESS` (0x03) - Set brightness level (0–10)
-- `CLEAR` (0x04) - Clear display
-
-**Queries:**
-
-- `GET_VALUE` (0x80) - Current displayed number, decimal position, and brightness
-
-**State:**
-
-- Current number (uint16_t, 0–9999)
-- Decimal position (uint8_t, 0=none, 1-4)
-- Brightness level (uint8_t, 0–10)
-- Display active flag
-
-**Hardware:**
-
-- D2-D9 → 5641AS segments (a, b, c, d, e, f, g, dp)
-- D10-D13 → 5641AS digit select (D1, D2, D3, D4)
-- Multiplexing: Continuously cycles through digits at ~2ms intervals
-
-**Example usage:**
-
-```c
-#include "display_ops.h"
-
-// Display "123.4" (decimal on digit 3)
-display_send_set_number(&ctx, 0x40, write_fn, io_ctx, 1234, 3);
-
-// Display "12.34" (decimal on digit 2)
-display_send_set_number(&ctx, 0x40, write_fn, io_ctx, 1234, 2);
-
-// Clear display
-display_send_clear(&ctx, 0x40, write_fn, io_ctx);
-```
+The projects pin the published library (`lib_deps = cameronbrooks11/CRUMBS`),
+set `-DCRUMBS_MAX_HANDLERS=8` (6 for the display) and add `-I ..` so the ops
+headers resolve. Each peripheral prints a banner and `Ready` on its serial
+port at 115200 baud and is otherwise silent, except where a device README
+says so.
 
 ## Controllers
 
-### Discovery Controller
+Both Linux controllers are built by the root CMake with the Linux HAL
+([platform-setup.md](../../../docs/platform-setup.md#linux)):
 
-Auto-discovers devices by scanning I²C bus and identifying by type ID.
+```sh
+build-linux/crumbs_controller_discovery [/dev/i2c-1]    # scans, version-checks, binds what it finds
+build-linux/crumbs_controller_manual    [/dev/i2c-1]    # uses the fixed list in controller_manual/config.h
+```
 
-**Workflow:**
+`controller_discovery` starts empty: `scan` sweeps `0x08`–`0x77` with the
+non-strict CRUMBS probe, queries each device's version, prints
+`OK Compatible` or why not, and binds only the compatible ones.
+`controller_manual` binds the table in `config.h` (the four defaults above)
+with no scan and no version check. Their READMEs show each one's output.
 
-1. Run `scan` command
-2. Controller queries 0x08–0x77 for CRUMBS devices
-3. Identifies devices by type ID (0x01=LED, 0x02=Servo, 0x03=Calculator)
-4. Stores addresses for use in commands
+### Shell
 
-**Advantages:**
+Prompt `lhwit> `. `help`, `list`, `quit`. Every device command names its
+target, by index among devices of that type or by address:
 
-- Works regardless of device addresses
-- Verifies device types
-- Flexible for development
+```text
+<type> <idx> <cmd> [args]        e.g.  led 0 set_all 0x0F
+<type> @<addr> <cmd> [args]      e.g.  led @0x20 set_all 0x0F
+```
 
-**Use when:** Addresses may change, testing new hardware, learning the system.
+`@addr` accepts `0x20`, `32` or `040` and does not check the device's type;
+numeric arguments are decimal except `led set_all <mask>`, which also takes
+hex.
 
-### Manual Controller
+| Type | Command | Arguments |
+| --- | --- | --- |
+| `calculator` | `add` `sub` `mul` `div` | `<a> <b>` (unsigned 32-bit) |
+| | `result` | — |
+| | `history` | — |
+| `led` | `set_all` | `<mask>` (bits 0–3) |
+| | `set_one` | `<idx 0-3> <state 0/1>` |
+| | `blink` | `<idx> <enable 0/1> <period_ms>` |
+| | `get_state` `get_blink` | — |
+| `servo` | `set_pos` | `<idx 0-1> <angle 0-180>` |
+| | `set_speed` | `<idx> <speed 0-20>` |
+| | `sweep` | `<idx> <enable 0/1> <min> <max> <step>` |
+| | `get_pos` `get_speed` | — |
+| `display` | `set_number` | `<number 0-9999> <decimal_pos 0-4>` |
+| | `set_brightness` | `<level 0-10>` (stored only; the display has no brightness control) |
+| | `clear` `get_value` | — |
 
-Uses hardcoded addresses from `config.h`.
+There is no controller command for the display's `SET_SEGMENTS` opcode;
+`display_send_set_segments()` in `display_ops.h` is the only way to send it.
 
-**Workflow:**
+## Checking the whole family
 
-1. Edit `config.h` with device addresses
-2. Rebuild controller
-3. Run - immediate command access (no scan)
+```text
+lhwit> scan
+Scanning I2C bus for CRUMBS devices (0x08-0x77)...
 
-**Advantages:**
+Found 4 device(s):
+[0x10] Calculator
+       CRUMBS: v0.12.5 (controller: v0.12.5)
+       Module: v1.0.0 (expected: v1.0.x)
+       OK Compatible
+...
+Usable: 4/4 devices
 
-- Faster startup (no scan)
-- Simpler code flow
-- Production-ready
+lhwit> calculator 0 add 40 2
+OK: add(40, 2) sent. Use 'calculator result' to get answer.
+lhwit> calculator 0 result
+Result: 42
+lhwit> led 0 set_all 0x0F
+OK: LEDs set to 0x0F
+lhwit> servo 0 set_pos 0 45
+OK: Servo 0 position set to 45deg
+lhwit> display 0 set_number 1234 2
+OK: Display showing 1234 (decimal pos 2)
+```
 
-**Use when:** Addresses are fixed and known, performance matters, production deployment.
+(`controller_discovery` output; `controller_manual` appends `to 0x10` /
+`at 0x20` to its confirmations. The `...` elides the other three devices'
+identical blocks.)
 
-## Canonical Headers
+## Adopting the family
 
-All operation definitions live in shared headers:
-
-- `calculator_ops.h` - Calculator operations + helper functions
-- `led_ops.h` - LED operations + helper functions
-- `servo_ops.h` - Servo operations + helper functions
-- `lhwit_ops.h` - Convenience header (includes all three)
-
-**Pattern:** Both peripherals and controllers include the same headers, ensuring protocol consistency. No hardcoded magic numbers, no protocol drift.
-
-## Testing Procedure
-
-1. **Power on all three Arduino Nano boards**
-2. **Verify connections:** Check I²C wiring, LED resistors, servo power
-3. **Test discovery:** Run controller_discovery and execute `scan`
-4. **Test each device:**
-   - Calculator: `add 5 10`, then `result`
-   - LED: `set_all 0x0F`, then `get_state`
-   - Servo: `set_pos 0 90`, then `get_pos`
-5. **Test complex operations:**
-   - Calculator history: multiple operations, then `history`
-   - LED blinking: `blink 0 1 500` (LED 0, 500ms period)
-   - Servo sweep: `sweep 0 1 0 180 10` (servo 0, 0–180°, step 10)
-
-## Troubleshooting
-
-**No devices found during scan:**
-
-- Check I²C wiring (SDA/SCL/GND)
-- Verify peripherals are powered and running
-- Use `i2cdetect -y 1` to see what's on the bus
-- Check for address conflicts
-
-**Servo not moving:**
-
-- Verify external 5V power supply connected
-- Check servo signal wire on D9/D10
-- Check common ground between Arduino and servo supply
-- Test with simple position command: `servo set_pos 0 90`
-
-**LED not responding:**
-
-- Check wiring: D4-D7 → LED → 220Ω → GND
-- Test with: `led set_all 0x0F` (all on)
-- Verify LED polarity (long leg = anode/+)
-
-**Calculator returns wrong result:**
-
-- Test simple operation: `add 2 2`, then `result`
-- Check for overflow (32-bit integer limits)
-- View history: `history` command
-
-## Further Documentation
-
-- **Comprehensive Guide:** [docs/lhwit-family.md](../../../docs/lhwit-family.md)
-- **Discovery Controller:** [../controller_discovery/README.md](../controller_discovery/README.md)
-- **Manual Controller:** [../controller_manual/README.md](../controller_manual/README.md)
-- **Calculator Peripheral:** [calculator/README.md](calculator/README.md)
-- **LED Peripheral:** [led/README.md](led/README.md)
-- **Servo Peripheral:** [servo/README.md](servo/README.md)
+Copy the four headers, keep their type IDs, and bind a `crumbs_device_t` per
+device the way `controller_manual/main.c` does. The headers predate
+`crumbs_ops.h` and hand-write every wrapper; getters read with
+`crumbs_controller_read()` and compare type and opcode themselves. They will
+move to `crumbs_controller_read_expect()` and the peripherals to
+`crumbs_set_type_id()` once the library release that ships those is on the
+PlatformIO registry, since the projects pin the published version.

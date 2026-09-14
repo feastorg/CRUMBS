@@ -266,10 +266,10 @@ static void reply_handler_get_hist_meta(crumbs_context_t *ctx, crumbs_message_t 
 
 /*
  * History entry GET ops (CALC_OP_GET_HIST_0..11) are handled via on_request
- * fallback rather than individually-registered reply handlers. Registering
- * all 12 alongside the 4 SET handlers would exceed CRUMBS_MAX_HANDLERS (16
- * by default). The on_request callback is intentionally kept for this fan-out
- * case and serves as a practical illustration of the fallback model.
+ * fallback rather than individually-registered reply handlers. The reply
+ * table has its own CRUMBS_MAX_HANDLERS slots (this project builds with 8),
+ * so 3 + 12 reply handlers would not fit. The on_request callback is kept
+ * for this fan-out case and illustrates the fallback model.
  */
 static void on_request_hist(crumbs_context_t *ctx, crumbs_message_t *reply)
 {

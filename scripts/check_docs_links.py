@@ -50,6 +50,8 @@ def main() -> int:
     broken = []
     checked = 0
     for md in tracked_markdown():
+        if not md.exists():  # tracked but deleted in the working tree
+            continue
         text = FENCE_RE.sub("", md.read_text(encoding="utf-8"))
         targets = LINK_RE.findall(text) + REF_DEF_RE.findall(text)
         for raw in targets:
