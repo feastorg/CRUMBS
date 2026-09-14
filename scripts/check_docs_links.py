@@ -8,13 +8,14 @@ External (scheme) links are not fetched. Exit 1 if anything is broken.
 import re
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-LINK_RE = re.compile(r"(?<!\\)!?\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
+LINK_RE = re.compile(r"(?<!\\)!?\[(?:[^\[\]]|!\[[^\]]*\]\([^)]*\))*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 REF_DEF_RE = re.compile(r"^\s{0,3}\[[^\]]+\]:\s*(\S+)", re.M)
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$", re.M)
-FENCE_RE = re.compile(r"^(```|~~~).*?^\1\s*$", re.M | re.S)
+FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,}).*?^[ \t]*\1[ \t]*$", re.M | re.S)
 HTML_ANCHOR_RE = re.compile(r"<a\s+(?:name|id)=\"([^\"]+)\"")
 
 
@@ -22,8 +23,9 @@ def github_slug(text: str) -> str:
     text = re.sub(r"`([^`]*)`", r"\1", text)
     text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
     text = text.strip().lower()
-    text = re.sub(r"[^\w\- ]", "", text)
-    return text.replace(" ", "-")
+    # GitHub keeps letters, marks, digits, connectors, hyphens and spaces.
+    kept = (c for c in text if c in "- " or unicodedata.category(c)[0] in "LM" or unicodedata.category(c) in ("Nd", "Nl", "Pc"))
+    return "".join(kept).replace(" ", "-")
 
 
 def anchors_of(path: Path) -> set:

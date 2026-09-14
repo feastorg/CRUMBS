@@ -197,7 +197,7 @@ The first runs Doxygen over the public headers and fails on any undocumented sym
 **CI behavior:**
 
 - Documentation check runs on pushes and PRs to `dev` and `main`
-- Any Doxygen warning fails the `doxygen` job, which the required `ok` check depends on
+- Any Doxygen warning fails the `doxygen` job and any broken link fails the `docs-links` job; the required `ok` check depends on both
 - Goal: Keep public API documentation complete as the library evolves
 
 ### User Documentation
@@ -528,7 +528,8 @@ python scripts/generate_crc8.py  # --no-stage to skip
 - PlatformIO builds for AVR Nano and ESP32 examples
 - Core-only build and test under ASan+UBSan, and with `CRUMBS_MAX_HANDLERS=0` (`test_handlers` and `test_reply_handler` report as skipped there; `test_set_reply` compiles out its two table-dependent subtests)
 - `arduino-cli` compile of the two Arduino-IDE mixed-bus sketches, with ezo-driver and SparkFun BME280 pinned by tag
-- Doxygen documentation check
+- Doxygen documentation check (fails on any undocumented public symbol)
+- Markdown link check (`scripts/check_docs_links.py`; fails on any broken relative link or anchor)
 - CRC-8 source regeneration check (pycrc pinned to the version in the committed banner; the committed `src/crc` must match the generator output)
 - Repository metrics artifact generation
 - Tagged release packaging for Linux x86_64
