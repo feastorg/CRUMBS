@@ -150,6 +150,10 @@ if(CRUMBS_ENABLE_TESTS)
     target_link_libraries(test_type_id PRIVATE crumbs)
     add_test(NAME type_id_test COMMAND test_type_id)
 
+    add_executable(test_read_expect tests/test_read_expect.c)
+    target_link_libraries(test_read_expect PRIVATE crumbs)
+    add_test(NAME read_expect_test COMMAND test_read_expect)
+
     add_executable(test_handlers tests/test_handlers.c)
     target_link_libraries(test_handlers PRIVATE crumbs)
     add_test(NAME handlers_test COMMAND test_handlers)

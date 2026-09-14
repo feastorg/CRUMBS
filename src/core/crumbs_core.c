@@ -531,6 +531,31 @@ int crumbs_controller_read(crumbs_context_t *ctx,
     return crumbs_decode_message(buf, frame_len, out_msg, ctx);
 }
 
+int crumbs_controller_read_expect(crumbs_context_t *ctx,
+                                  uint8_t target_addr,
+                                  uint8_t expect_type_id,
+                                  uint8_t expect_opcode,
+                                  crumbs_message_t *out_msg,
+                                  crumbs_i2c_read_fn read_fn,
+                                  void *read_ctx)
+{
+    int rc = crumbs_controller_read(ctx, target_addr, out_msg, read_fn, read_ctx);
+    if (rc != 0)
+    {
+        return rc;
+    }
+
+    if (out_msg->opcode != expect_opcode ||
+        (expect_type_id != CRUMBS_TYPE_ID_ANY && out_msg->type_id != expect_type_id))
+    {
+        CRUMBS_DBG("rx: reply type 0x%02X op 0x%02X, expected type 0x%02X op 0x%02X\n",
+                   out_msg->type_id, out_msg->opcode, expect_type_id, expect_opcode);
+        return CRUMBS_RX_REPLY_MISMATCH;
+    }
+
+    return 0;
+}
+
 /**
  * @brief Peripheral-side handler for raw bytes received by a HAL.
  */

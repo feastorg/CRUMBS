@@ -105,6 +105,14 @@ extern "C"
  */
 #define CRUMBS_RX_TYPE_MISMATCH (-3)
 
+/**
+ * @brief crumbs_controller_read_expect() result: valid reply, wrong identity.
+ *
+ * The reply decoded correctly but its type_id/opcode are not the pair the
+ * controller asked for. out_msg holds what was received.
+ */
+#define CRUMBS_RX_REPLY_MISMATCH (-4)
+
     /**
      * @brief Role of a CRUMBS endpoint on the I2C bus.
      */
@@ -470,6 +478,34 @@ extern "C"
                                crumbs_message_t *out_msg,
                                crumbs_i2c_read_fn read_fn,
                                void *read_ctx);
+
+    /**
+     * @brief Read a reply and check it is the one that was asked for.
+     *
+     * crumbs_controller_read() followed by an identity check: the reply's
+     * opcode must equal @p expect_opcode, and its type_id must equal
+     * @p expect_type_id unless that is CRUMBS_TYPE_ID_ANY. A well-formed
+     * reply with a valid CRC can still be the wrong frame (another opcode's
+     * staged reply, another device type at a duplicated address); the CRC
+     * cannot catch that, this does. CRUMBS_DEFINE_GET_OP uses it.
+     *
+     * @param ctx            Initialized CRUMBS context in controller mode.
+     * @param target_addr    7-bit I2C address of the peripheral.
+     * @param expect_type_id Expected type_id, or CRUMBS_TYPE_ID_ANY to skip.
+     * @param expect_opcode  Expected opcode (always checked; 0x00 is a real opcode).
+     * @param out_msg        Output message; filled on success and on mismatch.
+     * @param read_fn        I2C read function (crumbs_i2c_read_fn).
+     * @param read_ctx       Opaque pointer passed to @p read_fn.
+     * @return 0 on success; crumbs_controller_read()'s codes on read/decode
+     *         failure; CRUMBS_RX_REPLY_MISMATCH (-4) on an identity mismatch.
+     */
+    int crumbs_controller_read_expect(crumbs_context_t *ctx,
+                                      uint8_t target_addr,
+                                      uint8_t expect_type_id,
+                                      uint8_t expect_opcode,
+                                      crumbs_message_t *out_msg,
+                                      crumbs_i2c_read_fn read_fn,
+                                      void *read_ctx);
 
     /**
      * @brief Probe an I2C address range for CRUMBS-capable devices.

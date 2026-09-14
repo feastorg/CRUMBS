@@ -456,7 +456,7 @@ Maximum payload is `CRUMBS_MAX_PAYLOAD` bytes (27). All multi-byte values are li
 - [ ] One `*_send_*` function per SET operation
 - [ ] One `*_query_*` function per GET operation (sends SET_REPLY)
 - [ ] One `*_result_t` struct per GET operation
-- [ ] One `*_get_*` function per GET operation (query + delay + read + parse + identity check)
+- [ ] One `*_get_*` function per GET operation (query + delay + `crumbs_controller_read_expect` + parse); hand-written getters use `crumbs_controller_read_expect()` rather than comparing `type_id`/`opcode` themselves
 - [ ] All `_get_*` functions return 0 on success, non-zero on error
 - [ ] `CRUMBS_DEFINE_GET_OP` / `CRUMBS_DEFINE_SEND_OP` used for 1:1 ops (or equivalent hand-written)
 - [ ] Header guard (`#ifndef / #define / #endif`) in place
