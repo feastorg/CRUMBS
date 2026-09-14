@@ -170,12 +170,10 @@ static inline int therm_get_temp(const crumbs_device_t *dev, therm_temp_result_t
 
     dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);
 
-    rc = crumbs_controller_read(dev->ctx, dev->addr, &reply, dev->read_fn, dev->io);
+    rc = crumbs_controller_read_expect(dev->ctx, dev->addr, THERM_TYPE_ID, THERM_OP_GET_TEMP,
+                                       &reply, dev->read_fn, dev->io);
     if (rc != 0)
-        return rc;
-
-    if (reply.type_id != THERM_TYPE_ID || reply.opcode != THERM_OP_GET_TEMP)
-        return -1;
+        return rc; /* read/decode codes, or CRUMBS_RX_REPLY_MISMATCH for another opcode's reply */
 
     /* Parse [ch0:i16][ch1:i16] using crumbs_msg_read_u16 then cast */
     uint16_t raw0, raw1;
@@ -191,16 +189,16 @@ static inline int therm_get_temp(const crumbs_device_t *dev, therm_temp_result_t
 }
 ```
 
-> **Why `crumbs_controller_read` instead of calling `read_fn` directly?**
+> **Why `crumbs_controller_read_expect` instead of calling `read_fn` directly?**
 >
-> `crumbs_controller_read` validates the frame length, calls `crumbs_decode_message` (CRC check + struct population), and returns a clean `crumbs_message_t`. Calling `read_fn` directly skips CRC validation and leaves raw bytes in a local buffer, which every caller would have to manage identically. The core function exists precisely so ops headers don't have to repeat this 4-line pattern.
+> It validates the frame length, calls `crumbs_decode_message` (CRC check + struct population), and then checks the reply is the one you asked for: a peripheral's staged reply persists until the next SET_REPLY, so a well-formed, CRC-valid frame can still be the answer to a *previous* query. Calling `read_fn` directly skips all of that and leaves raw bytes in a local buffer that every caller would have to manage identically. The core function exists so ops headers don't repeat it.
 
 ---
 
 ## Step 7: Reduce boilerplate with `crumbs_ops.h` (optional)
 
 The `_query_*` + `_get_*` pair and single-parameter `_send_*` functions are entirely deterministic.
-`src/crumbs_ops.h` provides macros that generate the identical code from a single line:
+`src/crumbs_ops.h` provides macros that generate the same sequence of calls from a single line:
 
 ```c
 #include "crumbs_ops.h"
@@ -456,7 +454,7 @@ Maximum payload is `CRUMBS_MAX_PAYLOAD` bytes (27). All multi-byte values are li
 - [ ] One `*_send_*` function per SET operation
 - [ ] One `*_query_*` function per GET operation (sends SET_REPLY)
 - [ ] One `*_result_t` struct per GET operation
-- [ ] One `*_get_*` function per GET operation (query + delay + read + parse + identity check)
+- [ ] One `*_get_*` function per GET operation (query + delay + `crumbs_controller_read_expect` + parse); hand-written getters use `crumbs_controller_read_expect()` rather than comparing `type_id`/`opcode` themselves
 - [ ] All `_get_*` functions return 0 on success, non-zero on error
 - [ ] `CRUMBS_DEFINE_GET_OP` / `CRUMBS_DEFINE_SEND_OP` used for 1:1 ops (or equivalent hand-written)
 - [ ] Header guard (`#ifndef / #define / #endif`) in place

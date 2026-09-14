@@ -6,8 +6,8 @@
  * @brief Helper macros for defining family ops-header functions.
  *
  * These macros generate the boilerplate query/get/send wrapper functions
- * that every CRUMBS family ops header requires. They produce identical
- * code to hand-written equivalents and carry no runtime overhead.
+ * that every CRUMBS family ops header requires. They expand to the same
+ * calls a hand-written wrapper would make and carry no runtime overhead.
  *
  * Usage — in your family's ops header (e.g. therm_ops.h):
  *
@@ -55,7 +55,8 @@ static inline int crumbs_ops_can_get(const crumbs_device_t *dev)
  *
  * Generates:
  *   family_query_name(dev)           — @internal, sends SET_REPLY probe
- *   family_get_name(dev, result_t*)  — public, full query+delay+read+parse
+ *   family_get_name(dev, result_t*)  — public: query, delay,
+ *                                       crumbs_controller_read_expect, parse
  *
  * Parameters:
  *   family    Token prefix, e.g. therm
@@ -85,11 +86,11 @@ static inline int crumbs_ops_can_get(const crumbs_device_t *dev)
         _rc = family##_query_##name(dev);                                               \
         if (_rc != 0) return _rc;                                                       \
         dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);                                   \
-        _rc = crumbs_controller_read(dev->ctx, dev->addr, &_r,                         \
-                                     dev->read_fn, dev->io);                           \
+        _rc = crumbs_controller_read_expect(dev->ctx, dev->addr,                       \
+                                            (uint8_t)(type_id_value),                  \
+                                            (uint8_t)(opcode_value), &_r,              \
+                                            dev->read_fn, dev->io);                    \
         if (_rc != 0) return _rc;                                                       \
-        if (_r.type_id != (uint8_t)(type_id_value) ||                                  \
-            _r.opcode  != (uint8_t)(opcode_value))  return -1;                         \
         return parse_fn(_r.data, _r.data_len, out);                                    \
     }
 
