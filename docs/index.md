@@ -109,10 +109,11 @@ void setup() {
 
 ### Meta
 
-| Document                        | Description                            |
-| ------------------------------- | -------------------------------------- |
-| [PlatformIO](platformio.md)     | Registry publishing and CI integration |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history and release notes      |
+| Document                        | Description                                    |
+| ------------------------------- | ---------------------------------------------- |
+| [PlatformIO](platformio.md)     | Registry publishing and CI integration         |
+| [Roadmap](roadmap.md)           | Deferred directions and out-of-scope decisions |
+| [CHANGELOG.md](../CHANGELOG.md) | Version history and release notes              |
 
 ---
 
