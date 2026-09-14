@@ -54,6 +54,7 @@ void crumbs_init(crumbs_context_t *ctx,
      */
     ctx->address = (role == CRUMBS_ROLE_PERIPHERAL) ? address : 0u;
     ctx->role = role;
+    ctx->type_id = 0u; /* Not declared: accept every type (see crumbs_set_type_id) */
     ctx->crc_error_count = 0u;
     ctx->last_crc_ok = 0u;
     ctx->on_message = NULL;
@@ -100,6 +101,15 @@ void crumbs_set_callbacks(crumbs_context_t *ctx,
     ctx->on_message = on_message;
     ctx->on_request = on_request;
     ctx->user_data = user_data;
+}
+
+void crumbs_set_type_id(crumbs_context_t *ctx, uint8_t type_id)
+{
+    if (!ctx)
+    {
+        return;
+    }
+    ctx->type_id = type_id;
 }
 
 /**
@@ -555,6 +565,20 @@ int crumbs_peripheral_handle_receive(crumbs_context_t *ctx,
     {
         CRUMBS_DBG("rx: decode failed (%d)\n", rc);
         return rc;
+    }
+
+    /*
+     * Type check. A declared type rejects frames for any other declared type
+     * before anything is dispatched, including SET_REPLY. CRUMBS_TYPE_ID_ANY
+     * (0x00) is a wildcard: the library's own getters and the scan probe send
+     * it, and a peripheral that has not declared a type accepts everything.
+     */
+    if (ctx->type_id != CRUMBS_TYPE_ID_ANY &&
+        msg.type_id != CRUMBS_TYPE_ID_ANY &&
+        msg.type_id != ctx->type_id)
+    {
+        CRUMBS_DBG("rx: type 0x%02X is not ours (0x%02X), dropped\n", msg.type_id, ctx->type_id);
+        return CRUMBS_RX_TYPE_MISMATCH;
     }
 
     /*

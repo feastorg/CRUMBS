@@ -52,7 +52,7 @@ Variable-length I²C messaging with CRC-8 validation
 
 | Range         | Decimal | Status                          |
 | ------------- | ------- | ------------------------------- |
-| `0x00`        | 0       | **Avoid** (uninitialized value) |
+| `0x00`        | 0       | **Wildcard** (`CRUMBS_TYPE_ID_ANY`) — never a device type |
 | `0x01`–`0xFF` | 1–255   | **Available** (255 type IDs)    |
 
 **Semantics:**
@@ -60,6 +60,12 @@ Variable-length I²C messaging with CRC-8 validation
 - Type ID identifies device **class/type**, not individual device
 - Multiple devices can share same type_id (distinguished by I²C address)
 - Each type_id has independent opcode namespace
+- A peripheral that has declared its type (`crumbs_set_type_id()`) drops any
+  frame whose type_id is another non-zero value, before dispatch. A peripheral
+  that has not declared one accepts every frame.
+- `0x00` in a frame means "any type": it is never rejected by that check. The
+  library's own SET_REPLY frames (from `CRUMBS_DEFINE_GET_OP` getters) and the
+  non-strict scan probe carry `0x00`. Do not assign `0x00` to a device.
 
 ---
 
@@ -124,6 +130,8 @@ The SET_REPLY command allows a controller to specify which data a peripheral sho
 #### Properties
 
 - SET_REPLY is NOT dispatched to user handlers or callbacks
+- `type_id` in a SET_REPLY frame is normally `0x00` (wildcard); a non-zero
+  value is subject to the peripheral's type check like any other frame
 - `requested_opcode` persists until another SET_REPLY is received
 - Initial value is `0x00` (by convention: device/version info)
 - Empty payload is ignored (no change to requested_opcode)
