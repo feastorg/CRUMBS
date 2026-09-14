@@ -27,7 +27,7 @@ crumbs_message_t msg;
 crumbs_msg_init(&msg, 0x01, 0x01);  // type_id=1, opcode=1
 crumbs_msg_add_u8(&msg, 1);         // payload: LED ON
 
-crumbs_controller_send(&ctx, 0x08, &msg, crumbs_arduino_wire_write, NULL);
+crumbs_controller_send(&ctx, 0x10, &msg, crumbs_arduino_wire_write, NULL);
 ```
 
 ```c
@@ -57,7 +57,7 @@ void on_message(crumbs_context_t *ctx, const crumbs_message_t *msg) {
 }
 
 void setup() {
-    crumbs_arduino_init_peripheral(&ctx, 0x08);
+    crumbs_arduino_init_peripheral(&ctx, 0x10);
     crumbs_set_callbacks(&ctx, on_message, NULL, NULL);
     crumbs_register_reply_handler(&ctx, 0x00, reply_version,   NULL);
     crumbs_register_reply_handler(&ctx, 0x80, reply_get_state, NULL);
@@ -67,7 +67,7 @@ void setup() {
 ## Features
 
 - **Variable-length payload** (0–27 bytes, 4–31 total frame)
-- **Controller/peripheral** (one controller, up to 112 devices)
+- **Controller/peripheral** (one controller, any number of peripherals)
 - **Handler dispatch** (per-opcode SET handlers via `crumbs_register_handler`)
 - **Reply handler dispatch** (per-opcode GET handlers via `crumbs_register_reply_handler`)
 - **Message helpers** (type-safe: u8, u16, u32, i32, float)
@@ -76,7 +76,7 @@ void setup() {
 - **Discovery** (scan for compatible devices)
 - **Bound-device handle** (`crumbs_device_t` groups transport fields per device)
 - **Platforms** (Arduino, PlatformIO, Linux)
-- **Zero allocation** (deterministic, RTOS-safe)
+- **Zero allocation** (no heap; every buffer is the caller's)
 
 ---
 
@@ -87,7 +87,7 @@ void setup() {
 | Document                              | Description                                                       |
 | ------------------------------------- | ----------------------------------------------------------------- |
 | [Platform Setup](platform-setup.md)   | Installation and configuration for Arduino, PlatformIO, and Linux |
-| [Protocol Specification](protocol.md) | Wire format, versioning, CRC-8, reserved opcodes                  |
+| [Protocol](protocol.md)               | Normative wire format: frame, CRC-8, SET_REPLY, address/type/opcode spaces |
 | [Examples](examples.md)               | Three-tier learning path with platform coverage                   |
 
 ### Reference
@@ -95,7 +95,7 @@ void setup() {
 | Document                              | Description                                                      |
 | ------------------------------------- | ---------------------------------------------------------------- |
 | [API Reference](api-reference.md)     | Complete C API, handler dispatch, message helpers, platform HALs |
-| [Architecture](architecture.md)       | Design philosophy, stakeholder roles, system architecture        |
+| [Architecture](architecture.md)       | Layers, dispatch order, handler tables, memory, HAL differences  |
 | [LHWIT Family](lhwit-family.md)       | Reference implementation (LEDs, servos, calculator, display)     |
 | [Create a Family](create-a-family.md) | Step-by-step guide for authoring custom device families          |
 
@@ -214,15 +214,6 @@ crumbs_msg_read_u16(data, len, offset, &out);
 crumbs_msg_read_u32(data, len, offset, &out);
 crumbs_msg_read_float(data, len, offset, &out);
 ```
-
----
-
-## Archived Documentation
-
-Historical and technical deep-dive documents are in [archive/](archive/):
-
-- `developer-notes.md` — Historical design decisions
-- `crc.md` — CRC-8 implementation details
 
 ---
 

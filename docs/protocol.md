@@ -1,266 +1,219 @@
-# Protocol Specification
+# Protocol
 
-**CRUMBS Protocol v0.10**  
-Variable-length I²C messaging with CRC-8 validation
+**CRUMBS protocol 1.0.** The frame below has been the wire format since library
+0.7; SET_REPLY (opcode `0xFE`) was added in 0.10.0, and receivers have rejected
+over-long buffers since 0.12.4. Nothing on the wire changes without a new
+protocol major version. This document is normative; the library
+version (`CRUMBS_VERSION`) is a separate number and moves independently.
 
----
+CRUMBS is a message layer over plain I²C. The I²C address selects the device;
+everything inside the transaction is one CRUMBS frame.
 
-## Wire Format
-
-```text
-┌──────────┬──────────┬──────────┬─────────────────┬──────────┐
-│  type_id │  opcode  │ data_len │   data[0..N]    │   crc8   │
-│ (1 byte) │ (1 byte) │ (1 byte) │ (0–27 bytes)    │ (1 byte) │
-└──────────┴──────────┴──────────┴─────────────────┴──────────┘
-```
-
-**Message size:** 4–31 bytes  
-**Maximum payload:** 27 bytes (constrained by Arduino Wire's 32-byte buffer)
-
----
-
-## Field Specifications
-
-| Field      | Size       | Range         | Available | Description                      |
-| ---------- | ---------- | ------------- | --------- | -------------------------------- |
-| `type_id`  | 1 byte     | `0x00`-`0xFF` | 255       | Device type; `0x00` = wildcard   |
-| `opcode`   | 1 byte     | `0x01`-`0xFD` | 253       | Command identifier (per type_id) |
-| `data_len` | 1 byte     | `0`-`27`      | 28        | Payload byte count               |
-| `data[]`   | 0–27 bytes | N/A           | N/A       | Opaque payload                   |
-| `crc8`     | 1 byte     | N/A           | N/A       | CRC-8 (polynomial 0x07)          |
-
-**Notes:**
-
-- The I²C address is handled by the transport layer (not part of the CRUMBS frame)
-- Maximum 31 bytes ensures Arduino Wire compatibility
-- CRC covers `type_id`, `opcode`, `data_len`, and `data[]` (excludes `crc8` itself)
-- Payload is opaque bytes; applications encode floats, ints, structs, etc. as needed
-
----
-
-## Address Space
-
-| Range         | Decimal | Status                           |
-| ------------- | ------- | -------------------------------- |
-| `0x00`–`0x07` | 0–7     | **Reserved** (I²C specification) |
-| `0x08`–`0x77` | 8–119   | **Available** (112 addresses)    |
-| `0x78`–`0x7F` | 120–127 | **Reserved** (I²C specification) |
-
----
-
-## Type ID Space
-
-| Range         | Decimal | Status                          |
-| ------------- | ------- | ------------------------------- |
-| `0x00`        | 0       | **Wildcard** (`CRUMBS_TYPE_ID_ANY`) — never a device type |
-| `0x01`–`0xFF` | 1–255   | **Available** (255 type IDs)    |
-
-**Semantics:**
-
-- Type ID identifies device **class/type**, not individual device
-- Multiple devices can share same type_id (distinguished by I²C address)
-- Each type_id has independent opcode namespace
-- A peripheral that has declared its type (`crumbs_set_type_id()`) drops any
-  frame whose type_id is another non-zero value, before dispatch. A peripheral
-  that has not declared one accepts every frame.
-- `0x00` in a frame means "any type": it is never rejected by that check. The
-  library's own SET_REPLY frames (from `CRUMBS_DEFINE_GET_OP` getters) and the
-  non-strict scan probe carry `0x00`. Do not assign `0x00` to a device.
-
----
-
-## Opcode Space
-
-| Range         | Decimal | Status                          |
-| ------------- | ------- | ------------------------------- |
-| `0x00`        | 0       | **Convention** (version info)   |
-| `0x01`–`0xFD` | 1–253   | **Available** (253 opcodes)     |
-| `0xFE`        | 254     | **Reserved** (SET_REPLY)        |
-| `0xFF`        | 255     | **Convention** (error response) |
-
-### Opcode Allocation Convention
-
-**Purpose:** Separate SET (commands) and GET (queries) operations to avoid reply ambiguity.
-
-**Common strategies:** Each type_id chooses allocation based on device needs.
-
-| Strategy           | SET Range     | GET Range     | Use Case                           |
-| ------------------ | ------------- | ------------- | ---------------------------------- |
-| **Balanced**       | `0x01`-`0x7F` | `0x80`-`0xFD` | General purpose (127 SET, 126 GET) |
-| **Sensor-heavy**   | `0x01`-`0x1F` | `0x20`-`0xFD` | Many readings (31 SET, 222 GET)    |
-| **Actuator-heavy** | `0x01`-`0xDF` | `0xE0`-`0xFD` | Many commands (223 SET, 30 GET)    |
-| **Simple device**  | `0x01`-`0x0F` | `0x10`-`0x1F` | Minimal opcodes (15 SET, 16 GET)   |
-
-**Example (balanced 0x80 split):**
-
-```c
-// LED controller
-#define LED_OP_SET_ALL   0x01  // SET: Change all LEDs
-#define LED_OP_BLINK     0x02  // SET: Configure blinking
-#define LED_OP_GET_STATE 0x80  // GET: Query current state
-```
-
----
-
-## Reserved Opcodes
-
-### Opcode 0xFE: SET_REPLY
-
-The SET_REPLY command allows a controller to specify which data a peripheral should return on the next I²C read request.
-
-#### Wire format
+## Frame
 
 ```text
-┌──────────┬──────────┬──────────┬───────────────┬──────────┐
-│  type_id │   0xFE   │   0x01   │ target_opcode │   crc8   │
-│ (1 byte) │ (1 byte) │ (1 byte) │   (1 byte)    │ (1 byte) │
-└──────────┴──────────┴──────────┴───────────────┴──────────┘
+┌─────────┬────────┬──────────┬──────────────────┬──────┐
+│ type_id │ opcode │ data_len │ data[0..data_len)│ crc8 │
+│ 1 byte  │ 1 byte │ 1 byte   │ 0–27 bytes       │ 1 B  │
+└─────────┴────────┴──────────┴──────────────────┴──────┘
 ```
 
-#### Workflow
+| Field      | Meaning                                                          |
+| ---------- | ---------------------------------------------------------------- |
+| `type_id`  | Device class the frame is addressed to or comes from. `0x00` = any. |
+| `opcode`   | Command or query identifier, scoped to the `type_id`. `0xFE` is reserved. |
+| `data_len` | Payload length, `0`–`27`.                                        |
+| `data`     | Opaque bytes; the application defines the layout.                |
+| `crc8`     | CRC-8 over the preceding `3 + data_len` bytes.                   |
+
+Frame length is `4 + data_len`: 4 bytes minimum, 31 maximum
+(`CRUMBS_MESSAGE_MAX_SIZE`). The 31-byte ceiling is chosen so a frame fits the
+32-byte buffer of the AVR Arduino `Wire` library.
+
+A receiver rejects a frame when the buffer is shorter than 4 bytes, `data_len`
+exceeds 27, the buffer is shorter *or longer* than `4 + data_len`, or the CRC
+does not match. Only a CRC mismatch counts as a CRC error in the receiver's
+statistics; structural failures do not.
+
+### CRC-8
+
+| Parameter   | Value                                   |
+| ----------- | --------------------------------------- |
+| Width       | 8                                       |
+| Polynomial  | `0x07` (x⁸ + x² + x + 1)                |
+| Init        | `0x00`                                  |
+| Reflect in/out | no / no                              |
+| XOR out     | `0x00`                                  |
+| Check value | `crc8("123456789") = 0xF4`              |
+
+These are the parameters of CRC-8/SMBUS. The CRC covers `type_id`, `opcode`,
+`data_len` and `data`, in that order, and excludes the CRC byte. The reference
+implementation is a 16-entry nibble table generated by pycrc
+(`src/crc/crc8_nibble.c`); `crumbs_crc8()` is the public entry point.
+
+### Multi-byte values
+
+The payload is opaque to the protocol. The library's helpers
+(`crumbs_msg_add_u16()` and friends) write integers **little-endian** and floats
+as their 4 native bytes; a family that uses them inherits that convention.
+
+## Transactions
+
+Two I²C transaction shapes carry every CRUMBS exchange.
+
+**SET** — one write. The controller writes a frame; the peripheral validates it
+and dispatches on `opcode`. Nothing comes back on the bus.
+
+**GET** — a write, then a read.
 
 ```text
-1. Controller → SET_REPLY(0x80) → Peripheral  # Request opcode 0x80
-2. Library intercepts, stores ctx->requested_opcode = 0x80
-3. Controller → I²C read request → Peripheral
-4. Peripheral on_request() switches on ctx->requested_opcode
-5. Controller ← Reply with opcode 0x80 data ← Peripheral
+controller ─ write ─▶ [type][0xFE][0x01][op][crc]   SET_REPLY: stage opcode `op`
+           (wait)
+controller ─ read  ─▶ up to 31 bytes                 the peripheral's reply frame
 ```
 
-#### Properties
+The peripheral stores `op` as its *requested opcode* and builds the reply when
+the read arrives. The requested opcode persists until the next SET_REPLY, so a
+controller can read the same value repeatedly with one SET_REPLY.
 
-- SET_REPLY is NOT dispatched to user handlers or callbacks
-- `type_id` in a SET_REPLY frame is `0x00` (wildcard; what the generated getters
-  send) or the target's type; either passes the peripheral's type check. Any
-  other non-zero value is dropped like any other frame
-- `requested_opcode` persists until another SET_REPLY is received
-- Initial value is `0x00` (by convention: device/version info)
-- Empty payload is ignored (no change to requested_opcode)
+### SET_REPLY (`0xFE`)
 
-### Opcode 0x00: Version Info Convention
+The only opcode the protocol reserves. The library intercepts it before any
+user code runs: it is never delivered to `on_message` or to a handler, and a
+handler registered for `0xFE` is never called.
 
-By convention, opcode `0x00` should return device identification and version information.
+- The generated wrappers send it with `type_id 0x00` and a one-byte payload
+  (hand-written senders may use the target's type). A receiver accepts any
+  `data_len ≥ 1` and uses `data[0]`; an empty payload leaves the requested
+  opcode unchanged.
+- The initial requested opcode after initialisation is `0x00`.
+- A SET_REPLY frame is subject to the type check below like any other frame.
 
-#### Recommended payload format (5 bytes)
+### The read
 
-```text
-┌─────────────────┬───────────────┬───────────────┬───────────────┐
-│ CRUMBS_VERSION  │  module_major │  module_minor │  module_patch │
-│    (2 bytes)    │    (1 byte)   │    (1 byte)   │    (1 byte)   │
-└─────────────────┴───────────────┴───────────────┴───────────────┘
-```
+A controller reads 31 bytes and trims to the length the reply's own header
+declares; on both Arduino and Linux a peripheral that has finished its frame
+leaves the remaining bytes reading as `0xFF`, and a decoder that receives the
+untrimmed buffer rejects it as over-long. A peripheral with neither a reply
+handler for the requested opcode nor an `on_request` callback gives the HAL
+nothing to write (the AVR `Wire` core then clocks out a single `0x00`), and
+the read fails to decode either way; a handler that returns without filling
+the reply sends the empty frame `00 00 00 00`.
 
-#### Example implementation
+### When the reply is built
 
-```c
-void on_request(crumbs_context_t *ctx, crumbs_message_t *reply) {
-    switch (ctx->requested_opcode) {
-        case 0x00:  // Version info
-            crumbs_msg_init(reply, MY_TYPE_ID, 0x00);
-            crumbs_msg_add_u16(reply, CRUMBS_VERSION);  // Library version
-            crumbs_msg_add_u8(reply, 1);  // Module major version
-            crumbs_msg_add_u8(reply, 0);  // Module minor version
-            crumbs_msg_add_u8(reply, 0);  // Module patch version
-            break;
-        // ... other opcodes ...
-    }
-}
-```
+The peripheral builds its reply inside the I²C request callback — after the
+controller has addressed it for reading and before the first byte is clocked
+out. On AVR that callback runs in the TWI interrupt with SCL held low by the
+hardware (clock stretching), so the controller's read waits for the reply to
+be encoded. Incoming frames are processed in the receive interrupt the same
+way, and a read that arrives while that is still running is address-ACKed by
+the hardware and stretched until the interrupt returns. The controller must
+therefore tolerate clock stretching. `CRUMBS_DEFAULT_QUERY_DELAY_US` (10 ms),
+the pause the generated getters insert between the SET_REPLY write and the
+read, is margin on top of that, chosen conservatively; the header says to
+reduce it only with an oscilloscope on the bus.
 
-**Benefits:**
+Two limits apply. The Raspberry Pi's Broadcom I²C controller does not honour
+clock stretching: when a peripheral's interrupt is late it reads `0xFF` bytes
+instead of waiting, which fails the CRC — measured as a few percent of first
+reads in [feastorg/Slice_DCMT#3](https://github.com/feastorg/Slice_DCMT/issues/3),
+unchanged by halving the bus clock or lengthening the pre-read delay. And
+SMBus, whose CRC this protocol shares, caps a target's cumulative stretching at
+25 ms per message (T_LOW:SEXT) and a controller's at 10 ms per byte
+(T_LOW:MEXT); a reply handler that finishes well inside 25 ms keeps CRUMBS
+usable on SMBus-timed controllers.
 
-- Controllers can identify device types during bus scan
-- Version compatibility checking
-- Debugging aid
+### Type check
 
----
+A peripheral may declare its own `type_id` (`crumbs_set_type_id()`). Once
+declared, an incoming frame is dropped — before SET_REPLY handling and before
+any callback — when its `type_id` is neither `0x00` nor the declared value. A
+peripheral that has not declared a type accepts every frame. The check runs
+after CRC validation, so a corrupt frame is reported as a CRC error whatever
+its type.
 
-## Versioning
+On the controller side, `crumbs_controller_read_expect()` applies the mirror
+check to a reply: opcode must match, and `type_id` must match unless the
+expected type is `0x00`.
 
-**Library version:** `CRUMBS_VERSION` macro (integer: major*10000 + minor*100 + patch)
+## Number spaces
 
-**Module compatibility:** Follow [Semantic Versioning](https://semver.org/):
+### I²C address
 
-- **MAJOR**: Incompatible protocol changes (must match)
-- **MINOR**: New commands added (peripheral >= controller required)
-- **PATCH**: Bug fixes (no compatibility impact)
+CRUMBS uses 7-bit addressing. I²C reserves `0x00`–`0x07` and `0x78`–`0x7F`,
+leaving `0x08`–`0x77`. Within it,
+avoid addresses another standard on the same bus may drive, worst first:
 
-**Version check example:**
+| Avoid          | Why                                                             |
+| -------------- | --------------------------------------------------------------- |
+| `0x0C`         | SMBus Alert Response Address: a host reads it expecting every alerting device to answer |
+| `0x08`–`0x0B`  | SMBus Host, Smart Battery Charger, Selector and Battery (SMBus 3.3.1, Table 17) |
+| `0x48`–`0x4B`  | SMBus prototype addresses, "not intended for production parts and should never be assigned to any device" (SMBus §6.2.2.3); LM75-class temperature sensors occupy `0x48`–`0x4F` |
+| `0x50`–`0x57`  | 24Cxx EEPROMs and DIMM SPD, the most contested block on a real bus |
+| `0x61`         | SMBus Device Default Address (ARP); the Atlas Scientific EZO-DO also ships here |
 
-```c
-if (crumbs_version < 1003) {  // Require >= 0.10.3
-    fprintf(stderr, "CRUMBS library too old\n");
-}
-```
+`0x10`–`0x17` is reserved by neither the I²C specification nor SMBus, and is
+where the library's examples default. Every address is a default: the
+integrator owns the map, and the controller-side scanners exist so a conflict
+is found on the bench rather than in the field.
 
----
+### `type_id`
 
-## CRC-8 Specification
+`0x00` is the wildcard and must not be assigned to a device. `0x01`–`0xFF`
+identify a device class, not an individual — two devices of the same type are
+told apart by address. Each type owns an independent opcode space.
 
-| Property   | Value                                     |
-| ---------- | ----------------------------------------- |
-| Polynomial | `0x07` (x^8 + x^2 + x + 1)                |
-| Initial    | `0x00`                                    |
-| Algorithm  | Nibble-based (4-bit chunks)               |
-| Coverage   | `type_id`, `opcode`, `data_len`, `data[]` |
-| Excluded   | `crc8` field itself                       |
+### `opcode`
 
-Implementation: `crc8_nibble_calculate()` from `src/crc/crc8_nibble.c`
+| Value         | Status                                                     |
+| ------------- | ---------------------------------------------------------- |
+| `0xFE`        | Reserved: SET_REPLY.                                       |
+| `0x00`        | Convention: version information (below).                   |
+| all others    | Free per type. Convention: SET commands low, GET queries from `0x80` up, so a reply's opcode says what it is. |
 
----
+`0x00` is an ordinary opcode to the library; only the convention gives it
+meaning.
 
-## Communication Patterns
+### Opcode `0x00`: version information
 
-```text
-Controller → [4–31 byte message] → Peripheral    # Send command (SET)
-Controller → [SET_REPLY + target] → Peripheral   # Request specific data
-Controller → [I²C read request] → Peripheral     # Read staged reply
-Controller ← [4–31 byte response] ← Peripheral   # Receive data (GET)
-```
+A peripheral should answer opcode `0x00` with five bytes:
 
----
+| Byte  | Content                                                 |
+| ----- | ------------------------------------------------------- |
+| 0–1   | `CRUMBS_VERSION` of the library the peripheral was built with, little-endian |
+| 2     | module major                                            |
+| 3     | module minor                                            |
+| 4     | module patch                                            |
 
-## Timing
+`crumbs_build_version_reply(reply, type_id, major, minor, patch)` produces
+exactly this frame. A controller that reads it can tell the device's type,
+its firmware version and which CRUMBS release it runs; a peripheral that
+implements it answers a bare read with it, since the requested opcode starts
+at `0x00`. For compatibility, treat the module version as semantic: a major
+mismatch is incompatible, and a peripheral's minor must be at least the
+controller's. `crumbs_controller_scan_for_crumbs_with_types()` reports the
+`type_id` of whatever frame each device returns.
 
-| Parameter       | Value        | Notes                                |
-| --------------- | ------------ | ------------------------------------ |
-| Message spacing | 10ms min     | delay() between send/read            |
-| Read timeout    | 50ms typical | Processing time                      |
-| I²C clock       | 100kHz       | Use 50kHz if CRC errors              |
-| Bus length      | <30cm        | Longer needs lower clock/termination |
+`CRUMBS_VERSION` is `major × 10000 + minor × 100 + patch` (`0.12.5` → `1205`).
+For the module version, bump major for an incompatible opcode or payload
+change, minor for additions, patch for fixes.
 
-**Critical:** `delay(10)` between send and read:
+## Discovery
 
-```c
-crumbs_controller_send(&ctx, 0x08, &msg, write_fn, NULL);
-delay(10);
-crumbs_arduino_read(NULL, 0x08, buf, sizeof(buf), 5000);
-```
+The controller-side scanners take one of two probes:
 
----
+- **Read probe** (`crumbs_controller_scan_for_crumbs*`, both modes): read the
+  address and accept it if the bytes decode as a CRUMBS frame. The CRC is the
+  discriminator, so a foreign device whose first bytes happen to be
+  CRC-consistent is reported as present; the tests keep a deliberate example.
+  In non-strict mode an address whose read did not decode is written an
+  all-zero frame (`00 00 00 00`) and read once more; that write is a page
+  write to a 24Cxx EEPROM at the same address.
+- **Address probe** (`crumbs_arduino_scan`, `crumbs_linux_scan`): I²C-level only.
+  Strict mode reads one byte, which consumes a byte from whatever device
+  answers; non-strict mode is an address-only ACK check. Neither decodes a
+  frame.
 
-## Example: Encoding Data Types
-
-### Float
-
-```c
-crumbs_message_t msg;
-crumbs_msg_init(&msg, 0x01, 0x01);
-crumbs_msg_add_float(&msg, 25.5f);
-```
-
-### Multiple values
-
-```c
-crumbs_msg_init(&msg, 0x01, 0x02);
-crumbs_msg_add_u16(&msg, 1234);    // 2 bytes
-crumbs_msg_add_u8(&msg, 0xAB);     // 1 byte
-crumbs_msg_add_float(&msg, 3.14f); // 4 bytes
-// Total: 7 bytes payload
-```
-
----
-
-## See Also
-
-- [api-reference.md](api-reference.md) - Complete API documentation including message helpers
+See [api-reference.md](api-reference.md#discovery-and-scanning) for the signatures and
+return values.

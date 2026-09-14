@@ -12,7 +12,7 @@ This controller demonstrates proper CRUMBS usage with auto-discovery:
 - Canonical `*_ops.h` helper functions - Protocol-defined command builders
 - SET_REPLY query pattern - Two-step query/read for GET operations
 - Platform-specific `crumbs_linux_read_message()` - Linux I2C read wrapper
-- Version querying and compatibility checking per [protocol.md](../../../docs/protocol.md#opcode-0x00-version-info-convention)
+- Version querying and compatibility checking per [protocol.md](../../../docs/protocol.md#opcode-0x00-version-information)
 
 **Application Features:**
 
@@ -117,7 +117,7 @@ OK: Servo 0 position set to 90°
 - Checks CRUMBS version >= 0.10.0 (encoded as 1000)
 - Verifies module major version match, minor version peripheral >= controller
 - Incompatible devices are blocked from commands with clear error messages
-- See [protocol.md](../../../docs/protocol.md#opcode-0x00-version-info-convention) for compatibility rules
+- See [protocol.md](../../../docs/protocol.md#opcode-0x00-version-information) for compatibility rules
 
 ## Requirements
 

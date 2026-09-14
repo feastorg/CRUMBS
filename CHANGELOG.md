@@ -18,6 +18,7 @@ All notable changes to CRUMBS are documented in this file.
 
 ### Changed
 
+- Documentation: `docs/protocol.md` now declares **CRUMBS protocol 1.0** (the frame has been unchanged since library 0.7, SET_REPLY since 0.10.0) and is rewritten as the normative wire document, including the I2C address avoid-list, when the peripheral builds its reply (clock stretching), the Raspberry Pi controller's known failure to honour stretching, and the SMBus stretch limits. `docs/architecture.md` is rewritten from the code: dispatch order, handler tables, measured context sizes and library footprint, HAL differences. `docs/archive/` is removed (its still-true rationale lives in architecture.md). The `[0.10.3]` "Success Metrics" block below is dropped: none of its figures had a measurement behind them. (#24, #30, #33, #45, #47)
 - The Linux HAL requires **linux-wire 0.1.3 or newer** (`lw_probe`, `lw_set_target`); `find_package(linux_wire 0.1.3 ...)` enforces it, and both the CI and release workflows pin the 0.1.3 release tarball. `crumbs_linux_scan()` returns `-2` in non-strict mode if the adapter cannot perform an SMBus Quick Write, instead of reporting an empty bus. The seven `lw_set_slave` calls are now `lw_set_target`. (#65)
 - `crumbs_arduino_scan()` `strict` mode now performs a one-byte read (present if the target ACKs a read), matching `crumbs_linux_scan()`; it previously wrote a `0x00` data byte, the opposite of the Linux HAL and the one variant that put data on the bus. Non-strict is unchanged (address-only ACK). There is no replacement for the old data-byte write; if the intent was to stimulate a reply, use `crumbs_controller_scan_for_crumbs()` in non-strict mode instead. Neither HAL scanner reads or validates a CRUMBS frame; the API reference now says so and points at the core scanner. (#22, #23)
 - Examples now default to I2C address `0x10` instead of `0x08`/`0x0A` (`hello_*`, `basic_*`, the PlatformIO `simple_*` pair, the `mock_*` handler examples and the Linux `simple_controller`), and the mixed-bus controllers probe `0x10`-`0x12`. The old defaults sit inside the SMBus reserved block `0x08`-`0x0C` (Host, Smart Battery, Alert Response), and `basic_controller`/`basic_peripheral` shipped on different addresses so could not talk to each other as flashed. `mixed_bus_lab_validation` keeps `0x0A`/`0x14`/`0x15` until the lab hardware is reflashed. (#27, #34)
@@ -316,16 +317,6 @@ All notable changes to CRUMBS are documented in this file.
   - Fixed tier comparison tables (Tier 1: core_usage, Tier 2: handlers_usage, Tier 3: families_usage)
   - Updated `docs/getting-started.md` with examples progression as first Next Step
   - All documentation now reflects 4-level learning path: Hello → Basic → Diagnostics → Advanced
-
-### Success Metrics
-
-- First example size: 149 lines → 33 lines (78% reduction) ✓
-- Time to first success: 45 min → 10-15 min (67% improvement) ✓
-- Binary sizes: All examples <15% flash, <30% RAM ✓
-- Serial verbosity: Reduced 50-70% across all tiers ✓
-- Clear learning progression with prerequisites stated ✓
-
----
 
 ## [0.10.2] - Version Reply Helper
 
