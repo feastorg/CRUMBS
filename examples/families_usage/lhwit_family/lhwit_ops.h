@@ -13,7 +13,7 @@
  * all operations for the LHWIT family.
  *
  * Also provides version parsing and compatibility checking helpers
- * for controller-side version verification (per versioning.md).
+ * for controller-side version verification (opcode 0x00 convention, docs/protocol.md).
  */
 
 #ifndef LHWIT_OPS_H
@@ -34,7 +34,7 @@
 /**
  * @brief Parse version info from opcode 0x00 response payload.
  *
- * Per versioning.md, opcode 0x00 returns 5 bytes:
+ * Per the opcode 0x00 convention in docs/protocol.md, the reply is 5 bytes:
  *   [CRUMBS_VERSION:u16][module_major:u8][module_minor:u8][module_patch:u8]
  *
  * @param data       Pointer to payload data (reply.data)

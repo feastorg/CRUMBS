@@ -253,6 +253,17 @@ jobs:
   # ---------------------------------------------------------------------------
   # Doc Check
   # ---------------------------------------------------------------------------
+  docs-links:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check relative links and anchors in Markdown
+        run: python3 scripts/check_docs_links.py
+
   doxygen:
     runs-on: ubuntu-24.04 # apt doxygen 1.9.8; the gate should not move with the image
     timeout-minutes: 10
@@ -400,7 +411,7 @@ jobs:
   ok:
     name: ok
     if: always()
-    needs: [core-only-install, build-and-test, platformio, doxygen, crc-regen, build-configs, arduino-cli]
+    needs: [core-only-install, build-and-test, platformio, doxygen, docs-links, crc-regen, build-configs, arduino-cli]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
