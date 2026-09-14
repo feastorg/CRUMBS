@@ -37,7 +37,7 @@ are collected at the end.
 | `CRUMBS_MESSAGE_MAX_SIZE` | 31: the largest frame, and the read length the controller uses. — `crumbs_message.h` |
 | `crumbs_encode_message(msg, buffer, buffer_len)` | Serialise with CRC. Returns `4 + data_len`, or 0 for `NULL` args, `data_len > 27`, or a short buffer. — `crumbs.h` |
 | `crumbs_decode_message(buffer, buffer_len, msg, ctx)` | Validate and parse an exact-length frame. `0`, `-1` structural, `-2` CRC. `ctx` may be `NULL`; otherwise its statistics update. — `crumbs.h` |
-| `crumbs_frame_length(buffer, buffer_len, *frame_len)` | Header-declared length of a possibly padded read, for callers that decode raw reads themselves. `-1` if the header is implausible. — `crumbs.h` |
+| `crumbs_frame_length(buffer, buffer_len, *frame_len)` | Header-declared length of a possibly padded read, for callers that decode raw reads themselves. `-1` for `NULL` args, fewer than 4 bytes, `data_len > 27`, or a buffer shorter than its header declares. — `crumbs.h` |
 | `crumbs_crc8(data, len)` → `crumbs_crc8_t` | CRC-8/SMBUS (poly `0x07`, init 0). Returns 0 for `NULL` or empty input. — `crumbs_crc.h` |
 
 ### Payload helpers — `crumbs_message_helpers.h`
@@ -73,7 +73,7 @@ bytes; every read fails with `-1` when `offset + width > len`.
 
 | Symbol | |
 | --- | --- |
-| `crumbs_controller_send(ctx, target_addr, msg, write_fn, write_ctx)` | Encode and write one frame. `-1` `NULL` args, `-2` wrong role, `-3` encode failed, otherwise the HAL write's return (0 = success). |
+| `crumbs_controller_send(ctx, target_addr, msg, write_fn, write_ctx)` | Encode and write one frame. `-1` `NULL` args, `-2` wrong role, `-3` encode failed, otherwise the HAL write's return verbatim (0 = success; a HAL's own negative codes can collide with those three). |
 | `crumbs_controller_read(ctx, target_addr, *out_msg, read_fn, read_ctx)` | Read 31 bytes, trim, decode. `-1` short read or bad header, `-2` CRC, `0` with `out_msg` filled. Accepts any identity. |
 | `crumbs_controller_read_expect(ctx, target_addr, expect_type_id, expect_opcode, *out_msg, read_fn, read_ctx)` | `crumbs_controller_read` plus an identity check; `CRUMBS_RX_REPLY_MISMATCH` with `out_msg` still filled. `expect_type_id == CRUMBS_TYPE_ID_ANY` skips the type half; the opcode is always compared. |
 | `CRUMBS_RX_REPLY_MISMATCH` | `-7`. |
@@ -81,16 +81,16 @@ bytes; every read fails with `-1` when `offset + width > len`.
 | `crumbs_ops_can_send(dev)` / `crumbs_ops_can_get(dev)` | Whether `dev` has what a send (context + write) or a get (also read + delay) needs. |
 | `CRUMBS_DEFINE_SEND_OP(family, name, type_id, opcode, param_decl, pack_stmt)` | Defines `family_send_name(dev, param)`: one SET with one packed parameter. |
 | `CRUMBS_DEFINE_SEND_OP_0(family, name, type_id, opcode)` | Defines `family_send_name(dev)`: a payload-less SET. |
-| `CRUMBS_DEFINE_GET_OP(family, name, type_id, opcode, result_t, parse_fn)` | Defines `family_query_name(dev)` and `family_get_name(dev, *out)`: SET_REPLY, `delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US)`, `read_expect`, `parse_fn`. `-1` unbound device, else the send/read code, `-7` on identity mismatch, else `parse_fn`'s return. |
+| `CRUMBS_DEFINE_GET_OP(family, name, type_id, opcode, result_t, parse_fn)` | Defines `family_query_name(dev)` and `family_get_name(dev, *out)`: SET_REPLY, `delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US)`, `read_expect`, `parse_fn`. `-1` unbound device or `NULL` `out`, else the send/read code, `-7` on identity mismatch, else `parse_fn`'s return. |
 | `CRUMBS_DEFAULT_QUERY_DELAY_US` | 10 000 µs between the SET_REPLY write and the read. — `crumbs_i2c.h` |
 
 ## Discovery
 
 | Symbol | |
 | --- | --- |
-| `crumbs_controller_scan_for_crumbs(ctx, start, end, strict, write_fn, read_fn, io_ctx, found[], max_found, timeout_us)` | Read each address and count it if the bytes decode as a frame; non-strict also writes `00 00 00 00` to silent addresses and retries. Returns the count (stops at `max_found`), `-1` bad args. — `crumbs.h` |
+| `crumbs_controller_scan_for_crumbs(ctx, start, end, strict, write_fn, read_fn, io_ctx, found[], max_found, timeout_us)` | Read each address and count it if the bytes decode as a frame; non-strict (with `ctx` and `write_fn` given) also writes `00 00 00 00` to addresses whose read did not decode and retries — a peripheral dispatches that as an opcode-`0x00` SET. Returns the count (stops at `max_found`), `-1` bad args. `timeout_us` goes to every read. — `crumbs.h` |
 | `crumbs_controller_scan_for_crumbs_with_types(…, found[], types[], max_found, timeout_us)` | Same, also recording each reply's `type_id`. — `crumbs.h` |
-| `crumbs_controller_scan_for_crumbs_candidates(ctx, candidates[], count, strict, …, found[], types[], max_found, timeout_us)` | Same probe over an explicit list; duplicates skipped; `-1` on any candidate above `0x7F`. — `crumbs.h` |
+| `crumbs_controller_scan_for_crumbs_candidates(ctx, candidates[], count, strict, …, found[], types[], max_found, timeout_us)` | Same probe over an explicit list; duplicates skipped; `-1` when it reaches a candidate above `0x7F` (earlier hits are already in `found[]`). — `crumbs.h` |
 | `crumbs_arduino_scan(wire, start, end, strict, found[], max_found)` | Address-only: strict = one-byte read, non-strict = address ACK. Counts past `max_found`. — `crumbs_arduino.h` |
 | `crumbs_linux_scan(i2c, start, end, strict, found[], max_found)` | Address-only: strict = one-byte read (driver-owned counts as present), non-strict = SMBus Quick Write. Stops at `max_found`; `-2` if the adapter cannot Quick-Write. — `crumbs_linux.h` |
 | `crumbs_linux_scan_for_crumbs(ctx, i2c, start, end, strict, found[], max_found, timeout_us)` | The core read-probe scan wired to the Linux HAL. — `crumbs_linux.h` |
@@ -106,7 +106,7 @@ returns a `CRUMBS_I2C_DEV_*` code.
 | `crumbs_i2c_dev_write(dev, data, len)` | One write; `len == 0` succeeds without touching the bus. |
 | `crumbs_i2c_dev_read(dev, data, len, timeout_us)` | One read; short read is an error. |
 | `crumbs_i2c_dev_write_then_read(dev, tx, tx_len, rx, rx_len, timeout_us, require_repeated_start, write_read_fn)` | Write then read, through `write_read_fn` when given (repeated start possible), else two transactions. |
-| `crumbs_i2c_dev_read_reg_ex(dev, reg, reg_len, out, out_len, …)` / `crumbs_i2c_dev_write_reg_ex(dev, reg, reg_len, data, data_len)` | Register access with an arbitrary-width register address; writes are staged in a 64-byte buffer. |
+| `crumbs_i2c_dev_read_reg_ex(dev, reg, reg_len, out, out_len, …)` / `crumbs_i2c_dev_write_reg_ex(dev, reg, reg_len, data, data_len)` | Register access with an arbitrary-width register address; a write with both parts is staged in a buffer of `CRUMBS_I2C_DEV_MAX_WRITE` (64 unless the library is built with another value). |
 | `crumbs_i2c_dev_read_reg_u8` / `crumbs_i2c_dev_write_reg_u8` | 8-bit register address. |
 | `crumbs_i2c_dev_read_reg_u16be` / `crumbs_i2c_dev_write_reg_u16be` | 16-bit big-endian register address. |
 | `CRUMBS_I2C_DEV_OK`, `CRUMBS_I2C_DEV_E_INVALID`, `CRUMBS_I2C_DEV_E_WRITE`, `CRUMBS_I2C_DEV_E_READ`, `CRUMBS_I2C_DEV_E_SHORT_READ`, `CRUMBS_I2C_DEV_E_NO_REPEATED_START`, `CRUMBS_I2C_DEV_E_SIZE` | `0`, `-1` … `-6` in that order. |
@@ -118,8 +118,8 @@ The function-pointer types a HAL implements and the core calls.
 | Symbol | |
 | --- | --- |
 | `crumbs_i2c_write_fn` | `(user_ctx, addr, data, len)` → 0 on success; anything else is passed through by the core. |
-| `crumbs_i2c_read_fn` | `(user_ctx, addr, buffer, len, timeout_us)` → bytes read, negative on error. The core always passes `timeout_us = 0`. |
-| `crumbs_i2c_write_read_fn` | `(user_ctx, addr, tx, tx_len, rx, rx_len, timeout_us, require_repeated_start)` → bytes read, or `CRUMBS_I2C_DEV_E_NO_REPEATED_START`. |
+| `crumbs_i2c_read_fn` | `(user_ctx, addr, buffer, len, timeout_us)` → bytes read, negative on error. `crumbs_controller_read` passes `timeout_us = 0`; the scanners and `crumbs_i2c_dev_read` forward the caller's value. |
+| `crumbs_i2c_write_read_fn` | `(user_ctx, addr, tx, tx_len, rx, rx_len, timeout_us, require_repeated_start)` → bytes read, negative on error; `crumbs_i2c_dev_write_then_read` reports any negative as `CRUMBS_I2C_DEV_E_READ` except `-5`, which it passes through. |
 | `crumbs_i2c_scan_fn` | `(user_ctx, start, end, strict, found, max_found)`: the shape of the HAL address scanners. |
 | `crumbs_delay_fn` | `(us)`: blocking delay. |
 | `crumbs_platform_millis_fn` | `(void)` → milliseconds. |
@@ -170,7 +170,7 @@ stored on the bus handle and not enforced.
 
 | Range | Meaning |
 | --- | --- |
-| `0` | Success everywhere; scanners return a count ≥ 0. |
+| `0` | Success; scanners return a count ≥ 0, and a HAL read returns its byte count, so `0` there means nothing was read. |
 | `-1` … `-6` | Function-specific: `-1` bad argument / wrong role / structural decode failure; `-2` CRC (codec), wrong role (`send`), address select (Linux); `-3` encode failed (`send`), read/write failed (Linux), read callback failed (helpers); `-4` short read/write; `-5` no repeated start; `-6` too long for a buffer. The tables above give each function's own set. |
 | `CRUMBS_RX_REPLY_MISMATCH` (`-7`), `CRUMBS_RX_TYPE_MISMATCH` (`-8`) | Protocol-level, deliberately below every transport code so a getter's caller can tell them apart. New `CRUMBS_RX_*` codes continue downward. |
 | positive | From an Arduino write: the `Wire.endTransmission()` code. |

@@ -24,7 +24,6 @@
 #if defined(__linux__)
 
 #include <linux_wire.h> /* linux-wire C API */
-#include <unistd.h>     /* usleep */
 
 /* ---- Public API -------------------------------------------------------- */
 

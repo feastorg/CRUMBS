@@ -109,8 +109,9 @@ extern "C"
      * @param addr       7-bit I2C address of peripheral.
      * @param buffer     Output buffer for received bytes.
      * @param len        Maximum bytes to read.
-     * @param timeout_us Timeout hint in microseconds; the core always passes 0.
-     *                   Each HAL documents what 0 means for it.
+     * @param timeout_us Timeout hint in microseconds. crumbs_controller_read()
+     *                   passes 0; the scanners and crumbs_i2c_dev_* forward the
+     *                   caller's value. Each HAL documents what 0 means for it.
      * @return Number of bytes read (>=0) on success, negative on error.
      */
     typedef int (*crumbs_i2c_read_fn)(

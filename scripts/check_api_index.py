@@ -41,6 +41,9 @@ def main() -> int:
         return 2
     text = DOC.read_text(encoding="utf-8")
     names = public_symbols()
+    if not names:
+        print(f"no public symbols found in {XML_DIR}: is the Doxygen XML stale or empty?", file=sys.stderr)
+        return 2
     missing = sorted(n for n in names if not re.search(rf"\b{re.escape(n)}\b", text))
     for n in missing:
         print(f"{DOC.relative_to(ROOT)}: public symbol not indexed: {n}")

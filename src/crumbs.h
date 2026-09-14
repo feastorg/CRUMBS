@@ -66,7 +66,6 @@ extern "C"
      * with a build flag, identically for the library and the sketch, and
      * compare crumbs_context_size() with sizeof(crumbs_context_t) at startup.
      * 0 compiles both tables out. Dispatch is a linear search.
-     * Set to 0 to disable handler dispatch entirely.
      *
      * IMPORTANT: For Arduino/PlatformIO, you must add this to your
      * platformio.ini build_flags to affect the library compilation:
@@ -538,7 +537,9 @@ extern "C"
      * @param start_addr Address range start (inclusive).
      * @param end_addr Address range end (inclusive).
      * @param strict Non-zero for strict read-only; 0 to also try probe writes.
-     *        The probe frame is 00 00 00 00: harmless to CRUMBS peripherals, but a
+     *        The probe frame is 00 00 00 00: a CRUMBS peripheral dispatches it as
+     *        an opcode-0x00 SET with no payload (to on_message and any handler
+     *        registered for 0x00), and a
      *        24Cxx-style EEPROM takes it as a page write at address 0.
      * @param write_fn Write function for probe writes (may be NULL if strict).
      * @param read_fn Read function to use for reading frames.
@@ -573,7 +574,9 @@ extern "C"
      * @param start_addr Address range start (inclusive).
      * @param end_addr Address range end (inclusive).
      * @param strict Non-zero for strict read-only; 0 to also try probe writes.
-     *        The probe frame is 00 00 00 00: harmless to CRUMBS peripherals, but a
+     *        The probe frame is 00 00 00 00: a CRUMBS peripheral dispatches it as
+     *        an opcode-0x00 SET with no payload (to on_message and any handler
+     *        registered for 0x00), and a
      *        24Cxx-style EEPROM takes it as a page write at address 0.
      * @param write_fn Write function for probe writes (may be NULL if strict).
      * @param read_fn Read function to use for reading frames.
@@ -608,7 +611,9 @@ extern "C"
      * @param candidates Input list of candidate 7-bit addresses.
      * @param candidate_count Number of entries in @p candidates.
      * @param strict Non-zero for strict read-only; 0 to also try probe writes.
-     *        The probe frame is 00 00 00 00: harmless to CRUMBS peripherals, but a
+     *        The probe frame is 00 00 00 00: a CRUMBS peripheral dispatches it as
+     *        an opcode-0x00 SET with no payload (to on_message and any handler
+     *        registered for 0x00), and a
      *        24Cxx-style EEPROM takes it as a page write at address 0.
      * @param write_fn Write function for probe writes (may be NULL if strict).
      * @param read_fn Read function to use for reading frames.
