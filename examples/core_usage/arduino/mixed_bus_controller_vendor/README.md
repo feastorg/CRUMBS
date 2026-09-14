@@ -1,137 +1,34 @@
-# Mixed Bus Controller Vendor (Arduino)
+# mixed_bus_controller_vendor
 
-This example validates one shared I2C bus with three device classes at once:
+`mixed_bus_controller` with the vendors' own libraries for the non-CRUMBS
+devices: Atlas Scientific EZO pH (`0x63`) and DO (`0x61`) through
+[ezo-driver](https://github.com/feastorg/ezo-driver) and a Bosch BME280
+through SparkFun's library. CRUMBS candidates `0x10`–`0x12` as before.
+Built in CI with ezo-driver v0.5.1 and SparkFun BME280 v2.0.11 pinned by
+tag and commit.
 
-- CRUMBS peripherals (`basic_peripheral`)
-- Atlas EZO command/response devices (pH + DO) via `ezo-driver`
-- Bosch BMP/BME280 register sensors via SparkFun BME280 library
+## Output
 
-The existing `mixed_bus_controller` example remains the low-level raw-register reference. This vendor example shows the same mixed-bus concept using real external device libraries.
+Same skeleton (validation pass, then a status pass every 5 s, CRUMBS lines
+identical to `mixed_bus_controller`), plus:
 
-## Dependencies (External)
+- `EZO pH addr=0x63` followed by ` init=not_ready`, ` startup_settle=pending`
+  (first second), ` send_rc=… send_name=…`, or ` read_rc=… read_name=…
+  status=… ph=<x.xxx>`. The driver sends `r` and waits the time it reports.
+- `EZO DO addr=0x61` — queries the output configuration (`O,?`) once until
+  it succeeds, then reads; prints ` output_mask=…`, ` present_mask=…` and
+  ` mg_l=…` / ` sat_pct=…` as enabled.
+- `Bosch addr=0x76` followed by ` init=fail` or ` temp_c=… pressure_pa=…
+  pressure_hpa=… humidity_pct=<n|NA> model_hint=<BMP280_or_no_humidity|BME280>`.
 
-Install these in your Arduino libraries environment:
+## Build
 
-1. `CRUMBS`
-2. `ezo-driver` (your repo)
-3. `SparkFun BME280 Arduino Library`
-
-Notes:
-
-- `ezo-driver` is expected to be available as an Arduino library (local clone/copy is fine).
-- SparkFun BME280 can be installed via Arduino Library Manager.
-- This example intentionally does not vendor those libraries into CRUMBS.
-
-## Behavior
-
-At startup:
-
-1. initializes CRUMBS controller context,
-2. initializes EZO transport/devices on the same `Wire` bus,
-3. initializes configured BMP/BME sensors,
-4. runs one validation pass.
-
-Then every `STATUS_INTERVAL_MS` (default 5000 ms) it runs a status pass.
-
-Each pass prints:
-
-1. CRUMBS scan and per-device query reply
-2. EZO pH read status/value (via `ezo_ph_*` typed helpers)
-3. EZO DO output config + read status/value(s) (via `ezo_do_*` typed helpers)
-4. Bosch sensor measurement lines for each configured address
-
-Per-device failures are non-fatal: one missing/failed device does not stop the rest of the pass.
-
-## Config Knobs
-
-See `config.h`:
-
-- `kCrumbsCandidates[]`
-- `EZO_PH_ADDR`, `EZO_DO_ADDR`
-- `kBoschSensorAddrs[]`, `BOSCH_SENSOR_COUNT`
-- `STATUS_INTERVAL_MS`, `HEARTBEAT_INTERVAL_MS`
-
-Defaults:
-
-- CRUMBS candidates: `0x10`, `0x11`, `0x12`
-- EZO pH: `0x63`
-- EZO DO: `0x61`
-- Bosch sensors: `0x76`, `0x77`
-
-## Topology Profiles
-
-### Minimal
-
-- 1x controller running `mixed_bus_controller_vendor`
-- 1x CRUMBS peripheral running `basic_peripheral` at `0x10`
-- 1x EZO pH at `0x63`
-- 1x EZO DO at `0x61`
-- 1x BMP/BME280 at `0x76`
-
-Set `BOSCH_SENSOR_COUNT = 1` for this profile.
-
-### Max Validation
-
-- 1x controller running `mixed_bus_controller_vendor`
-- 3x CRUMBS peripherals at `0x10`, `0x11`, `0x12`
-- 1x EZO pH at `0x63`
-- 1x EZO DO at `0x61`
-- 2x BMP/BME280 at `0x76`, `0x77`
-
-## Wiring Checklist
-
-- Shared `SDA`, `SCL`, and `GND` across all devices.
-- One pull-up network for SDA/SCL (many breakout boards already include pull-ups).
-- Every I2C address on the bus must be unique.
-- EZO devices must already be in I2C mode.
-
-## Flash Sequence for CRUMBS Peripherals
-
-Use `basic_peripheral` for all CRUMBS nodes:
-
-1. Flash board #1 with `DEVICE_ADDR = 0x10`
-2. Flash board #2 with `DEVICE_ADDR = 0x11`
-3. Flash board #3 with `DEVICE_ADDR = 0x12`
-4. Flash this vendor controller sketch on the controller board
-
-## Expected Serial Patterns
-
-Validation pass once at startup:
-
-```text
-=== Validation pass (once at startup) ===
-CRUMBS scan result: 3
-  addr=0x10 type=0x01
-  addr=0x11 type=0x01
-  addr=0x12 type=0x01
-CRUMBS addr=0x10 type=0x01 reply_op=0x00 len=5 data=...
-CRUMBS addr=0x11 type=0x01 reply_op=0x00 len=5 data=...
-CRUMBS addr=0x12 type=0x01 reply_op=0x00 len=5 data=...
-EZO pH addr=0x63 read_rc=0 read_name=EZO_OK status=EZO_STATUS_SUCCESS ph=...
-EZO DO addr=0x61 output_mask=0x.. read_rc=0 read_name=EZO_OK status=EZO_STATUS_SUCCESS present_mask=0x.. mg_l=... sat_pct=...
-Bosch addr=0x76 temp_c=... pressure_pa=... pressure_hpa=... humidity_pct=... model_hint=...
-Bosch addr=0x77 temp_c=... pressure_pa=... pressure_hpa=... humidity_pct=... model_hint=...
+```sh
+git clone --depth 1 --branch v0.5.1 https://github.com/feastorg/ezo-driver third_party/ezo-driver
+git clone --depth 1 --branch v2.0.11 https://github.com/sparkfun/SparkFun_BME280_Arduino_Library third_party/SparkFun_BME280
+arduino-cli compile --fqbn arduino:avr:nano --warnings more --library "$PWD" \
+  --library "$PWD/third_party/ezo-driver" --library "$PWD/third_party/SparkFun_BME280" \
+  examples/core_usage/arduino/mixed_bus_controller_vendor
 ```
 
-Periodic pass every `STATUS_INTERVAL_MS`:
-
-```text
-=== Status pass ===
-...same line families repeated...
-```
-
-## Negative Checks
-
-- Wrong EZO address: EZO line shows error/status, CRUMBS and Bosch lines still continue.
-- Missing Bosch sensor on one configured address: that line prints `init=fail`, others still continue.
-- Duplicate I2C addresses are invalid and can cause contention/corrupted behavior.
-
-## Primary References
-
-- SparkFun BME280 Arduino library:
-  - https://github.com/sparkfun/SparkFun_BME280_Arduino_Library
-  - https://raw.githubusercontent.com/sparkfun/SparkFun_BME280_Arduino_Library/master/src/SparkFunBME280.h
-- Atlas EZO pH + protocol references:
-  - https://atlas-scientific.com/embedded-solutions/ezo-ph-circuit/
-  - https://files.atlas-scientific.com/pH_EZO_Datasheet.pdf
-  - https://files.atlas-scientific.com/EZO-PRS-Datasheet.pdf
+In the Arduino IDE install the two libraries by the same names.

@@ -1,5 +1,5 @@
 /**
- * @file simple_controller.ino
+ * @file advanced_controller.ino
  * @brief CRUMBS Controller example sketch to send messages to a CRUMBS Slice.
  */
 
@@ -43,9 +43,11 @@ void setup()
     Serial.println(F("Controller: CRC diagnostics reset."));
 
     Serial.println(F("Controller ready. Enter messages in the format:"));
-    Serial.println(F("address,type_id,opcode,data0,data1,data2,data3,data4,data5,data6"));
+    Serial.println(F("address,type_id,opcode[,byte0,...,byte26]   (numbers: 0x hex or decimal)"));
     Serial.println(F("Example Serial Commands:"));
-    Serial.println(F("   0x10,1,1,75.0,1.0,0.0,65.0,2.0,7.0,3.14")); // Example: address 0x10, type_id 1, opcode 1, data...
+    Serial.println(F("   0x10,1,1,0x12,0x34")); // address 0x10, type_id 1, opcode 1, two payload bytes
+    Serial.println(F("   request=0x10"));
+    Serial.println(F("   scan strict"));
 }
 
 // Main loop that listens for serial input, parses commands, and sends crumbs_message_ts to the specified Slice.

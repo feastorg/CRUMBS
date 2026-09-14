@@ -1,33 +1,14 @@
-# Basic Controller
+# basic_controller
 
-**Level 2** - Prerequisite: Complete [hello_controller](../hello_controller/) first
+Drives `basic_peripheral` and decodes what comes back with
+`crumbs_decode_message`.
 
-## What's New
+- Target `0x10`, type `0x01` (`config.h`).
+- Serial (115200) prints a command list, then single characters:
+  - `s` — store `AA BB CC` (opcode `0x01`), prints `Sent: Store data`.
+  - `c` — clear (opcode `0x02`), prints `Sent: Clear data`.
+  - `v` — SET_REPLY `0x00`, 10 ms, read, decode; prints `Version: 1.0.0`.
+  - `d` — SET_REPLY `0x80`; prints `Stored data (<n> bytes): <hex>`.
+- A reply that fails to decode prints nothing.
 
-- Multiple command types (store/clear/query)
-- Two-step query pattern (SET_REPLY + read)
-- Decoding replies
-
-Talks to the peripheral at `0x10` (`TARGET_ADDR` in `config.h`), the `basic_peripheral` default.
-
-## Commands
-
-- **s** - Store data (sends 3 bytes)
-- **c** - Clear stored data
-- **v** - Query version info
-- **d** - Query stored data
-
-## Upload & Test
-
-1. Wire Arduino to basic_peripheral (SDA/SCL + GND)
-2. Upload this sketch
-3. Open Serial Monitor (115200 baud)
-4. Try commands: s, c, v, d
-
-## Key Learning
-
-- Multiple command types
-- SET_REPLY mechanism for queries
-- Decoding query responses
-
-**Next:** [advanced_controller](../advanced_controller/) for CSV parsing and scanning
+Build: Arduino IDE, or `arduino-cli compile --fqbn arduino:avr:nano --library "$PWD" examples/core_usage/arduino/basic_controller`.
