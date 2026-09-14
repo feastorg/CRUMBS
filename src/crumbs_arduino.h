@@ -77,7 +77,9 @@ extern "C"
      *   Writes nothing.
      * Two differences remain: Linux also reports an address a kernel driver
      * owns as present (there is no such notion here), and this function
-     * keeps counting past @p max_found while Linux stops there.
+     * keeps counting past @p max_found while Linux stops there. Linux can
+     * also return -2 when the adapter cannot perform a Quick Write; this
+     * function has no equivalent failure.
      *
      * @param user_ctx     Pointer to TwoWire instance or NULL to use &Wire
      * @param start_addr   Start address (inclusive) to probe, typically 0x03

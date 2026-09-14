@@ -268,7 +268,7 @@ extern "C" int crumbs_arduino_scan(void *user_ctx,
             // the target ACKs its address for a read and clocks a byte out.
             // Puts no data on the bus, but does consume one byte from a
             // register-addressed or stream-style device.
-            uint8_t got = wire->requestFrom(static_cast<uint8_t>(addr), static_cast<uint8_t>(1));
+            uint8_t got = wire->requestFrom((int)addr, (int)1); // (int,int) as elsewhere in this file
             while (wire->available())
                 (void)wire->read();
             present = (got > 0);
