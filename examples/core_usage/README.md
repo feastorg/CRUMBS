@@ -27,7 +27,7 @@
 
 **Quick Start:** Upload [hello_peripheral](arduino/hello_peripheral/) and [hello_controller](arduino/hello_controller/) to see CRUMBS working in 15 minutes.
 
-For mixed-bus validation, run `basic_peripheral` on unique addresses (default full profile: `0x08`, `0x09`, `0x0A`).
+For mixed-bus validation, run `basic_peripheral` on unique addresses (default full profile: `0x10`, `0x11`, `0x12`).
 
 ### Getting Started (Arduino)
 

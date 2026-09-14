@@ -7,7 +7,7 @@
 #include "crumbs_linux.h"
 
 // Default address of slice peripheral
-#define DEFAULT_SLICE_ADDR 0x08
+#define DEFAULT_SLICE_ADDR 0x10
 
 static void usage(const char *prog)
 {
@@ -34,7 +34,7 @@ int main(int argc, char **argv)
     //----------------------------------------------------------------------
     // Parse arguments. "scan" as the first argument selects scan mode on the
     // default bus; otherwise the arguments are [i2c-device] [peripheral-addr].
-    // Example: ./crumbs_simple_linux_controller /dev/i2c-1 0x08
+    // Example: ./crumbs_simple_linux_controller /dev/i2c-1 0x10
     //----------------------------------------------------------------------
     const char *device_path = "/dev/i2c-1";
     uint8_t slice_addr = DEFAULT_SLICE_ADDR;

@@ -23,14 +23,14 @@ Each pass:
 ### Minimal (default in `config.h`)
 
 - 1x Arduino controller (`mixed_bus_controller`)
-- 1x Arduino CRUMBS peripheral (`basic_peripheral`) at `0x08`
+- 1x Arduino CRUMBS peripheral (`basic_peripheral`) at `0x10`
 - 1x BMP/BME280 at `0x76`
 - `SENSOR_COUNT = 1`
 
 ### Max Validation
 
 - 1x Arduino controller (`mixed_bus_controller`)
-- 3x Arduino CRUMBS peripherals (`basic_peripheral`) at `0x08`, `0x09`, `0x0A`
+- 3x Arduino CRUMBS peripherals (`basic_peripheral`) at `0x10`, `0x11`, `0x12`
 - 2x BMP/BME280 sensors at `0x76`, `0x77`
 - `SENSOR_COUNT = 2`
 
@@ -45,16 +45,16 @@ Each pass:
 
 Use `basic_peripheral` for every CRUMBS node:
 
-1. Set `DEVICE_ADDR = 0x08` in `basic_peripheral/config.h`, flash board #1.
-2. Set `DEVICE_ADDR = 0x09`, flash board #2.
-3. Set `DEVICE_ADDR = 0x0A`, flash board #3.
+1. Set `DEVICE_ADDR = 0x10` in `basic_peripheral/config.h`, flash board #1.
+2. Set `DEVICE_ADDR = 0x11`, flash board #2.
+3. Set `DEVICE_ADDR = 0x12`, flash board #3.
 4. Flash `mixed_bus_controller` on controller board.
 
 ## Controller Config Knobs
 
 `mixed_bus_controller/config.h` is the full test-topology config:
 
-- `kCrumbsCandidates[]`: CRUMBS addresses to probe (`0x08,0x09,0x0A` default)
+- `kCrumbsCandidates[]`: CRUMBS addresses to probe (`0x10,0x11,0x12` default)
 - `kSensorAddrs[]`: supported sensor addresses (`0x76,0x77` default)
 - `SENSOR_COUNT`: number of entries from `kSensorAddrs[]` to read
 - `STATUS_INTERVAL_MS`: periodic status interval (default 5000 ms)
@@ -66,14 +66,14 @@ Use `basic_peripheral` for every CRUMBS node:
 ```text
 === Validation pass (once at startup) ===
 CRUMBS scan result: 1
-  addr=0x08 type=0x01
-CRUMBS addr=0x08 type=0x01 reply_op=0x00 len=5 data=0x.. 0x.. 0x01 0x00 0x00 crumbs_ver=0x.... module=1.0.0
+  addr=0x10 type=0x01
+CRUMBS addr=0x10 type=0x01 reply_op=0x00 len=5 data=0x.. 0x.. 0x01 0x00 0x00 crumbs_ver=0x.... module=1.0.0
 Sensor addr=0x76 chip_rc=0 chip_id=0x58 model=BMP280 raw_rc=0 raw=0x.. 0x.. 0x.. 0x.. 0x.. 0x..
 
 === Status pass ===
 CRUMBS scan result: 1
-  addr=0x08 type=0x01
-CRUMBS addr=0x08 type=0x01 reply_op=0x00 len=5 data=...
+  addr=0x10 type=0x01
+CRUMBS addr=0x10 type=0x01 reply_op=0x00 len=5 data=...
 Sensor addr=0x76 chip_rc=0 chip_id=0x58 model=BMP280 raw_rc=0 raw=...
 ```
 
@@ -84,19 +84,19 @@ Sensor addr=0x76 chip_rc=0 chip_id=0x58 model=BMP280 raw_rc=0 raw=...
 ```text
 === Validation pass (once at startup) ===
 CRUMBS scan result: 3
-  addr=0x08 type=0x01
-  addr=0x09 type=0x01
-  addr=0x0A type=0x01
-CRUMBS addr=0x08 type=0x01 reply_op=0x00 len=5 data=...
-CRUMBS addr=0x09 type=0x01 reply_op=0x00 len=5 data=...
-CRUMBS addr=0x0A type=0x01 reply_op=0x00 len=5 data=...
+  addr=0x10 type=0x01
+  addr=0x11 type=0x01
+  addr=0x12 type=0x01
+CRUMBS addr=0x10 type=0x01 reply_op=0x00 len=5 data=...
+CRUMBS addr=0x11 type=0x01 reply_op=0x00 len=5 data=...
+CRUMBS addr=0x12 type=0x01 reply_op=0x00 len=5 data=...
 Sensor addr=0x76 chip_rc=0 chip_id=0x58 model=BMP280 raw_rc=0 raw=...
 Sensor addr=0x77 chip_rc=0 chip_id=0x60 model=BME280 raw_rc=0 raw=...
 ```
 
 ## Negative Sanity Checks
 
-- Duplicate CRUMBS address (for example two peripherals at `0x08`) is invalid and can cause bus contention.
+- Duplicate CRUMBS address (for example two peripherals at `0x10`) is invalid and can cause bus contention.
 - If `kCrumbsCandidates[]` omits active peripherals, discovery count drops, but sensor reads still run.
 - If sensor `chip_rc` or `raw_rc` is non-zero, check sensor power/address wiring and pull-ups.
 

@@ -13,7 +13,7 @@ static const uint32_t CRUMBS_READ_TIMEOUT_US = 10000;
 static const size_t CRUMBS_READ_BUFFER_LEN = 16u;
 
 static const uint8_t CRUMBS_QUERY_OPCODE = 0x00;
-static const uint8_t kCrumbsCandidates[] = {0x08, 0x09, 0x0A};
+static const uint8_t kCrumbsCandidates[] = {0x10, 0x11, 0x12};
 // Keep found-buffer bounded to candidate profile for low-RAM AVR targets.
 static const size_t MAX_CRUMBS_FOUND = 3u;
 

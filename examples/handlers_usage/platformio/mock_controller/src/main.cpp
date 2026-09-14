@@ -10,7 +10,7 @@
  *
  * Hardware:
  * - Arduino Nano (or compatible) as I2C controller
- * - Mock peripheral at address 0x08
+ * - Mock peripheral at address 0x10
  *
  * Serial Commands:
  * - help                    - Show available commands
@@ -36,7 +36,7 @@
  * Configuration
  * ============================================================================ */
 
-#define PERIPHERAL_ADDR 0x08
+#define PERIPHERAL_ADDR 0x10
 #define MAX_CMD_LEN 128
 
 /* ============================================================================

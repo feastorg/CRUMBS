@@ -8,6 +8,8 @@
 - Query responses (GET operations)
 - Version info pattern
 
+Listens at I2C address `0x10` (`DEVICE_ADDR` in `config.h`); `basic_controller` targets the same address.
+
 ## Commands
 
 - **0x01:** Store data (up to 10 bytes)

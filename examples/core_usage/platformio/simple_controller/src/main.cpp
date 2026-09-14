@@ -27,7 +27,7 @@ void setup()
 
 // Read a line from Serial and parse simple CSV commands in the form:
 // addr,type_id,opcode,byte0,byte1,...
-// Example: 0x08,1,1,0x12,0x34
+// Example: 0x10,1,1,0x12,0x34
 void loop()
 {
   if (!Serial.available())

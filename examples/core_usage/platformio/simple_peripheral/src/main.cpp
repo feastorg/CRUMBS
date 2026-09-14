@@ -55,9 +55,9 @@ void setup()
   {
     delay(1);
   }
-  Serial.println("CRUMBS PlatformIO peripheral (Nano) - init at address 0x08");
+  Serial.println("CRUMBS PlatformIO peripheral (Nano) - init at address 0x10");
 
-  crumbs_arduino_init_peripheral(&per_ctx, 0x08);
+  crumbs_arduino_init_peripheral(&per_ctx, 0x10);
   crumbs_set_callbacks(&per_ctx, on_message, on_request, NULL);
 }
 
