@@ -64,6 +64,65 @@ static int fake_read_noncrumbs(void *user_ctx, uint8_t addr, uint8_t *buf, size_
     return 5;
 }
 
+/* Foreign devices on a mixed bus. These model what real non-CRUMBS parts put
+   on the wire when read, so the scanner's rejection is checked against
+   plausible traffic rather than arbitrary garbage. */
+
+/* Atlas Scientific EZO: a status byte followed by an ASCII reading, e.g.
+   "9.560" (dissolved oxygen in mg/L), NUL-terminated. Byte 2 is '.' (0x2E =
+   46), above CRUMBS_MAX_PAYLOAD, so the header itself is rejected - and even
+   with that bound removed the declared 50-byte frame is longer than the 7
+   bytes read. Every ASCII digit and '.' exceeds 27, so no EZO reading can
+   pass the header check; the CRC is never consulted. */
+static int fake_read_ezo(void *user_ctx, uint8_t addr, uint8_t *buf, size_t len, uint32_t to)
+{
+    (void)user_ctx;
+    (void)to;
+    static const uint8_t reply[] = {0x01, '9', '.', '5', '6', '0', 0x00};
+    if (addr != DEV_A)
+        return 0;
+    if (len < sizeof(reply))
+        return 0;
+    memcpy(buf, reply, sizeof(reply));
+    return (int)sizeof(reply);
+}
+
+/* Bosch BMP280 read with the register pointer at 0xD0: chip id 0x58, then the
+   reserved registers 0xD1.. which read as zero. As a CRUMBS header this is
+   type 0x58, opcode 0x00, data_len 0 - well-formed, declaring a 4-byte frame -
+   so the only thing that can reject it is the CRC: crc8(58 00 00) = 0x75, and
+   the device supplies 0x00. */
+#define BMP280_CRC_OK 0x75
+
+static int fake_read_bmp280_impl(uint8_t addr, uint8_t *buf, size_t len, uint8_t byte3)
+{
+    if (addr != DEV_A)
+        return 0;
+    if (len < CRUMBS_MESSAGE_MAX_SIZE)
+        return 0;
+    memset(buf, 0, CRUMBS_MESSAGE_MAX_SIZE);
+    buf[0] = 0x58;
+    buf[3] = byte3;
+    return (int)CRUMBS_MESSAGE_MAX_SIZE;
+}
+
+static int fake_read_bmp280(void *user_ctx, uint8_t addr, uint8_t *buf, size_t len, uint32_t to)
+{
+    (void)user_ctx;
+    (void)to;
+    return fake_read_bmp280_impl(addr, buf, len, 0x00);
+}
+
+/* Same dump, but byte 3 happens to equal the CRC of the first three bytes.
+   Used as a control: if this is accepted and the plain dump is rejected, the
+   CRC - and nothing else - is what rejected the plain dump. */
+static int fake_read_bmp280_lucky_crc(void *user_ctx, uint8_t addr, uint8_t *buf, size_t len, uint32_t to)
+{
+    (void)user_ctx;
+    (void)to;
+    return fake_read_bmp280_impl(addr, buf, len, BMP280_CRC_OK);
+}
+
 static int test_scan_finds_devices(void)
 {
     crumbs_context_t ctx;
@@ -123,6 +182,46 @@ static int test_scan_rejects_noncrumbs(void)
 
     printf("  scan rejects non-CRUMBS: PASS\n");
     return 0;
+}
+
+static int run_scan_expect(const char *name, crumbs_i2c_read_fn read_fn, int expect_n)
+{
+    crumbs_context_t ctx;
+    crumbs_init(&ctx, CRUMBS_ROLE_CONTROLLER, 0);
+
+    uint8_t found[16];
+    int n = crumbs_controller_scan_for_crumbs(&ctx, DEV_A, DEV_A, 0 /* non-strict */,
+                                              fake_write, read_fn, NULL, found, sizeof(found), 10000);
+    if (n < 0)
+    {
+        fprintf(stderr, "%s: scan failed rc=%d\n", name, n);
+        return 1;
+    }
+    if (n != expect_n)
+    {
+        fprintf(stderr, "%s: expected %d device(s), scanner reported %d\n", name, expect_n, n);
+        return 1;
+    }
+    printf("  %s: PASS\n", name);
+    return 0;
+}
+
+static int test_scan_rejects_ezo_ascii(void)
+{
+    return run_scan_expect("scan rejects EZO ASCII reply (header)", fake_read_ezo, 0);
+}
+
+static int test_scan_rejects_bmp280_dump(void)
+{
+    return run_scan_expect("scan rejects BMP280 register dump (crc)", fake_read_bmp280, 0);
+}
+
+static int test_scan_crc_is_the_discriminator(void)
+{
+    /* Documents the real property: a foreign device whose bytes happen to
+       carry a valid CRC is indistinguishable from a CRUMBS peripheral. */
+    return run_scan_expect("scan accepts BMP280 dump with a lucky CRC (control)",
+                           fake_read_bmp280_lucky_crc, 1);
 }
 
 static int test_scan_empty_range(void)
@@ -273,6 +372,9 @@ int main(void)
 
     failures += test_scan_finds_devices();
     failures += test_scan_rejects_noncrumbs();
+    failures += test_scan_rejects_ezo_ascii();
+    failures += test_scan_rejects_bmp280_dump();
+    failures += test_scan_crc_is_the_discriminator();
     failures += test_scan_empty_range();
     failures += test_scan_with_types();
     failures += test_scan_with_types_null_types();
