@@ -525,6 +525,7 @@ python scripts/generate_crc8.py  # --no-stage to skip
 - Out-of-tree Linux example builds against the installed CRUMBS package
 - PlatformIO builds for AVR Nano and ESP32 examples
 - Doxygen documentation check
+- CRC-8 source regeneration check (pycrc pinned to the version in the committed banner; the committed `src/crc` must match the generator output)
 - Repository metrics artifact generation
 - Tagged release packaging for Linux x86_64
 

@@ -31,10 +31,13 @@ int main(void)
     const uint8_t check_str[] = "123456789";
     failures += check("crc8(\"123456789\")", check_str, 9, 0xF4);
 
-    /* Empty input: init 0x00 with no final XOR gives 0x00. */
+    /* Wrapper contract, not the algorithm: crumbs_crc8() returns 0 for
+       len == 0 before the generated code runs (src/crc/crumbs_crc.c). */
     failures += check("crc8(<empty>)", check_str, 0, 0x00);
 
-    /* The non-strict scan probe header (type 0, opcode 0, len 0). */
+    /* The non-strict scan probe header (type 0, opcode 0, len 0). All-zero
+       input only ever indexes table entry 0, which is 0 for every polynomial,
+       so this pins the wire bytes rather than discriminating the algorithm. */
     const uint8_t probe[] = {0x00, 0x00, 0x00};
     failures += check("crc8(00 00 00)", probe, sizeof(probe), 0x00);
 
