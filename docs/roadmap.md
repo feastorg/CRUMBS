@@ -14,7 +14,7 @@ Work that is planned is tracked in [GitHub issues](https://github.com/feastorg/C
 **Feasibility:** Very high — Arduino Wire API compatible, minimal validation needed  
 **Effort:** Low — Primarily documentation and testing
 
-**Done:** CI builds every PlatformIO example (core, handlers, and all four lhwit peripherals) for `esp32dev`; default I²C pins and a `platformio.ini` are in [platform-setup.md](platform-setup.md).
+**Done:** CI builds every PlatformIO example (core, handlers, and all four lhwit peripherals) for `esp32dev`; the default I²C pins are in [platform-setup.md](platform-setup.md#wiring) and every project ships an `esp32dev` env.
 
 **Remaining:**
 
@@ -85,7 +85,7 @@ bus.send(0x20, type_id=0x01, opcode=0x01, data=[0xFF])
 
 ## Linux Peripheral Support
 
-**Status:** I²C slave mode requires kernel driver development ([technical details](https://github.com/feastorg/linux-wire/blob/main/docs/slave-mode-investigation.md)). Alternative transports needed for Linux peripheral support.
+**Status:** I²C target mode (what the kernel calls slave mode) requires kernel driver development ([technical details](https://github.com/feastorg/linux-wire/blob/main/docs/slave-mode-investigation.md)). Alternative transports needed for Linux peripheral support.
 
 **Value:** Medium — Enables Raspberry Pi as peripheral, but microcontrollers better suited for this role  
 **Feasibility:** Low (I²C) / Medium (Serial) — Kernel driver required OR new transport layer  
@@ -109,7 +109,7 @@ bus.send(0x20, type_id=0x01, opcode=0x01, data=[0xFF])
 
 #### Option C: Custom Kernel Module
 
-- Full I²C slave functionality with event-driven architecture
+- Full I²C target functionality with event-driven architecture
 - **Verdict:** Beyond CRUMBS core library scope (requires kernel expertise, distribution complexity)
 
 ### Implementation Path (if pursuing Serial)

@@ -9,7 +9,7 @@
  * that every CRUMBS family ops header requires. They expand to the same
  * calls a hand-written wrapper would make and carry no runtime overhead.
  *
- * Usage — in your family's ops header (e.g. therm_ops.h):
+ * Usage - in your family's ops header (e.g. therm_ops.h):
  *
  * @code
  *   // After defining result structs and parse functions:

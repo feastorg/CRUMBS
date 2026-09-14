@@ -669,7 +669,7 @@ int crumbs_peripheral_handle_receive(crumbs_context_t *ctx,
  *   1. Per-opcode reply handler table (crumbs_register_reply_handler) for
  *      ctx->requested_opcode.
  *   2. on_request callback as fallback (backward-compatible).
- *   3. No reply configured — returns 0 with *out_len = 0.
+ *   3. No reply configured - returns 0 with *out_len = 0.
  */
 int crumbs_peripheral_build_reply(crumbs_context_t *ctx,
                                   uint8_t *out_buf,

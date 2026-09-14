@@ -5,7 +5,7 @@
  * A Linux I2C controller must request a fixed byte count up front. A CRUMBS
  * peripheral writes only its actual frame and stops driving the bus, so the
  * controller clocks in 0xFF for the remainder and the read returns the full
- * requested count — the buffer size, not the frame size.
+ * requested count - the buffer size, not the frame size.
  *
  * crumbs_decode_message() enforces an exact-frame-length contract since
  * v0.12.4 (trailing bytes -> -1), so host read paths must trim to the

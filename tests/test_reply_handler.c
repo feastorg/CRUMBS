@@ -173,7 +173,7 @@ static int test_handler_correct_opcode_selected(void)
     crumbs_register_reply_handler(&ctx, OP_GET_A, reply_handler_a, NULL);
     crumbs_register_reply_handler(&ctx, OP_GET_B, reply_handler_b, NULL);
 
-    /* Request opcode B — handler_b should fire, not handler_a */
+    /* Request opcode B - handler_b should fire, not handler_a */
     set_reply(&ctx, OP_GET_B);
 
     crumbs_message_t reply;
@@ -198,7 +198,7 @@ static int test_fallthrough_to_on_request(void)
     crumbs_register_reply_handler(&ctx, OP_GET_A, reply_handler_a, NULL);
     crumbs_set_callbacks(&ctx, NULL, fallback_on_request, NULL);
 
-    /* Request opcode C — no reply handler registered for it; should fall to on_request */
+    /* Request opcode C - no reply handler registered for it; should fall to on_request */
     set_reply(&ctx, OP_GET_C);
 
     crumbs_message_t reply;
@@ -220,7 +220,7 @@ static int test_on_request_only(void)
 
     crumbs_context_t ctx = {0};
     crumbs_init(&ctx, CRUMBS_ROLE_PERIPHERAL, 0x10);
-    /* No reply handlers registered — only on_request */
+    /* No reply handlers registered - only on_request */
     crumbs_set_callbacks(&ctx, NULL, fallback_on_request, NULL);
 
     set_reply(&ctx, OP_GET_A);
@@ -245,7 +245,7 @@ static int test_handler_priority_over_on_request(void)
     crumbs_register_reply_handler(&ctx, OP_GET_A, reply_handler_a, NULL);
     crumbs_set_callbacks(&ctx, NULL, fallback_on_request, NULL);
 
-    /* Request OP_GET_A — handler takes priority; on_request must NOT fire */
+    /* Request OP_GET_A - handler takes priority; on_request must NOT fire */
     set_reply(&ctx, OP_GET_A);
 
     crumbs_message_t reply;
@@ -365,7 +365,7 @@ static int test_user_data_forwarded(void)
     TEST_ASSERT_EQ(test_name, g_ud_handler_calls, 1, "handler should be called");
     if (g_captured_ud != expected_ptr)
     {
-        fprintf(stderr, "  %s: FAIL — user_data not forwarded (got %p, want %p)\n",
+        fprintf(stderr, "  %s: FAIL - user_data not forwarded (got %p, want %p)\n",
                 test_name, g_captured_ud, expected_ptr);
         return 1;
     }
@@ -389,7 +389,7 @@ static int test_table_full(void)
         int rc = crumbs_register_reply_handler(&ctx, (uint8_t)i, reply_handler_a, NULL);
         if (rc != 0)
         {
-            fprintf(stderr, "  %s: FAIL — registration %d returned %d\n", test_name, i, rc);
+            fprintf(stderr, "  %s: FAIL - registration %d returned %d\n", test_name, i, rc);
             return 1;
         }
     }

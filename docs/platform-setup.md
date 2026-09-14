@@ -1,647 +1,165 @@
 # Platform Setup
 
-This guide covers installation, configuration, and first-run setup for CRUMBS on all supported platforms: Arduino, PlatformIO, and Linux.
+How to get CRUMBS compiling and a first pair of devices talking on each
+platform. Peripherals run on Arduino (AVR and ESP32 are the tested cores); a
+controller runs on Arduino or on Linux over `i2c-dev`.
 
-## Quick Start
+## Arduino IDE
 
-**Platform:** [PlatformIO](#platformio-setup) (recommended), [Arduino IDE](#arduino-setup) (simple projects), or [Linux](#linux-setup) (Raspberry Pi/PC)
+CRUMBS is not in the Library Manager index. Install it as a folder:
 
-**Hardware:** 4.7kΩ pull-ups on SDA/SCL, common ground. **Level shifter for 5V↔3.3V.**
-
----
-
-## Arduino Setup
-
-### Installation
-
-#### Method 1: Library Manager (recommended)
-
-1. Open Arduino IDE
-2. Go to Sketch → Include Library → Manage Libraries
-3. Search for "CRUMBS"
-4. Click Install
-
-#### Method 2: Manual Installation
-
-1. Download or clone the CRUMBS repository
-2. Place the `CRUMBS` folder in your Arduino `libraries` directory
-   - Windows: `Documents\Arduino\libraries\`
-   - macOS: `~/Documents/Arduino/libraries/`
-   - Linux: `~/Arduino/libraries/`
-3. Restart Arduino IDE
-
-### First Program (Peripheral)
-
-Create a new sketch:
-
-```cpp
-#include <crumbs_arduino.h>
-#include <crumbs_message_helpers.h>
-
-#define I2C_ADDRESS 0x08
-
-crumbs_context_t ctx;
-static uint8_t g_led_state = 0;
-
-static void reply_version(crumbs_context_t *ctx, crumbs_message_t *reply, void *u)
-{
-    (void)ctx; (void)u;
-    crumbs_build_version_reply(reply, 0x01, 1, 0, 0);  // type_id, major, minor, patch
-}
-
-static void reply_get_state(crumbs_context_t *ctx, crumbs_message_t *reply, void *u)
-{
-    (void)ctx; (void)u;
-    crumbs_msg_init(reply, 0x01, 0x80);
-    crumbs_msg_add_u8(reply, g_led_state);
-}
-
-void on_message(crumbs_context_t *ctx, const crumbs_message_t *msg)
-{
-    if (msg->opcode == 0x01 && msg->data_len >= 1) {
-        g_led_state = msg->data[0];
-        digitalWrite(LED_BUILTIN, g_led_state ? HIGH : LOW);
-    }
-}
-
-void setup() {
-    pinMode(LED_BUILTIN, OUTPUT);
-    crumbs_arduino_init_peripheral(&ctx, I2C_ADDRESS);
-    crumbs_set_callbacks(&ctx, on_message, NULL, NULL);
-    crumbs_register_reply_handler(&ctx, 0x00, reply_version,   NULL);  // version query
-    crumbs_register_reply_handler(&ctx, 0x80, reply_get_state, NULL);  // GET state
-}
-
-void loop() {
-    // Wire callbacks handle everything
-}
+```sh
+git clone https://github.com/feastorg/CRUMBS.git ~/Arduino/libraries/CRUMBS
 ```
 
-**Upload:** Select board/port, upload, wire I²C + GND + pull-ups.
+or **Sketch → Include Library → Add .ZIP Library…** with a release archive.
+Restart the IDE; the sketches appear under **File → Examples → CRUMBS**.
 
-**Always delay 10 ms between send/read:**
+Start with `hello_peripheral` on one board and `hello_controller` on another,
+wired as in [Wiring](#wiring). Both default to address `0x10`
+(`config.h` in each sketch); the controller's serial monitor at 115200 baud
+shows the exchange.
 
-```cpp
-crumbs_controller_send(&ctx, 0x08, &msg, crumbs_arduino_wire_write, NULL);
-delay(10);
+With `arduino-cli`, in the form CI uses for the mixed-bus sketches:
 
-crumbs_message_t reply;
-crumbs_controller_read(&ctx, 0x08, &reply, crumbs_arduino_read, NULL);
+```sh
+arduino-cli compile --fqbn arduino:avr:nano --library "$PWD" examples/core_usage/arduino/hello_peripheral
 ```
 
-### First Program (Controller)
+To change `CRUMBS_MAX_HANDLERS` for an IDE sketch you must rebuild the library
+with the same value; a `#define` in the sketch is not enough (see
+[architecture.md](architecture.md#handler-tables)). PlatformIO makes this
+easy; the IDE does not.
 
-```cpp
-#include <crumbs_arduino.h>
-#include <crumbs_message_helpers.h>
+## PlatformIO
 
-crumbs_context_t ctx;
-
-void setup() {
-    Serial.begin(9600);
-    crumbs_arduino_init_controller(&ctx);
-
-    // Send LED ON command to peripheral at 0x08
-    crumbs_message_t msg;
-    crumbs_msg_init(&msg, 0x01, 0x01);  // type=1, opcode=1
-    crumbs_msg_add_u8(&msg, 1);         // payload: LED ON
-
-    int rc = crumbs_controller_send(&ctx, 0x08, &msg,
-                                    crumbs_arduino_wire_write, NULL);
-
-    Serial.print("Send result: ");
-    Serial.println(rc);  // 0 = success
-}
-
-void loop() {
-    delay(1000);
-}
-```
-
-### Troubleshooting (Arduino)
-
-| Issue                               | Solution                                                               |
-| ----------------------------------- | ---------------------------------------------------------------------- |
-| Compile error: "crumbs.h not found" | Verify library in `libraries/` folder, restart IDE                     |
-| No response from peripheral         | Check wiring, verify addresses, measure 3.3V on SDA/SCL with pull-ups  |
-| Data corruption                     | Add `Wire.setClock(100000)` to slow clock, add delays between messages |
-| Multiple definitions error          | Include CRUMBS headers in only one file, or use header guards          |
-
-### Hardware Notes
-
-#### I²C pins by board
-
-- Arduino Uno/Nano: A4 (SDA), A5 (SCL)
-- Arduino Mega: 20 (SDA), 21 (SCL)
-- Arduino Due: 20 (SDA), 21 (SCL) — 3.3V logic
-- ESP32: GPIO 21 (SDA), GPIO 22 (SCL) — configurable
-- ESP8266: GPIO 4 (SDA), GPIO 5 (SCL)
-
-#### Pull-up resistors
-
-- Required on SDA and SCL lines
-- Typical value: 4.7kΩ to Vcc (3.3V or 5V depending on board)
-- Many boards have built-in pull-ups (may need external ones for longer wires)
-
----
-
-## PlatformIO Setup
-
-### Installation (PlatformIO)
-
-PlatformIO can automatically fetch CRUMBS as a library dependency.
-
-**Example platformio.ini (Arduino Nano):**
+Depend on the registry package:
 
 ```ini
 [env:nanoatmega328new]
 platform = atmelavr
 board = nanoatmega328new
 framework = arduino
-
-lib_deps =
-    cameronbrooks11/CRUMBS@^0.12.5
-
-build_flags =
-    -DCRUMBS_MAX_HANDLERS=8  ; optional: reduce handler table size
+lib_deps = cameronbrooks11/CRUMBS@^0.12.5
+build_flags = -DCRUMBS_MAX_HANDLERS=8   ; optional; applies to library and sketch alike
 ```
 
-**Example platformio.ini (ESP32):**
+The registry owner is `cameronbrooks11` (the publishing account), not the
+GitHub organisation. To build against a working copy instead, point
+`lib_deps` at it: `lib_deps = symlink:///path/to/CRUMBS`.
 
-```ini
-[env:esp32dev]
-platform = espressif32
-board = esp32dev
-framework = arduino
+The shipped projects under `examples/*/platformio/` and
+`examples/families_usage/lhwit_family/` build for `nanoatmega328new`
+(default), `nanoatmega328old` and `esp32dev`:
 
-lib_deps =
-    cameronbrooks11/CRUMBS@^0.12.5
-
-build_flags =
-    -DCRUMBS_MAX_HANDLERS=8  ; optional
+```sh
+pio run -d examples/core_usage/platformio/simple_peripheral -e nanoatmega328new -t upload
+pio run -d examples/core_usage/platformio/simple_controller -e nanoatmega328new -t upload
+pio device monitor            # monitor_speed = 115200 is set in the project
 ```
 
-> **ESP32 I²C pins:** GPIO 21 (SDA), GPIO 22 (SCL) by default. Use `Wire.begin(sda, scl)` to override.
+Their `platformio.ini` pins the registry version, so they build the published
+library, not the checkout they sit in.
 
-**To install and build:**
+## Linux
 
-```bash
-pio lib install
-pio run
-```
+The Linux HAL is controller-only and needs
+[linux-wire](https://github.com/feastorg/linux-wire) **0.1.3 or newer**.
 
-### First Program
+### linux-wire
 
-Create `src/main.cpp` with the same Arduino code shown above. PlatformIO will automatically:
+Build from source on any architecture (the only prebuilt tarball is x86_64):
 
-- Download CRUMBS library
-- Compile with correct build flags
-- Link everything together
-
-### Advanced Configuration
-
-**To adjust handler memory usage:**
-
-```ini
-build_flags =
-    -DCRUMBS_MAX_HANDLERS=4  # Reduce from default 16
-```
-
-**For multiple environments:**
-
-```ini
-[env:controller]
-board = uno
-build_flags =
-    -DROLE_CONTROLLER
-
-[env:peripheral]
-board = nano
-build_flags =
-    -DROLE_PERIPHERAL
-    -DI2C_ADDRESS=0x08
-```
-
-### Troubleshooting (PlatformIO)
-
-| Issue              | Solution                                                       |
-| ------------------ | -------------------------------------------------------------- |
-| Library not found  | Run `pio lib install`, check internet connection               |
-| Handler table full | Set `-DCRUMBS_MAX_HANDLERS=<smaller number>`                   |
-| ABI mismatch error | Ensure `CRUMBS_MAX_HANDLERS` set in `build_flags`, not in code |
-| Upload fails       | Check USB port permissions, verify board selection             |
-
----
-
-## Linux Setup
-
-> **Note:** Linux HAL supports **controller mode only**. Peripheral mode (I²C target) is not implemented. For peripheral devices, use Arduino or other microcontroller.
-
-### Prerequisites
-
-```bash
-# Ubuntu/Debian
-sudo apt-get install build-essential cmake git
-
-# Raspberry Pi OS
-sudo apt-get install cmake git
-
-# Fedora/RHEL
-sudo dnf install cmake gcc git
-```
-
-### Install linux-wire Dependency
-
-CRUMBS Linux HAL requires the `linux-wire` library (**0.1.3 or newer**) for I²C bus access.
-
-#### System-wide installation (recommended)
-
-```bash
-# Clone linux-wire (0.1.3 or newer is required)
+```sh
 git clone --branch v0.1.3 https://github.com/feastorg/linux-wire.git
-cd linux-wire
-
-# Build and install (linux-wire preset flow)
-cmake --preset minimal
-cmake --build --preset minimal
-sudo cmake --install build/minimal --prefix /usr/local
+cmake -S linux-wire -B linux-wire/build -DCMAKE_BUILD_TYPE=Release
+cmake --build linux-wire/build
+sudo cmake --install linux-wire/build                  # to /usr/local
 ```
 
-Presets require CMake 3.20+. If your host has older CMake, use the fallback `cmake -S . -B build` flow from the linux-wire README.
+Use `--prefix <dir>` on the install to keep it local; a linux-wire *build*
+tree is not a usable prefix (it exports nothing until installed). linux-wire's
+own `cmake --preset` flow needs `ninja-build`; the lines above work with the
+default Makefiles generator.
 
-**To verify installation:**
+### Build CRUMBS
 
-```bash
-cmake --find-package -DNAME=linux_wire -DCOMPILER_ID=GNU \
-      -DLANGUAGE=C -DMODE=EXIST
-# Should print: "linux_wire found."
-```
-
-#### Local build (development)
-
-For development without system install:
-
-```bash
-# Build linux-wire locally (preset flow)
-cd linux-wire
-cmake --preset dev
-cmake --build --preset dev
-
-# Point CRUMBS at local linux-wire preset build
-cd ../CRUMBS
-cmake --preset linux -DCMAKE_PREFIX_PATH=$HOME/linux-wire/build/dev
+```sh
+cmake --preset linux                                   # add -DCMAKE_PREFIX_PATH=<prefix> if not /usr/local
 cmake --build --preset linux
+ctest --test-dir build-linux
 ```
 
-#### Long-term CMake Integration Pattern
+The presets need CMake 3.21; the project itself needs 3.13, so on older CMake:
 
-The canonical CMake dependency contract for Linux HAL consumers is the namespaced target `linux_wire::linux_wire`.
+```sh
+cmake -S . -B build-linux -DCRUMBS_ENABLE_LINUX_HAL=ON
+cmake --build build-linux
+```
 
-Supported integration modes:
+Either way the six Linux example programs are in `build-linux/`. Without
+`CRUMBS_ENABLE_LINUX_HAL=ON` (the `default` preset) the library and tests
+build but no examples do.
 
-- **Installed package**: `find_package(linux_wire CONFIG REQUIRED)` provides `linux_wire::linux_wire` directly.
-- **Sibling source ingestion**: add `linux-wire` before `CRUMBS` in the parent build. If a raw build-tree target named `linux_wire` already exists, `CRUMBS` creates a local bridge target named `linux_wire::linux_wire` and links against that.
+### Use CRUMBS from your own CMake project
 
-This preserves one canonical target name for `CRUMBS` while still supporting active multi-repo development.
-
-Parent-build example:
+```sh
+cmake --install build-linux --prefix ~/crumbs-install
+```
 
 ```cmake
-cmake_minimum_required(VERSION 3.13)
-project(my_linux_stack C CXX)
-
-set(LINUX_WIRE_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(CRUMBS_ENABLE_LINUX_HAL ON CACHE BOOL "" FORCE)
-set(CRUMBS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(CRUMBS_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
-
-add_subdirectory(../linux-wire linux_wire_subbuild)
-add_subdirectory(../CRUMBS crumbs_subbuild)
+find_package(crumbs CONFIG REQUIRED)        # CMAKE_PREFIX_PATH=~/crumbs-install
+target_link_libraries(app PRIVATE crumbs::crumbs)
 ```
 
-Avoid linking exported or installable CRUMBS targets directly to a raw `linux_wire` target. That breaks CMake export generation. The bridge or installed-package path is the stable pattern.
+Headers install to `include/crumbs/`; include them as `<crumbs.h>` and
+`<crumbs_linux.h>`. The installed package pulls linux-wire in through
+`find_dependency`, so the same prefix path (or a system install) must
+contain it.
 
-### Install CRUMBS
+### The I²C bus
 
-```bash
-# Clone CRUMBS
-git clone https://github.com/feastorg/CRUMBS.git
-cd CRUMBS
+On a Raspberry Pi enable the interface (`raspi-config` → Interface Options →
+I2C) and use `/dev/i2c-1`. Elsewhere load `i2c-dev` (`sudo modprobe i2c-dev`)
+and find the bus with `i2cdetect -l`. Add your user to the `i2c` group rather
+than running as root.
 
-# Configure and build (Linux preset enables the HAL and examples)
-cmake --preset linux
-cmake --build --preset linux
+`i2cdetect -y 1` shows what ACKs; a CRUMBS peripheral shows up like any other
+device. Then:
 
-# Optional: system-wide install
-sudo cmake --install build-linux --prefix /usr/local
+```sh
+build-linux/crumbs_simple_linux_controller /dev/i2c-1 0x10      # send a test frame, read the reply
+build-linux/crumbs_simple_linux_controller scan                 # CRUMBS devices on /dev/i2c-1
+build-linux/crumbs_simple_linux_controller scan strict          # read-only probe
 ```
 
-### I²C Device Permissions
-
-Linux I²C devices (`/dev/i2c-*`) typically require root access or group membership.
-
-#### Option 1: Add user to i2c group
-
-```bash
-sudo usermod -a -G i2c $USER
-# Log out and back in for changes to take effect
-```
-
-#### Option 2: Use sudo
-
-```bash
-sudo ./build/crumbs_simple_linux_controller
-```
-
-#### Option 3: udev rule (advanced)
-
-Create `/etc/udev/rules.d/99-i2c.rules`:
-
-```text
-KERNEL=="i2c-[0-9]*", GROUP="i2c", MODE="0660"
-```
-
-Then reload rules:
-
-```bash
-sudo udevadm control --reload-rules
-sudo udevadm trigger
-```
-
-### Enable I²C on Raspberry Pi
-
-```bash
-# Enable I²C interface
-sudo raspi-config
-# Navigate to: Interfacing Options → I2C → Enable
-
-# Verify I²C device exists
-ls -l /dev/i2c-*
-# Should show /dev/i2c-1 (or /dev/i2c-0 on older models)
-
-# Load kernel module (if needed)
-sudo modprobe i2c-dev
-```
-
-### First Program (Linux Controller)
-
-The example programs are built automatically when `CRUMBS_BUILD_EXAMPLES=ON`.
-
-**Run simple controller:**
-
-```bash
-sudo ./build/crumbs_simple_linux_controller /dev/i2c-1 0x08
-```
-
-**Scan for CRUMBS devices:**
-
-```bash
-# Non-strict mode (attempt reads, send probe if needed)
-sudo ./build/crumbs_simple_linux_controller scan
-
-# Strict mode (read-only checks, safer for sensitive devices)
-sudo ./build/crumbs_simple_linux_controller scan strict
-```
-
-### Write Your Own Linux Controller
-
-**Example CMake project structure:**
-
-```text
-my_project/
-├── CMakeLists.txt
-└── src/
-    └── main.c
-```
-
-**CMakeLists.txt:**
-
-```cmake
-cmake_minimum_required(VERSION 3.13)
-project(my_controller C)
-
-find_package(crumbs CONFIG REQUIRED)
-
-add_executable(my_controller src/main.c)
-target_link_libraries(my_controller PRIVATE crumbs::crumbs)
-```
-
-**src/main.c:**
-
-```c
-#include "crumbs.h"
-#include "crumbs_linux.h"
-#include "crumbs_message_helpers.h"
-#include <stdio.h>
-
-int main() {
-    crumbs_context_t ctx;
-    crumbs_linux_i2c_t bus;
-
-    // Open I²C bus
-    int rc = crumbs_linux_init_controller(&ctx, &bus, "/dev/i2c-1", 10000);
-    if (rc != 0) {
-        fprintf(stderr, "Failed to open I2C bus: %d\n", rc);
-        return 1;
-    }
-
-    // Send message
-    crumbs_message_t msg;
-    crumbs_msg_init(&msg, 0x01, 0x01);
-    crumbs_msg_add_u8(&msg, 1);  // LED ON
-
-    rc = crumbs_controller_send(&ctx, 0x08, &msg,
-                                crumbs_linux_i2c_write, &bus);
-
-    printf("Send result: %d\n", rc);
-
-    crumbs_linux_close(&bus);
-    return 0;
-}
-```
-
-**Build:**
-
-```bash
-cmake -S . -B build
-cmake --build build
-./build/my_controller
-```
-
-### Troubleshooting (Linux)
-
-| Issue                       | Solution                                                     |
-| --------------------------- | ------------------------------------------------------------ |
-| `linux_wire not found`      | Install linux-wire with presets, or set `-DCMAKE_PREFIX_PATH=$HOME/linux-wire/build/dev` (or `build/minimal`) |
-| `/dev/i2c-1` not found      | Enable I²C in raspi-config, load `i2c-dev` module            |
-| Permission denied           | Add user to `i2c` group or use `sudo`                        |
-| `i2c-dev` module not loaded | Run `sudo modprobe i2c-dev`, add to `/etc/modules` for boot  |
-| Link errors                 | Verify `crumbs::crumbs` target linked in CMake               |
-| Wrong I²C bus               | Use `i2cdetect -l` to list buses, adjust device path         |
-
----
-
-## Hardware Wiring
-
-### Standard I²C Connection
-
-```text
-Controller          Peripheral
----------          ----------
-    SDA  ───────────  SDA
-    SCL  ───────────  SCL
-    GND  ───────────  GND
-     |                 |
-     ├── 4.7kΩ ── Vcc  (pull-up)
-     └── 4.7kΩ ── Vcc  (pull-up)
-```
-
-### Multiple Peripherals
-
-```text
-Controller          Peripheral 1 (0x08)    Peripheral 2 (0x09)
----------          ------------------      ------------------
-    SDA  ────┬──────  SDA                      SDA
-             │
-    SCL  ────┼──┬───  SCL                      SCL
-             │  │
-    GND  ────┼──┼───  GND                      GND
-             │  │
-       4.7kΩ │  └── 4.7kΩ to Vcc
-             │
-             └────── Vcc (3.3V or 5V)
-```
-
-**Important:**
-
-- All devices must share a common ground
-- Only one set of pull-up resistors needed per bus
-- Use 3.3V logic if any device is 3.3V-only
-- Maximum bus length: ~1 meter (longer requires lower pull-up resistance)
-
----
-
-## Verification and Testing
-
-### I²C Bus Scanner (Arduino)
-
-Use the built-in Wire scanner to verify devices are visible:
-
-```cpp
-#include <Wire.h>
-
-void setup() {
-    Serial.begin(9600);
-    Wire.begin();
-
-    Serial.println("Scanning I2C bus...");
-    for (uint8_t addr = 0x08; addr < 0x78; addr++) {
-        Wire.beginTransmission(addr);
-        if (Wire.endTransmission() == 0) {
-            Serial.print("Found device at 0x");
-            Serial.println(addr, HEX);
-        }
-    }
-}
-
-void loop() {}
-```
-
-### CRUMBS Device Scanner (Arduino)
-
-Verify devices speak CRUMBS protocol:
-
-```cpp
-#include <crumbs_arduino.h>
-
-crumbs_context_t ctx;
-
-void setup() {
-    Serial.begin(9600);
-    crumbs_arduino_init_controller(&ctx);
-
-    uint8_t found[32];
-    int count = crumbs_controller_scan_for_crumbs(
-        &ctx, 0x08, 0x77, 1,  // strict mode
-        crumbs_arduino_wire_write, crumbs_arduino_read, NULL,
-        found, 32, 50000);
-
-    Serial.print("Found ");
-    Serial.print(count);
-    Serial.println(" CRUMBS devices:");
-
-    for (int i = 0; i < count; i++) {
-        Serial.print("  0x");
-        Serial.println(found[i], HEX);
-    }
-}
-
-void loop() {}
-```
-
-If your physical bus also includes non-CRUMBS peripherals, avoid broad range scans and use an explicit candidate list:
-
-```c
-uint8_t candidates[] = {0x10, 0x12, 0x20};
-uint8_t found[8], types[8];
-int count = crumbs_controller_scan_for_crumbs_candidates(
-    &ctx, candidates, sizeof(candidates), 1,
-    crumbs_arduino_wire_write, crumbs_arduino_read, NULL,
-    found, types, 8, 10000);
-```
-
-### I²C Bus Scanner (Linux)
-
-```bash
-# List I²C buses
-i2cdetect -l
-
-# Scan bus 1 for devices
-i2cdetect -y 1
-```
-
-### CRUMBS Device Scanner (Linux)
-
-```bash
-# Non-strict mode
-sudo ./build/crumbs_simple_linux_controller scan
-
-# Strict mode (safer, read-only)
-sudo ./build/crumbs_simple_linux_controller scan strict
-```
-
-For mixed buses, prefer candidate-address scanning in application code instead of broad `0x08..0x77` sweeps.
-
----
-
-## Next Steps
-
-Once your platform is set up and basic communication is working:
-
-1. **Work through examples** — Progressive tutorials in `examples/core_usage/`
-   - Start with `hello_peripheral/` + `hello_controller/` (Arduino)
-   - Or `simple_controller/` (Linux)
-
-2. **Learn handler dispatch** — Register per-opcode handlers instead of switch statements
-   - SET ops: `crumbs_register_handler()` — see `examples/handlers_usage/`
-   - GET ops: `crumbs_register_reply_handler()` — see `examples/families_usage/lhwit_family/`
-   - Read [API Reference: Handler Dispatch](api-reference.md#peripheral--crumbsh)
-
-3. **Use message helpers** — Type-safe payload builders
-   - Include `crumbs_message_helpers.h`
-   - See [API Reference: Message Helpers](api-reference.md#payload-helpers--crumbs_message_helpersh)
-
-4. **Create command headers** — Reusable command definitions
-   - See `examples/handlers_usage/mock_ops.h`
-
-5. **Optimize memory** — Reduce handler table size for constrained devices
-   - Set `CRUMBS_MAX_HANDLERS` via build flags
-
----
-
-## See Also
-
-- [API Reference](api-reference.md) — Complete function documentation
-- [Protocol Specification](protocol.md) — Wire format and versioning
-- [Examples](examples.md) — Working code for all platforms
-- [Architecture](architecture.md) — Design decisions and internals
+Non-strict scanning writes an all-zero frame to addresses that do not answer
+a read; do not run it on a bus with an EEPROM at an unknown address
+([protocol.md](protocol.md#discovery)).
+
+## Wiring
+
+SDA to SDA, SCL to SCL, and a common ground; one pair of pull-ups per bus.
+Default `Wire` pins: Uno and Nano A4 (SDA) / A5 (SCL); Mega 20 / 21; ESP32
+GPIO 21 / 22; Raspberry Pi GPIO 2 / 3 (header pins 3 / 5).
+
+- Arduino-only buses: 4.7 kΩ from SDA and SCL to the boards' logic voltage.
+  The AVR `Wire` core turns on the chip's internal pull-ups, but those are
+  tens of kΩ and only adequate for two boards on a few centimetres of wire.
+- A Raspberry Pi controller: the Pi already pulls both lines to 3.3 V through
+  its onboard resistors; add nothing, and never pull the bus to 5 V.
+- Every device on one bus must sit at a distinct address. The examples use
+  `0x10`; the LHWIT family uses `0x10`–`0x40` in steps of `0x10`; the address
+  avoid-list is in [protocol.md](protocol.md#ic-address).
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| Controller sends, peripheral silent | Same address in both sketches; SDA/SCL not swapped; common ground; pull-ups present. `i2cdetect` (Linux) or `crumbs_arduino_scan` sees the peripheral? |
+| `crumbs_controller_read` returns `-1` | Nothing decodable came back: the address did not answer, or the peripheral had nothing staged for the requested opcode — see [protocol.md](protocol.md#the-read). |
+| `-2` (CRC) on most reads from a Pi | The Pi's I²C controller does not honour clock stretching; a peripheral whose interrupt is late returns `0xFF`s. Keep handlers short; see [protocol.md](protocol.md#when-the-reply-is-built). |
+| `CRUMBS_MAX_HANDLERS mismatch` at boot | The value was set in the sketch, not as a build flag for the library too. |
+| `Could not find a package configuration file provided by "linux_wire"` at configure | Install linux-wire ≥ 0.1.3 (a build tree is not enough) or pass its install prefix in `CMAKE_PREFIX_PATH`. |
+| `crumbs_linux_scan` returns `-2` | The adapter cannot do an SMBus Quick Write; use strict mode. |
+| `lw_open_bus: open: Permission denied` | Add yourself to the `i2c` group and log in again. |

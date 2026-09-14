@@ -264,7 +264,7 @@ extern "C"
     };
 
     /**
-     * @brief Bound device handle — groups all transport fields for a single
+     * @brief Bound device handle - groups all transport fields for a single
      *        CRUMBS device on the bus.
      *
      * Pass a pointer to this struct to ops-header functions instead of the
@@ -770,10 +770,10 @@ extern "C"
      *
      * Dispatches in order:
      * 1. Per-opcode reply handler table (crumbs_register_reply_handler) for
-     *    ctx->requested_opcode — preferred for family peripherals.
-     * 2. on_request callback — called when no matching reply handler is found
+     *    ctx->requested_opcode - preferred for family peripherals.
+     * 2. on_request callback - called when no matching reply handler is found
      *    (backward-compatible with existing code).
-     * 3. No reply configured — returns success with *out_len set to 0.
+     * 3. No reply configured - returns success with *out_len set to 0.
      *
      * @param ctx Active CRUMBS context (peripheral role).
      * @param out_buf Buffer to receive encoded frame.

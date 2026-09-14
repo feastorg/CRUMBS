@@ -4,7 +4,7 @@
  * Minimal Arduino 'non-CRUMBS' peripheral for testing scanner false-positives.
  *
  * Behavior:
- *  - Joins I2C as a slave at address 69 (0x45)
+ *  - Joins I2C as a target (peripheral) at address 69 (0x45)
  *  - On receive: drains the bytes and logs count to Serial
  *  - On request: responds with a short, non-CRUMBS payload (will NOT be a
  *    valid 31-byte CRUMBS frame) so the CRUMBS-aware scanner should *not*

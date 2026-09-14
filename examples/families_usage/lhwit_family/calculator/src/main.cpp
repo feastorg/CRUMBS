@@ -283,7 +283,7 @@ static void on_request_hist(crumbs_context_t *ctx, crumbs_message_t *reply)
         memcpy(reply->data, &g_history[entry_idx], 16);
         reply->data_len = 16;
     }
-    /* else data_len stays 0 — empty reply for non-existent entry */
+    /* else data_len stays 0 - empty reply for non-existent entry */
 }
 
 /* ============================================================================

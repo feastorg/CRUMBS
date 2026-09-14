@@ -86,7 +86,7 @@ void setup() {
 
 | Document                              | Description                                                       |
 | ------------------------------------- | ----------------------------------------------------------------- |
-| [Platform Setup](platform-setup.md)   | Installation and configuration for Arduino, PlatformIO, and Linux |
+| [Platform Setup](platform-setup.md)   | Install, build, wire and verify on Arduino IDE, PlatformIO and Linux |
 | [Protocol](protocol.md)               | Normative wire format: frame, CRC-8, SET_REPLY, address/type/opcode spaces |
 | [Examples](examples.md)               | Three-tier learning path with platform coverage                   |
 
@@ -103,15 +103,12 @@ void setup() {
 
 | Document                                          | Description                                  |
 | ------------------------------------------------- | -------------------------------------------- |
-| [CONTRIBUTING.md](../CONTRIBUTING.md)             | How to build, test, and contribute to CRUMBS |
-| [Character Usage Guide](character-usage-guide.md) | ASCII vs Unicode in documentation            |
-| [Doxygen Style Guide](doxygen-style-guide.md)     | In-source documentation standards            |
+| [CONTRIBUTING.md](../CONTRIBUTING.md)             | Build, test, doc checks, style, commits, CI, releasing |
 
 ### Meta
 
 | Document                        | Description                                    |
 | ------------------------------- | ---------------------------------------------- |
-| [PlatformIO](platformio.md)     | Registry publishing and CI integration         |
 | [Roadmap](roadmap.md)           | Deferred directions and out-of-scope decisions |
 | [CHANGELOG.md](../CHANGELOG.md) | Version history and release notes              |
 
