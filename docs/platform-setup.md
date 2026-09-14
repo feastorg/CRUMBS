@@ -625,11 +625,11 @@ Once your platform is set up and basic communication is working:
 2. **Learn handler dispatch** — Register per-opcode handlers instead of switch statements
    - SET ops: `crumbs_register_handler()` — see `examples/handlers_usage/`
    - GET ops: `crumbs_register_reply_handler()` — see `examples/families_usage/lhwit_family/`
-   - Read [API Reference: Handler Dispatch](api-reference.md#handler-dispatch)
+   - Read [API Reference: Handler Dispatch](api-reference.md#peripheral--crumbsh)
 
 3. **Use message helpers** — Type-safe payload builders
    - Include `crumbs_message_helpers.h`
-   - See [API Reference: Message Helpers](api-reference.md#message-helpers)
+   - See [API Reference: Message Helpers](api-reference.md#payload-helpers--crumbs_message_helpersh)
 
 4. **Create command headers** — Reusable command definitions
    - See `examples/handlers_usage/mock_ops.h`

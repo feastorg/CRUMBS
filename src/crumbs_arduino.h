@@ -20,8 +20,8 @@ extern "C"
      * @brief Initialize a CRUMBS context for use as an I2C controller on Arduino.
      *
      * This uses the default global Wire instance and calls Wire.begin().
-     * You can still call crumbs_set_callbacks() afterwards if you want to
-     * attach any controller-side metadata or debug hooks.
+     * No Wire callbacks are attached in controller mode. On AVR the clock is
+     * set to CRUMBS_DEFAULT_TWI_FREQ (100 kHz) after Wire.begin().
      *
      * @param ctx Pointer to the CRUMBS context to initialize.
      */
@@ -53,7 +53,8 @@ extern "C"
      * @param addr     7-bit I2C address of the target peripheral.
      * @param data     Pointer to data buffer to transmit.
      * @param len      Number of bytes to transmit.
-     * @return 0 on success, non-zero on error.
+     * @return 0 on success; the positive Wire.endTransmission() code on a bus
+     *         error; -1 for NULL data with len > 0; -2 for a short write.
      */
     int crumbs_arduino_wire_write(void *user_ctx,
                                   uint8_t addr,
@@ -103,8 +104,9 @@ extern "C"
      * @param addr       7-bit I2C address of the target peripheral.
      * @param buffer     Output buffer to receive data.
      * @param len        Maximum number of bytes to read.
-     * @param timeout_us Timeout hint in microseconds.
-     * @return Number of bytes read (>=0) or negative on error.
+     * @param timeout_us Poll deadline in microseconds; 0 returns what requestFrom()
+     *                   already buffered, which on AVR is the whole transfer.
+     * @return Number of bytes read (0..len), or -1 for a NULL buffer or len == 0.
      */
     int crumbs_arduino_read(void *user_ctx,
                             uint8_t addr,
@@ -125,9 +127,10 @@ extern "C"
      * @param tx_len                  Number of write-phase bytes.
      * @param rx                      Read buffer (may be NULL if rx_len==0).
      * @param rx_len                  Number of bytes to read.
-     * @param timeout_us              Timeout hint in microseconds.
-     * @param require_repeated_start  Non-zero requires combined no-STOP behavior.
-     * @return Number of bytes read (>=0) or negative on error.
+     * @param timeout_us              Poll deadline for the read phase; 0 takes what is buffered.
+     * @param require_repeated_start  Non-zero ends the write phase without STOP (repeated start).
+     * @return Number of bytes read (>=0); -1 bad arguments, -2 write phase failed,
+     *         -6 tx_len or rx_len exceeds the Wire buffer.
      */
     int crumbs_arduino_write_then_read(void *user_ctx,
                                        uint8_t addr,

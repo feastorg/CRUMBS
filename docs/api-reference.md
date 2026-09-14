@@ -1,1076 +1,176 @@
 # API Reference
 
-This document provides the complete CRUMBS C API reference for users implementing controllers and peripherals. All public functions, types, constants, and helper utilities are documented here.
-
-## Overview
-
-The CRUMBS API is organized into:
-
-- **Core API**: Message encoding/decoding, context management, callbacks
-- **Handler Dispatch**: Per-command function registration for peripherals
-- **Message Helpers**: Type-safe payload builders and readers
-- **Platform HAL**: Arduino and Linux adapter functions
-- **Discovery**: Bus scanning for CRUMBS-compatible devices
-
-## Key Types and Constants
-
-### Message Structure
-
-```c
-typedef struct {
-    uint8_t type_id;      // Device/module type identifier
-    uint8_t opcode;       // Command/query opcode
-    uint8_t data_len;     // Payload length (0–27)
-    uint8_t data[27];     // Payload buffer
-    uint8_t crc8;         // CRC-8 checksum over serialized frame
-} crumbs_message_t;
-```
-
-> `address` was removed in v0.10.3 — it was never serialized and was redundant with `ctx->address` inside every callback.
-
-**Serialized frame format** (4–31 bytes):
-
-```text
-[type_id:1][opcode:1][data_len:1][data:0–27][crc8:1]
-```
-
-CRC is computed over: `type_id + opcode + data_len + data[0..data_len-1]`
-
-### Context Structure
-
-```c
-typedef struct crumbs_context_t {
-    crumbs_role_t role;           // CONTROLLER or PERIPHERAL
-    uint8_t address;              // Device I²C address (peripherals only)
-    uint8_t type_id;              // Declared device type; 0 = not declared (see crumbs_set_type_id)
-
-    // CRC statistics
-    uint32_t crc_error_count;     // Cumulative CRC failures
-    int last_crc_ok;              // 1 if last decode succeeded, 0 otherwise
-
-    // Callbacks
-    crumbs_message_cb_t on_message;    // General message callback
-    crumbs_request_cb_t on_request;    // Peripheral request callback (for reads)
-    void *user_data;                   // Opaque user pointer
-
-    // Handler dispatch table (if enabled)
-    // ... internal fields ...
-} crumbs_context_t;
-```
-
-### Constants
-
-```c
-#define CRUMBS_MAX_PAYLOAD      27    // Maximum payload bytes
-#define CRUMBS_MESSAGE_MAX_SIZE 31    // Maximum serialized frame size
-#define CRUMBS_CMD_SET_REPLY    0xFE  // Reserved opcode for SET_REPLY command
-#define CRUMBS_VERSION          1204  // Library version (1204 = v0.12.5, formula: major*10000 + minor*100 + patch)
-```
-
-### Bound-Device Handle
-
-```c
-typedef struct {
-    crumbs_context_t   *ctx;      // Shared controller context
-    uint8_t             addr;     // 7-bit I²C address of this device
-    crumbs_i2c_write_fn write_fn; // I²C write callback
-    crumbs_i2c_read_fn  read_fn;  // I²C read callback (NULL if no GET ops)
-    crumbs_delay_fn     delay_fn; // Microsecond delay callback (NULL if no GET ops)
-    void               *io;       // Platform I/O context (Wire*, linux handle, etc.)
-} crumbs_device_t;
-```
-
-Bundle all per-device transport state into one value that ops-header functions accept as `const crumbs_device_t *dev`. Populate once at startup (or after scan) and reuse for every call to that device. See `examples/families_usage/lhwit_family/` for usage.
-
-### Callback Signatures
-
-```c
-// Message callback — invoked on all received messages
-typedef void (*crumbs_message_cb_t)(
-    crumbs_context_t *ctx,
-    const crumbs_message_t *msg);
-
-// Request callback — invoked when peripheral receives an I²C read request
-// (fallback; prefer crumbs_register_reply_handler for per-opcode dispatch)
-typedef void (*crumbs_request_cb_t)(
-    crumbs_context_t *ctx,
-    crumbs_message_t *reply);
-
-// SET handler — per-opcode dispatch for incoming SET commands
-typedef void (*crumbs_handler_fn)(
-    crumbs_context_t *ctx,
-    uint8_t opcode,
-    const uint8_t *data,
-    uint8_t data_len,
-    void *user_data);
-
-// Reply handler — per-opcode dispatch for GET reply building
-typedef void (*crumbs_reply_fn)(
-    crumbs_context_t *ctx,
-    crumbs_message_t *reply,
-    void *user_data);
-```
-
----
-
-## Core API
-
-### Context Initialization
-
-```c
-void crumbs_init(crumbs_context_t *ctx, crumbs_role_t role, uint8_t address);
-```
-
-Initialize a CRUMBS context. Must be called before any other operations.
-
-**Parameters:**
-
-- `ctx` — Context to initialize
-- `role` — `CRUMBS_ROLE_CONTROLLER` or `CRUMBS_ROLE_PERIPHERAL`
-- `address` — Device I²C address (only used for peripherals; controllers can use 0x00)
-
-### Callback Registration
-
-```c
-void crumbs_set_callbacks(crumbs_context_t *ctx,
-                          crumbs_message_cb_t on_message,
-                          crumbs_request_cb_t on_request,
-                          void *user_data);
-```
-
-Install callbacks for message handling.
-
-**Parameters:**
-
-- `on_message` — Invoked when a message is received (both roles). May be NULL.
-- `on_request` — Invoked when peripheral receives an I²C read request. May be NULL.
-- `user_data` — Opaque pointer passed to callbacks.
-
-```c
-void crumbs_set_type_id(crumbs_context_t *ctx, uint8_t type_id);
-```
-
-Declare the peripheral's device type. Afterwards `crumbs_peripheral_handle_receive()` drops frames whose `type_id` is neither this value nor `CRUMBS_TYPE_ID_ANY` (`0x00`), returning `CRUMBS_RX_TYPE_MISMATCH` (`-8`) before any callback or handler runs. Default is `0` (not declared: every frame is dispatched); passing `0` restores that.
-
-**Callback Execution Order:**
-
-1. Message decoded and CRC validated
-2. Type check: if the peripheral declared a type (`crumbs_set_type_id()`) and the frame carries a different non-zero `type_id`, stop here (`CRUMBS_RX_TYPE_MISMATCH`)
-3. SET_REPLY (`0xFE`) intercepted: `requested_opcode` stored, nothing below runs
-4. `on_message` callback invoked (if registered)
-5. Handler dispatch (if registered for this opcode)
-
-### Encoding and Decoding
-
-```c
-size_t crumbs_encode_message(const crumbs_message_t *msg,
-                             uint8_t *buffer,
-                             size_t buffer_len);
-```
-
-Encode a message into a wire-format frame.
-
-**Returns:**
-
-- Encoded frame length (4 + data_len) on success
-- `0` on failure (buffer too small or data_len > 27)
-
----
-
-```c
-int crumbs_decode_message(const uint8_t *buffer,
-                          size_t buffer_len,
-                          crumbs_message_t *msg,
-                          crumbs_context_t *ctx);
-```
-
-Decode a wire-format frame into a message structure.
-
-**Parameters:**
-
-- `ctx` — Optional context for CRC statistics (may be NULL)
-
-**Returns:**
-
-- `0` — Success
-- `-1` — Invalid frame (too short, too long, bad data_len, truncated)
-- `-2` — CRC mismatch
-
-If `ctx` is non-NULL, CRC statistics are updated.
-
-### Controller Operations
-
-```c
-int crumbs_controller_send(const crumbs_context_t *ctx,
-                           uint8_t target_addr,
-                           const crumbs_message_t *msg,
-                           crumbs_i2c_write_fn write_fn,
-                           void *write_ctx);
-```
-
-Send a message from controller to a peripheral device.
-
-**Returns:**
-
-- `0` — Success
-- `-1` — Invalid arguments (NULL ctx/msg/write_fn)
-- `-2` — Context not in controller role
-- `-3` — Encode failed (data_len > 27 or buffer issue)
-- `>0` — I2C write error (platform-specific, from write_fn)
-
-**Common issues:**
-
-- Return `-3`: Check `msg->data_len` ≤ 27
-- Return `>0`: I²C bus error - check wiring, pull-ups, address
-- No response from peripheral: Add 10ms delay before reading
-
-**Example:**
-
-```c
-crumbs_message_t msg;
-crumbs_msg_init(&msg, 0x01, 0x10);  // type=LED, opcode=query
-int rc = crumbs_controller_send(&ctx, 0x08, &msg,
-                                crumbs_arduino_wire_write, NULL);
-if (rc != 0) {
-    Serial.print("Send failed: ");
-    Serial.println(rc);  // Debug error code
-}
-```
-
-### Controller Reply Read
-
-```c
-int crumbs_controller_read_expect(crumbs_context_t *ctx,
-                                  uint8_t target_addr,
-                                  uint8_t expect_type_id,
-                                  uint8_t expect_opcode,
-                                  crumbs_message_t *out_msg,
-                                  crumbs_i2c_read_fn read_fn,
-                                  void *read_ctx);
-```
-
-`crumbs_controller_read()` followed by an identity check: the reply's `opcode` must equal `expect_opcode`, and its `type_id` must equal `expect_type_id` unless that is `CRUMBS_TYPE_ID_ANY`. A reply with a valid CRC can still be the wrong frame — another opcode's staged reply, or another device type answering at a duplicated address — and the CRC cannot tell; this does. `out_msg` is filled on success and on mismatch.
-
-**Returns:** `0`=match; `crumbs_controller_read()`'s codes on read/decode failure; `CRUMBS_RX_REPLY_MISMATCH` (`-7`)=well-formed reply, wrong identity. Protocol-level `CRUMBS_RX_*` codes start at `-7`, disjoint from transport-level codes (`-1`..`-6`), so the value survives pass-through.
-
-`CRUMBS_DEFINE_GET_OP` getters use this, so a hand-written getter should too rather than comparing the fields itself.
-
----
-
-### Peripheral Operations
-
-```c
-int crumbs_peripheral_handle_receive(crumbs_context_t *ctx,
-                                     const uint8_t *buffer,
-                                     size_t len);
-```
-
-Process incoming data on a peripheral device. Decodes the message, validates CRC, and invokes callbacks/handlers.
-
-**Returns:** `0`=success, `-1`=invalid/decode fail, `-2`=CRC error (check wiring, use `crumbs_get_crc_error_count()`), `CRUMBS_RX_TYPE_MISMATCH` (`-8`)=valid frame for another declared type (see `crumbs_set_type_id()`; not counted as a CRC error)
-
-Called from Wire `onReceive()` on Arduino.
-
----
-
-```c
-int crumbs_peripheral_build_reply(crumbs_context_t *ctx,
-                                  uint8_t *out_buf,
-                                  size_t out_buf_len,
-                                  size_t *out_len);
-```
-
-Build a reply frame for an I²C read request. Dispatches in order:
-
-1. Per-opcode reply handler table (`crumbs_register_reply_handler`) — checked first
-2. `on_request` callback fallback — called only when no matching reply handler exists
-3. Returns 0-length reply if neither is configured
-
-**Returns:**
-
-- `0` — Success (`out_len` set to frame size, or 0 if no reply configured)
-- `-1` — Invalid arguments or not peripheral role
-- `-2` — Encode failed
-
-Typically called from Wire `onRequest()` on Arduino.
-
-### CRC Statistics
-
-```c
-uint32_t crumbs_get_crc_error_count(const crumbs_context_t *ctx);
-int crumbs_last_crc_ok(const crumbs_context_t *ctx);
-void crumbs_reset_crc_stats(crumbs_context_t *ctx);
-```
-
-Access CRC validation statistics. Use these for diagnostics or to detect noisy I²C bus conditions.
-
-### ABI Compatibility Check
-
-```c
-size_t crumbs_context_size(void);
-```
-
-Returns the size of `crumbs_context_t` as compiled into the library. Use this to detect mismatches when `CRUMBS_MAX_HANDLERS` differs between library and application.
-
-**When to use:** Precompiled libraries (PlatformIO lib_deps)
-
-**Example:**
-
-```c
-void setup() {
-    if (sizeof(crumbs_context_t) != crumbs_context_size()) {
-        Serial.println("ERROR: CRUMBS_MAX_HANDLERS mismatch!");
-        while(1);  // Halt
-    }
-}
-```
-
-**Fix:** Set `CRUMBS_MAX_HANDLERS` via `build_flags` in `platformio.ini`.
-
----
-
-## Handler Dispatch
-
-The handler dispatch system provides per-opcode function registration for structured command processing.
-
-### Handler Registration
-
-```c
-int crumbs_register_handler(crumbs_context_t *ctx,
-                            uint8_t opcode,
-                            crumbs_handler_fn fn,
-                            void *user_data);
-```
-
-Register a handler function for a specific opcode.
-
-**Returns:**
-
-- `0` — Success
-- `-1` — NULL context or handler table full
-
-**Example:**
-
-```c
-crumbs_register_handler(&ctx, 0x01, handle_led_set, &led_state);
-crumbs_register_handler(&ctx, 0x10, handle_led_query, NULL);
-```
-
----
-
-```c
-int crumbs_unregister_handler(crumbs_context_t *ctx, uint8_t opcode);
-```
-
-Remove a handler for a specific opcode. Always returns `0`.
-
-Alternatively, call `crumbs_register_handler()` with `fn = NULL`.
-
-### Handler Function Signature
-
-```c
-void my_handler(crumbs_context_t *ctx,
-                uint8_t opcode,
-                const uint8_t *data,
-                uint8_t data_len,
-                void *user_data) {
-    // Process command...
-}
-```
-
-**Parameters:**
-
-- `ctx` — The CRUMBS context
-- `opcode` — The command that triggered this handler
-- `data` — Payload bytes (may be NULL if data_len == 0)
-- `data_len` — Payload length (0–27)
-- `user_data` — Opaque pointer registered with this handler
-
----
-
-```c
-int crumbs_register_reply_handler(crumbs_context_t *ctx,
-                                  uint8_t opcode,
-                                  crumbs_reply_fn fn,
-                                  void *user_data);
-```
-
-Register a reply-builder function for a specific GET opcode. Invoked by `crumbs_peripheral_build_reply()` when `ctx->requested_opcode` matches — symmetric counterpart to `crumbs_register_handler()` for SET ops.
-
-**Returns:** `0` on success, `-1` if ctx is NULL or handler table is full.
-
-When both a reply handler and `on_request` are configured, the reply handler takes priority; `on_request` is called only when no matching reply handler is found (fully backward-compatible).
-
-**Example:**
-
-```c
-static void reply_version(crumbs_context_t *ctx, crumbs_message_t *reply, void *user)
-{
-    (void)ctx; (void)user;
-    crumbs_build_version_reply(reply, MY_TYPE_ID, 1, 0, 0);
-}
-
-static void reply_get_state(crumbs_context_t *ctx, crumbs_message_t *reply, void *user)
-{
-    (void)ctx; (void)user;
-    crumbs_msg_init(reply, MY_TYPE_ID, MY_OP_GET_STATE);
-    crumbs_msg_add_u8(reply, g_state);
-}
-
-// In setup():
-crumbs_register_reply_handler(&ctx, 0x00,             reply_version,   NULL);
-crumbs_register_reply_handler(&ctx, MY_OP_GET_STATE,  reply_get_state, NULL);
-```
-
-### SET Dispatch Flow
-
-When a SET message arrives at a peripheral:
-
-1. Message decoded and CRC validated
-2. `on_message` callback invoked (if registered)
-3. Handler dispatch searches for matching opcode
-4. Handler invoked (if found)
-
-Both mechanisms coexist — use `on_message` for logging, handlers for command logic.
-
-### GET Dispatch Flow
-
-When the bus master issues an I²C read request:
-
-1. `crumbs_peripheral_build_reply()` called by the HAL
-2. Reply handler table searched for `ctx->requested_opcode`
-3. If found: corresponding `crumbs_reply_fn` called
-4. If not found: `on_request` callback called (backward-compatible fallback)
-5. If neither configured: reply length set to 0 (empty response)
-
-### Memory Configuration
-
-Handler dispatch uses `CRUMBS_MAX_HANDLERS` slots (default: 16).
-
-**Adjust handler table size:**
-
-```ini
-# platformio.ini
-build_flags = -DCRUMBS_MAX_HANDLERS=8
-```
-
-**Disable handler dispatch:**
-
-```ini
-build_flags = -DCRUMBS_MAX_HANDLERS=0
-```
-
-> **Important:** Always set via `build_flags`. Defining in sketch before `#include` does not work on Arduino/PlatformIO due to separate library compilation.
-
-**Memory usage:**
-
-| Max Handlers | AVR (2-byte ptr) | 32-bit (4-byte ptr) |
-| ------------ | ---------------- | ------------------- |
-| 16           | ~68 bytes        | ~132 bytes          |
-| 8            | ~36 bytes        | ~68 bytes           |
-| 4            | ~21 bytes        | ~37 bytes           |
-| 0            | 0 bytes          | 0 bytes             |
-
----
-
-## Message Helpers
-
-The `crumbs_message_helpers.h` header provides zero-overhead inline helpers for building and reading message payloads. These eliminate manual byte manipulation.
-
-**Include:**
-
-```c
-#include "crumbs_message_helpers.h"    // Linux/CMake
-#include <crumbs_message_helpers.h>    // Arduino
-```
-
-### Message Builder
-
-#### Initialization
-
-```c
-void crumbs_msg_init(crumbs_message_t *msg, uint8_t type_id, uint8_t opcode);
-```
-
-Initialize a message with type and opcode. Sets `data_len = 0` and zeros all fields.
-
-#### Adding Values
-
-All add functions return `0` on success, `-1` if the value would exceed the 27-byte payload limit.
-
-```c
-int crumbs_msg_add_u8(crumbs_message_t *msg, uint8_t value);
-int crumbs_msg_add_u16(crumbs_message_t *msg, uint16_t value);     // little-endian
-int crumbs_msg_add_u32(crumbs_message_t *msg, uint32_t value);     // little-endian
-int crumbs_msg_add_i8(crumbs_message_t *msg, int8_t value);
-int crumbs_msg_add_i16(crumbs_message_t *msg, int16_t value);      // little-endian
-int crumbs_msg_add_i32(crumbs_message_t *msg, int32_t value);      // little-endian
-int crumbs_msg_add_float(crumbs_message_t *msg, float value);      // native byte order
-int crumbs_msg_add_bytes(crumbs_message_t *msg, const void *data, uint8_t len);
-```
-
-**Encoding notes:**
-
-- Multi-byte integers use **little-endian** (LSB first)
-- Floats use **native byte order** (memcpy)
-
-**Example:**
-
-```c
-crumbs_message_t msg;
-crumbs_msg_init(&msg, 0x02, 0x02);  // type=Servo, opcode=SetBoth
-crumbs_msg_add_u16(&msg, 1500);     // Servo 1
-crumbs_msg_add_u16(&msg, 2000);     // Servo 2
-```
-
-### Message Reader
-
-All read functions return `0` on success, `-1` if reading would exceed buffer bounds.
-
-```c
-int crumbs_msg_read_u8(const uint8_t *data, uint8_t len, uint8_t offset, uint8_t *out);
-int crumbs_msg_read_u16(const uint8_t *data, uint8_t len, uint8_t offset, uint16_t *out);
-int crumbs_msg_read_u32(const uint8_t *data, uint8_t len, uint8_t offset, uint32_t *out);
-int crumbs_msg_read_i8(const uint8_t *data, uint8_t len, uint8_t offset, int8_t *out);
-int crumbs_msg_read_i16(const uint8_t *data, uint8_t len, uint8_t offset, int16_t *out);
-int crumbs_msg_read_i32(const uint8_t *data, uint8_t len, uint8_t offset, int32_t *out);
-int crumbs_msg_read_float(const uint8_t *data, uint8_t len, uint8_t offset, float *out);
-int crumbs_msg_read_bytes(const uint8_t *data, uint8_t len, uint8_t offset, void *out, uint8_t count);
-```
-
-**Example (peripheral handler):**
-
-```c
-void handle_servo(crumbs_context_t *ctx, uint8_t cmd,
-                  const uint8_t *data, uint8_t len, void *user) {
-    uint8_t channel;
-    uint16_t pulse_us;
-
-    if (crumbs_msg_read_u8(data, len, 0, &channel) < 0) return;
-    if (crumbs_msg_read_u16(data, len, 1, &pulse_us) < 0) return;
-
-    set_servo(channel, pulse_us);
-}
-```
-
-### Command Header Pattern
-
-For reusable command definitions, create a shared header file. See `examples/handlers_usage/mock_ops.h` for a complete example.
-
-**Pattern:**
-
-```c
-// my_device_commands.h
-#ifndef MY_DEVICE_COMMANDS_H
-#define MY_DEVICE_COMMANDS_H
-
-#include "crumbs.h"
-#include "crumbs_message_helpers.h"
-
-#define MY_TYPE_ID        0x10
-#define MY_CMD_ACTION_A   0x01
-#define MY_CMD_ACTION_B   0x02
-
-static inline int my_send_action_a(
-    crumbs_context_t *ctx, uint8_t addr,
-    uint16_t param1, uint8_t param2,
-    crumbs_i2c_write_fn write_fn, void *write_ctx) {
-
-    crumbs_message_t msg;
-    crumbs_msg_init(&msg, MY_TYPE_ID, MY_CMD_ACTION_A);
-    crumbs_msg_add_u16(&msg, param1);
-    crumbs_msg_add_u8(&msg, param2);
-
-    return crumbs_controller_send(ctx, addr, &msg, write_fn, write_ctx);
-}
-
-#endif
-```
-
-**Benefits:**
-
-- Type-safe: Function parameters enforce correct types
-- Self-documenting: Command names and parameters are explicit
-- Reusable: Same header works on controller and peripheral
-- Composable: Include multiple device headers in one controller
-
----
-
-## Version Reply Helper
-
-```c
-void crumbs_build_version_reply(crumbs_message_t *reply,
-                                uint8_t type_id,
-                                uint8_t major,
-                                uint8_t minor,
-                                uint8_t patch);
-```
-
-Convenience helper declared in `crumbs_message_helpers.h`. Populates a standard opcode-0x00 version reply in one call: initialises the message and packs `[CRUMBS_VERSION:u16][major:u8][minor:u8][patch:u8]`.
-
-**Example:**
-
-```c
-static void reply_version(crumbs_context_t *ctx, crumbs_message_t *reply, void *u)
-{
-    (void)ctx; (void)u;
-    crumbs_build_version_reply(reply, MY_TYPE_ID,
-                               MY_VER_MAJOR, MY_VER_MINOR, MY_VER_PATCH);
-}
-```
-
----
-
-## Ops Header Macros (`crumbs_ops.h`)
-
-`src/crumbs_ops.h` provides code-generation macros for authoring family ops headers. Include it in your ops header to eliminate boilerplate for standard GET and SET wrapper functions.
-
-```c
-#include "crumbs_ops.h"
-```
-
-### `CRUMBS_DEFINE_GET_OP`
-
-```c
-CRUMBS_DEFINE_GET_OP(family, name, type_id, opcode, result_t, parse_fn)
-```
-
-Generates:
-
-- `static inline int family_query_name(const crumbs_device_t *dev)` — internal, sends the SET_REPLY frame only
-- `static inline int family_get_name(const crumbs_device_t *dev, result_t *out)` — public: query → `delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US)` → `crumbs_controller_read_expect(type_id, opcode)` → `parse_fn`. Returns `CRUMBS_RX_REPLY_MISMATCH` (`-7`) if the reply is well-formed but not the requested `(type_id, opcode)`; other non-zero codes pass through from the query's `crumbs_controller_send` (i.e. from `write_fn`), the read, and the parser. protocol-level `CRUMBS_RX_*` codes occupy `-7` and below, disjoint from every transport and helper code, so they are unambiguous even through a getter
-
-Use for standard 1:1 opcode→result GETs. Multi-opcode GETs must still be written by hand.
-
-### `CRUMBS_DEFINE_SEND_OP`
-
-```c
-CRUMBS_DEFINE_SEND_OP(family, name, type_id, opcode, param_decl, pack_stmt)
-```
-
-Generates `static inline int family_send_name(const crumbs_device_t *dev, <params>)`.
-
-### `CRUMBS_DEFINE_SEND_OP_0`
-
-```c
-CRUMBS_DEFINE_SEND_OP_0(family, name, type_id, opcode)
-```
-
-Zero-parameter variant for commands with no payload (e.g. `display_send_clear`).
-
-See `examples/families_usage/lhwit_family/led_ops.h` for a complete usage example.
-
----
-
-## Platform HAL: Arduino
-
-### Initialization
-
-```c
-void crumbs_arduino_init_controller(crumbs_context_t *ctx);
-void crumbs_arduino_init_peripheral(crumbs_context_t *ctx, uint8_t address);
-```
-
-Initialize context and register Wire callbacks. Uses default Wire instance.
-
-**Example (controller):**
-
-```c
-crumbs_context_t ctx;
-crumbs_arduino_init_controller(&ctx);
-```
-
-**Example (peripheral):**
-
-```c
-#define I2C_ADDRESS 0x08
-crumbs_context_t ctx;
-crumbs_arduino_init_peripheral(&ctx, I2C_ADDRESS);
-// Register per-opcode reply handlers for GET ops (preferred)
-crumbs_register_reply_handler(&ctx, 0x00, reply_version, NULL);
-crumbs_register_reply_handler(&ctx, MY_OP_GET_STATE, reply_state, NULL);
-// on_request callback is also accepted as a backward-compatible fallback
-```
-
-### I²C Write Function
-
-```c
-int crumbs_arduino_wire_write(void *user_ctx, uint8_t addr,
-                              const uint8_t *data, size_t len);
-```
-
-Wire-based write function for `crumbs_controller_send()`.
-
-**Returns:**
-
-- `0` — Success
-- `>0` — Wire error code (from `endTransmission()`)
-
-**Example:**
-
-```c
-crumbs_message_t msg;
-crumbs_msg_init(&msg, 0x01, 0x01);
-crumbs_controller_send(&ctx, 0x08, &msg, crumbs_arduino_wire_write, NULL);
-```
-
-### I²C Read Function
-
-```c
-int crumbs_arduino_read(void *user_ctx, uint8_t addr,
-                       uint8_t *buffer, size_t len, uint32_t timeout_us);
-```
-
-Wire-based read function for scanner and diagnostics.
-
-**Returns:**
-
-- Number of bytes read (0–31)
-- Negative values on error
-
-### Bus Scanner (any I²C device)
-
-```c
-int crumbs_arduino_scan(void *user_ctx, uint8_t start_addr, uint8_t end_addr,
-                        int strict, uint8_t *found, size_t max_found);
-```
-
-Address probe. Reports **every** address that acknowledges — register-addressed sensors, EEPROMs, anything — with no CRUMBS frame read or decoded in either mode. For discovery that validates a CRUMBS frame, use `crumbs_controller_scan_for_crumbs()` (Core Scanner below) with `crumbs_arduino_read`.
-
-`crumbs_linux_scan()` (linux-wire 0.1.3+) puts the same transactions on the wire in both modes — strict is a one-byte read, non-strict is address + write bit + STOP (an SMBus Quick Write there) — so portable code gets the same bus behaviour from the same argument. Two differences: Linux also reports an address owned by a kernel driver as present (`i2cdetect`'s `UU`; no such notion on Arduino), and Linux stops at `max_found` while Arduino keeps counting. Linux non-strict returns `-2` if the adapter cannot perform a Quick Write.
-
-**Parameters:**
-
-- `user_ctx` — `TwoWire *` to use, or `NULL` for `&Wire`
-- `strict` — Non-zero: **one-byte read** probe; present if the target ACKs a read and clocks a byte out. Writes nothing, but consumes one byte from a register-addressed or stream-style device (advances an auto-increment pointer; takes an EZO's pending response). Zero: **address-only write**, no data phase; present if the address ACKs. Writes nothing.
-- `found` — Output array for discovered addresses
-- `max_found` — Size of found array
-
-**Returns:** Number of addresses that acknowledged (may exceed `max_found`; only the first `max_found` are stored), or `-1` on bad arguments.
-
-**Example:**
-
-```c
-uint8_t devices[10];
-int count = crumbs_arduino_scan(NULL, 0x08, 0x77, 0, devices, 10);  // address-only probe on Wire
-```
-
----
-
-## Platform HAL: Linux
-
-> **Note:** Linux HAL supports **controller mode only**. Peripheral mode (I²C target) is not yet implemented.
-
-### Initialization
-
-```c
-int crumbs_linux_init_controller(crumbs_context_t *ctx,
-                                 crumbs_linux_i2c_t *i2c,
-                                 const char *device_path,
-                                 uint32_t timeout_us);
-```
-
-Initialize controller context and open I²C bus device.
-
-**Parameters:**
-
-- `device_path` — e.g., `"/dev/i2c-1"`
-- `timeout_us` — Read timeout in microseconds
-
-**Returns:**
-
-- `0` — Success
-- `-1` — Invalid arguments
-- `-2` — Failed to open device
-
-**Example:**
-
-```c
-crumbs_context_t ctx;
-crumbs_linux_i2c_t bus;
-int rc = crumbs_linux_init_controller(&ctx, &bus, "/dev/i2c-1", 10000);
-```
-
-### Cleanup
-
-```c
-void crumbs_linux_close(crumbs_linux_i2c_t *i2c);
-```
-
-Close I²C bus file descriptor.
-
-### I²C Write Function
-
-```c
-int crumbs_linux_i2c_write(void *user_ctx, uint8_t target_addr,
-                           const uint8_t *data, size_t len);
-```
-
-Linux I²C write function for `crumbs_controller_send()`.
-
-**Returns:**
-
-- `0` — Success
-- `-1` — Invalid arguments or bus not open
-- `-2` — Failed to select slave address
-- `-3` — Write I/O error
-- `-4` — Incomplete write
-
-### I²C Read Function
-
-```c
-int crumbs_linux_read_message(crumbs_linux_i2c_t *i2c, uint8_t target_addr,
-                              crumbs_context_t *ctx, crumbs_message_t *out_msg);
-```
-
-> **Deprecated since v0.10.3.** Prefer `crumbs_controller_read(ctx, addr, &msg, crumbs_linux_read, &bus)` for portable code. `crumbs_linux_read_message` is retained for compatibility.
-
-Read and decode a CRUMBS message from a peripheral.
-
-**Returns:**
-
-- `0` — Success
-- `-1` — Invalid arguments or bus not open
-- `-2` — Failed to select slave address
-- `-3` — Read I/O error
-- `-4` — No bytes read
-- `-1/-2` — Decode/CRC error (from decode)
-
----
-
-## Discovery and Scanning
-
-### Core Scanner
-
-```c
-int crumbs_controller_scan_for_crumbs(
-    const crumbs_context_t *ctx,
-    uint8_t start_addr,
-    uint8_t end_addr,
-    int strict,
-    crumbs_i2c_write_fn write_fn,
-    crumbs_i2c_read_fn read_fn,
-    void *io_ctx,
-    uint8_t *found,
-    size_t max_found,
-    uint32_t timeout_us);
-```
-
-Platform-independent bus scanner for CRUMBS-compatible devices.
-
-**Parameters:**
-
-- `start_addr`/`end_addr` — Inclusive probe range (0x08–0x77 typical)
-- `strict` — Non-zero: read-only scan (no probe writes). Each probe clocks up to 31 bytes out of every address, which advances a register-addressed device's auto-increment pointer and consumes an Atlas EZO's pending response.
-- `strict == 0` — Attempts read first; if no valid CRUMBS frame and `ctx`+`write_fn` are available, sends the probe frame `00 00 00 00` (type `0x00`, opcode `0x00`, empty payload, CRC) and reads again. A CRUMBS peripheral sees that as an ordinary opcode-`0x00` SET. **A 24Cxx-style EEPROM sees it as a page write at address 0** — do not use non-strict mode on a bus that may carry one.
-- `write_fn`/`read_fn` — Platform primitives
-- `found` — Output array for discovered addresses
-- `max_found` — Size of found array
-- `timeout_us` — Read timeout per device
-
-On mixed buses (CRUMBS + non-CRUMBS sensors), avoid broad range scanning and use constrained candidate address lists.
-
-**Returns:** Number of devices found, or negative on error
-
-**Example (Arduino):**
-
-```c
-uint8_t devices[10];
-int count = crumbs_controller_scan_for_crumbs(
-    &ctx, 0x08, 0x77, 1,
-    crumbs_arduino_wire_write, crumbs_arduino_read, NULL,
-    devices, 10, 10000);
-```
-
-### Candidate-Address Scanner
-
-```c
-int crumbs_controller_scan_for_crumbs_candidates(
-    const crumbs_context_t *ctx,
-    const uint8_t *candidates,
-    size_t candidate_count,
-    int strict,
-    crumbs_i2c_write_fn write_fn,
-    crumbs_i2c_read_fn read_fn,
-    void *io_ctx,
-    uint8_t *found,
-    uint8_t *types,
-    size_t max_found,
-    uint32_t timeout_us);
-```
-
-Use this helper on mixed buses. It probes only the explicit addresses in `candidates` (deduplicated), avoiding full-range scans.
-
----
-
-## Raw I2C Device Helpers
-
-```c
-typedef int (*crumbs_i2c_write_read_fn)(
-    void *user_ctx, uint8_t addr,
-    const uint8_t *tx, size_t tx_len,
-    uint8_t *rx, size_t rx_len,
-    uint32_t timeout_us,
-    int require_repeated_start);
-```
-
-`crumbs_i2c_write_read_fn` performs a combined write-then-read transaction. Return value is bytes read (`>=0`) or negative on error.
-
-Helper APIs bound to `crumbs_device_t`:
-
-```c
-int crumbs_i2c_dev_write(...);
-int crumbs_i2c_dev_read(...);
-int crumbs_i2c_dev_write_then_read(...);
-int crumbs_i2c_dev_read_reg_ex(...);
-int crumbs_i2c_dev_write_reg_ex(...);
-int crumbs_i2c_dev_read_reg_u8(...);
-int crumbs_i2c_dev_write_reg_u8(...);
-int crumbs_i2c_dev_read_reg_u16be(...);
-int crumbs_i2c_dev_write_reg_u16be(...);
-```
-
-Standard helper error codes:
-
-- `CRUMBS_I2C_DEV_E_INVALID` (`-1`)
-- `CRUMBS_I2C_DEV_E_WRITE` (`-2`)
-- `CRUMBS_I2C_DEV_E_READ` (`-3`)
-- `CRUMBS_I2C_DEV_E_SHORT_READ` (`-4`)
-- `CRUMBS_I2C_DEV_E_NO_REPEATED_START` (`-5`)
-- `CRUMBS_I2C_DEV_E_SIZE` (`-6`)
-
-`crumbs_i2c_dev_write_then_read` fallback behavior:
-
-- if `write_read_fn` is provided, it is used,
-- if it is NULL and `require_repeated_start == 0`, fallback is `dev->write_fn` + `dev->read_fn`,
-- if it is NULL and `require_repeated_start != 0`, returns `CRUMBS_I2C_DEV_E_NO_REPEATED_START`.
-
----
-
-## Return Values and Error Codes
-
-All CRUMBS functions use consistent conventions:
-
-- **Success**: `0` (or positive value where documented)
-- **Failure**: Negative values indicate specific error conditions
-
-### Core Functions
-
-| Function                             | Success             | Error                                                     |
-| ------------------------------------ | ------------------- | --------------------------------------------------------- |
-| `crumbs_encode_message()`            | `>0` (frame length) | `0` (buffer too small)                                    |
-| `crumbs_decode_message()`            | `0`                 | `-1` (frame error), `-2` (CRC mismatch)                   |
-| `crumbs_controller_send()`           | `0`                 | `-1` (args), `-2` (role), `-3` (encode), `>0` (I2C error) |
-| `crumbs_peripheral_handle_receive()` | `0`                 | `-1` (args/decode), `-2` (CRC), `-8` (type mismatch)      |
-| `crumbs_peripheral_build_reply()`    | `0`                 | `-1` (args/role), `-2` (encode)                           |
-| `crumbs_controller_read()`           | `0`                 | `-1` (args/short read), decode error codes                |
-| `crumbs_controller_read_expect()`    | `0`                 | as `crumbs_controller_read()`, plus `-7` (reply identity mismatch) |
-| `crumbs_register_handler()`          | `0`                 | `-1` (NULL ctx or table full)                             |
-| `crumbs_register_reply_handler()`    | `0`                 | `-1` (NULL ctx or table full)                             |
-| `crumbs_unregister_handler()`        | `0`                 | Never fails                                               |
-
-### Arduino HAL
-
-| Function                      | Success | Error                  |
-| ----------------------------- | ------- | ---------------------- |
-| `crumbs_arduino_wire_write()` | `0`     | `>0` (Wire error code) |
-
-### Linux HAL
-
-| Function                         | Success | Error                                                                 |
-| -------------------------------- | ------- | --------------------------------------------------------------------- |
-| `crumbs_linux_init_controller()` | `0`     | `-1` (args), `-2` (open failed)                                       |
-| `crumbs_linux_i2c_write()`       | `0`     | `-1` (args), `-2` (select), `-3` (I/O), `-4` (incomplete)             |
-| `crumbs_linux_read_message()`    | `0`     | `-1` (args), `-2` (select), `-3` (I/O), `-4` (no data), decode errors |
-
----
-
-## Complete Examples
-
-### Peripheral with Handler Dispatch
-
-```cpp
-#include <crumbs.h>
-#include <crumbs_arduino.h>
-#include <crumbs_message_helpers.h>
-
-#define I2C_ADDRESS 0x08
-static crumbs_context_t ctx;
-static uint8_t led_state = 0;
-
-void handle_set_all(crumbs_context_t *c, uint8_t cmd,
-                    const uint8_t *data, uint8_t len, void *user) {
-    uint8_t bitmask;
-    if (crumbs_msg_read_u8(data, len, 0, &bitmask) == 0) {
-        led_state = bitmask;
-    }
-}
-
-void handle_set_one(crumbs_context_t *c, uint8_t cmd,
-                    const uint8_t *data, uint8_t len, void *user) {
-    uint8_t index, state;
-    if (crumbs_msg_read_u8(data, len, 0, &index) == 0 &&
-        crumbs_msg_read_u8(data, len, 1, &state) == 0) {
-        if (state) led_state |= (1 << index);
-        else led_state &= ~(1 << index);
-    }
-}
-
-static void reply_get_state(crumbs_context_t *ctx, crumbs_message_t *reply, void *user)
-{
-    (void)ctx; (void)user;
-    crumbs_msg_init(reply, 0x01, 0x10);
-    crumbs_msg_add_u8(reply, led_state);
-}
-
-void setup() {
-    crumbs_arduino_init_peripheral(&ctx, I2C_ADDRESS);
-    crumbs_register_handler(&ctx, 0x01, handle_set_all, NULL);
-    crumbs_register_handler(&ctx, 0x02, handle_set_one, NULL);
-    crumbs_register_reply_handler(&ctx, 0x10, reply_get_state, NULL);
-}
-
-void loop() {}
-```
-
-### Controller with Message Helpers
-
-```cpp
-#include <crumbs.h>
-#include <crumbs_arduino.h>
-#include <crumbs_message_helpers.h>
-
-static crumbs_context_t ctx;
-
-void setup() {
-    Serial.begin(9600);
-    crumbs_arduino_init_controller(&ctx);
-}
-
-void loop() {
-    // Send LED command
-    crumbs_message_t msg;
-    crumbs_msg_init(&msg, 0x01, 0x02);  // type=LED, opcode=set_one
-    crumbs_msg_add_u8(&msg, 0);         // LED index 0
-    crumbs_msg_add_u8(&msg, 1);         // State ON
-
-    int rc = crumbs_controller_send(&ctx, 0x08, &msg,
-                                    crumbs_arduino_wire_write, NULL);
-
-    if (rc != 0) {
-        Serial.print("Send failed: ");
-        Serial.println(rc);
-    }
-
-    delay(1000);
-}
-```
-
----
-
-## See Also
-
-- [Protocol Specification](protocol.md) — Wire format, versioning, CRC-8
-- [Platform Setup](platform-setup.md) — Installation and configuration
-- [Examples](examples.md) — Complete working examples
-- Source headers: `src/crumbs.h`, `src/crumbs_message_helpers.h`, `src/crumbs_arduino.h`, `src/crumbs_linux.h`
+Every public symbol, grouped by task, one line each. The headers are the
+reference: each entry's Doxygen comment carries the full contract, and CI
+fails if a public symbol lacks one or is missing from this page. Return codes
+are collected at the end.
+
+| Header | Include when |
+| --- | --- |
+| `crumbs.h` | always — context, codec, dispatch, controller, scanners, raw I²C helpers |
+| `crumbs_message_helpers.h` | building or reading payloads |
+| `crumbs_ops.h` | writing a family's controller-side wrappers |
+| `crumbs_arduino.h` / `crumbs_linux.h` | the HAL for your platform |
+| `crumbs_message.h`, `crumbs_i2c.h`, `crumbs_crc.h`, `crumbs_version.h` | pulled in by `crumbs.h` |
+
+## Context and lifecycle — `crumbs.h`
+
+| Symbol | |
+| --- | --- |
+| `crumbs_context_t` | One per role. Address, role, declared type, CRC statistics, callbacks, requested opcode, handler tables. Size depends on `CRUMBS_MAX_HANDLERS`. |
+| `crumbs_role_t` | `CRUMBS_ROLE_CONTROLLER` (0) or `CRUMBS_ROLE_PERIPHERAL` (1). |
+| `crumbs_init(ctx, role, address)` | Zero the counters and callbacks; keep `address` only for a peripheral. Handler arrays are left as they are, counts reset. |
+| `crumbs_set_callbacks(ctx, on_message, on_request, user_data)` | Install or clear (`NULL`) the fallback callbacks. |
+| `crumbs_set_type_id(ctx, type_id)` | Declare the peripheral's type; frames for other non-zero types are then dropped. `0` clears. |
+| `crumbs_context_size()` | `sizeof(crumbs_context_t)` as the library was compiled — compare with the sketch's `sizeof` at startup to catch a `CRUMBS_MAX_HANDLERS` mismatch. |
+| `crumbs_message_cb_t` | `on_message(ctx, msg)`: every validated non-SET_REPLY frame, before any handler. Peripheral only. |
+| `crumbs_request_cb_t` | `on_request(ctx, reply)`: build the reply for `ctx->requested_opcode` when no reply handler matches. |
+| `CRUMBS_MAX_HANDLERS` | Entries per handler table, default 16; `0` compiles both tables out. Must be set as a build flag, identically for library and sketch. |
+| `CRUMBS_TYPE_ID_ANY` | `0x00`: the wildcard type in a frame, and "no declared type" for a context. |
+
+## Messages and framing
+
+| Symbol | |
+| --- | --- |
+| `crumbs_message_t` | `type_id`, `opcode`, `data_len`, `data[27]`, `crc8`. 31 bytes. The decoder fills `crc8`; the encoder does not. — `crumbs_message.h` |
+| `CRUMBS_MAX_PAYLOAD` | 27. — `crumbs_message.h` |
+| `CRUMBS_MESSAGE_MAX_SIZE` | 31: the largest frame, and the read length the controller uses. — `crumbs_message.h` |
+| `crumbs_encode_message(msg, buffer, buffer_len)` | Serialise with CRC. Returns `4 + data_len`, or 0 for `NULL` args, `data_len > 27`, or a short buffer. — `crumbs.h` |
+| `crumbs_decode_message(buffer, buffer_len, msg, ctx)` | Validate and parse an exact-length frame. `0`, `-1` structural, `-2` CRC. `ctx` may be `NULL`; otherwise its statistics update. — `crumbs.h` |
+| `crumbs_frame_length(buffer, buffer_len, *frame_len)` | Header-declared length of a possibly padded read, for callers that decode raw reads themselves. `-1` for `NULL` args, fewer than 4 bytes, `data_len > 27`, or a buffer shorter than its header declares. — `crumbs.h` |
+| `crumbs_crc8(data, len)` → `crumbs_crc8_t` | CRC-8/SMBUS (poly `0x07`, init 0). Returns 0 for `NULL` or empty input. — `crumbs_crc.h` |
+
+### Payload helpers — `crumbs_message_helpers.h`
+
+All `static inline`. Multi-byte integers are little-endian; floats are 4 native
+bytes. Every add fails atomically with `-1` when the payload would exceed 27
+bytes; every read fails with `-1` when `offset + width > len`.
+
+| Symbol | |
+| --- | --- |
+| `crumbs_msg_init(msg, type_id, opcode)` | Zero the message and set the header. |
+| `crumbs_msg_add_u8`, `crumbs_msg_add_u16`, `crumbs_msg_add_u32`, `crumbs_msg_add_i8`, `crumbs_msg_add_i16`, `crumbs_msg_add_i32`, `crumbs_msg_add_float` `(msg, value)` | Append one value. |
+| `crumbs_msg_add_bytes(msg, data, len)` | Append raw bytes; `len == 0` is a no-op. |
+| `crumbs_msg_read_u8`, `crumbs_msg_read_u16`, `crumbs_msg_read_u32`, `crumbs_msg_read_i8`, `crumbs_msg_read_i16`, `crumbs_msg_read_i32`, `crumbs_msg_read_float` `(data, len, offset, *out)` | Read one value from a payload. |
+| `crumbs_msg_read_bytes(data, len, offset, out, count)` | Copy raw bytes out. |
+| `crumbs_build_version_reply(reply, type_id, major, minor, patch)` | The opcode `0x00` reply: `CRUMBS_VERSION` (u16) then the three module bytes. Returns `0`, or `-1` for `NULL`. |
+
+## Peripheral — `crumbs.h`
+
+| Symbol | |
+| --- | --- |
+| `crumbs_peripheral_handle_receive(ctx, buffer, len)` | Decode → type check → SET_REPLY intercept → `on_message` → matching handler. `0`, `-1`, `-2`, or `CRUMBS_RX_TYPE_MISMATCH`. The HAL calls this from its receive callback. |
+| `crumbs_peripheral_build_reply(ctx, out_buf, out_buf_len, *out_len)` | Reply handler for the requested opcode, else `on_request`, else nothing (`*out_len = 0`, returns 0). `-1` bad args, `-2` encode failed. The HAL calls this from its request callback. |
+| `crumbs_register_handler(ctx, opcode, fn, user_data)` | Add or replace the SET handler for `opcode`; `fn == NULL` removes it. `-1` when the table is full, `ctx` is `NULL`, or tables are compiled out. |
+| `crumbs_unregister_handler(ctx, opcode)` | Same as registering `NULL`. |
+| `crumbs_register_reply_handler(ctx, opcode, fn, user_data)` | Same contract for the reply-handler table; `fn == NULL` removes. |
+| `crumbs_handler_fn` | `fn(ctx, opcode, data, data_len, user_data)`. `data` is never `NULL`. |
+| `crumbs_reply_fn` | `fn(ctx, reply, user_data)`: fill `reply`; an untouched reply goes out as `00 00 00 00`. |
+| `CRUMBS_CMD_SET_REPLY` | `0xFE`. Never dispatched to user code. |
+| `CRUMBS_RX_TYPE_MISMATCH` | `-8`: frame carried another non-zero type. Not a CRC error. |
+
+## Controller — `crumbs.h`, `crumbs_ops.h`
+
+| Symbol | |
+| --- | --- |
+| `crumbs_controller_send(ctx, target_addr, msg, write_fn, write_ctx)` | Encode and write one frame. `-1` `NULL` args, `-2` wrong role, `-3` encode failed, otherwise the HAL write's return verbatim (0 = success; a HAL's own negative codes can collide with those three). |
+| `crumbs_controller_read(ctx, target_addr, *out_msg, read_fn, read_ctx)` | Read 31 bytes, trim, decode. `-1` short read or bad header, `-2` CRC, `0` with `out_msg` filled. Accepts any identity. |
+| `crumbs_controller_read_expect(ctx, target_addr, expect_type_id, expect_opcode, *out_msg, read_fn, read_ctx)` | `crumbs_controller_read` plus an identity check; `CRUMBS_RX_REPLY_MISMATCH` with `out_msg` still filled. `expect_type_id == CRUMBS_TYPE_ID_ANY` skips the type half; the opcode is always compared. |
+| `CRUMBS_RX_REPLY_MISMATCH` | `-7`. |
+| `crumbs_device_t` | `ctx`, `addr`, `write_fn`, `read_fn`, `delay_fn`, `io`: one bound target for the wrappers and raw helpers. |
+| `crumbs_ops_can_send(dev)` / `crumbs_ops_can_get(dev)` | Whether `dev` has what a send (context + write) or a get (also read + delay) needs. |
+| `CRUMBS_DEFINE_SEND_OP(family, name, type_id, opcode, param_decl, pack_stmt)` | Defines `family_send_name(dev, param)`: one SET with one packed parameter. |
+| `CRUMBS_DEFINE_SEND_OP_0(family, name, type_id, opcode)` | Defines `family_send_name(dev)`: a payload-less SET. |
+| `CRUMBS_DEFINE_GET_OP(family, name, type_id, opcode, result_t, parse_fn)` | Defines `family_query_name(dev)` and `family_get_name(dev, *out)`: SET_REPLY, `delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US)`, `read_expect`, `parse_fn`. `-1` unbound device or `NULL` `out`, else the send/read code, `-7` on identity mismatch, else `parse_fn`'s return. |
+| `CRUMBS_DEFAULT_QUERY_DELAY_US` | 10 000 µs between the SET_REPLY write and the read. — `crumbs_i2c.h` |
+
+## Discovery
+
+| Symbol | |
+| --- | --- |
+| `crumbs_controller_scan_for_crumbs(ctx, start, end, strict, write_fn, read_fn, io_ctx, found[], max_found, timeout_us)` | Read each address and count it if the bytes decode as a frame; non-strict (with `ctx` and `write_fn` given) also writes `00 00 00 00` to addresses whose read did not decode and retries — a peripheral dispatches that as an opcode-`0x00` SET. Returns the count (stops at `max_found`), `-1` bad args. `timeout_us` goes to every read. — `crumbs.h` |
+| `crumbs_controller_scan_for_crumbs_with_types(…, found[], types[], max_found, timeout_us)` | Same, also recording each reply's `type_id`. — `crumbs.h` |
+| `crumbs_controller_scan_for_crumbs_candidates(ctx, candidates[], count, strict, …, found[], types[], max_found, timeout_us)` | Same probe over an explicit list; duplicates skipped; `-1` when it reaches a candidate above `0x7F` (earlier hits are already in `found[]`). — `crumbs.h` |
+| `crumbs_arduino_scan(wire, start, end, strict, found[], max_found)` | Address-only: strict = one-byte read, non-strict = address ACK. Counts past `max_found`. — `crumbs_arduino.h` |
+| `crumbs_linux_scan(i2c, start, end, strict, found[], max_found)` | Address-only: strict = one-byte read (driver-owned counts as present), non-strict = SMBus Quick Write. Stops at `max_found`; `-2` if the adapter cannot Quick-Write. — `crumbs_linux.h` |
+| `crumbs_linux_scan_for_crumbs(ctx, i2c, start, end, strict, found[], max_found, timeout_us)` | The core read-probe scan wired to the Linux HAL. — `crumbs_linux.h` |
+| `crumbs_linux_scan_for_crumbs_with_types(…, found[], types[], max_found, timeout_us)` | With types. — `crumbs_linux.h` |
+
+## Raw I²C devices — `crumbs.h`
+
+For non-CRUMBS devices sharing the bus. Each takes a `crumbs_device_t` and
+returns a `CRUMBS_I2C_DEV_*` code.
+
+| Symbol | |
+| --- | --- |
+| `crumbs_i2c_dev_write(dev, data, len)` | One write; `len == 0` succeeds without touching the bus. |
+| `crumbs_i2c_dev_read(dev, data, len, timeout_us)` | One read; short read is an error. |
+| `crumbs_i2c_dev_write_then_read(dev, tx, tx_len, rx, rx_len, timeout_us, require_repeated_start, write_read_fn)` | Write then read, through `write_read_fn` when given (repeated start possible), else two transactions. |
+| `crumbs_i2c_dev_read_reg_ex(dev, reg, reg_len, out, out_len, …)` / `crumbs_i2c_dev_write_reg_ex(dev, reg, reg_len, data, data_len)` | Register access with an arbitrary-width register address; a write with both parts is staged in a buffer of `CRUMBS_I2C_DEV_MAX_WRITE` (64 unless the library is built with another value). |
+| `crumbs_i2c_dev_read_reg_u8` / `crumbs_i2c_dev_write_reg_u8` | 8-bit register address. |
+| `crumbs_i2c_dev_read_reg_u16be` / `crumbs_i2c_dev_write_reg_u16be` | 16-bit big-endian register address. |
+| `CRUMBS_I2C_DEV_OK`, `CRUMBS_I2C_DEV_E_INVALID`, `CRUMBS_I2C_DEV_E_WRITE`, `CRUMBS_I2C_DEV_E_READ`, `CRUMBS_I2C_DEV_E_SHORT_READ`, `CRUMBS_I2C_DEV_E_NO_REPEATED_START`, `CRUMBS_I2C_DEV_E_SIZE` | `0`, `-1` … `-6` in that order. |
+
+## Transport hooks — `crumbs_i2c.h`
+
+The function-pointer types a HAL implements and the core calls.
+
+| Symbol | |
+| --- | --- |
+| `crumbs_i2c_write_fn` | `(user_ctx, addr, data, len)` → 0 on success; anything else is passed through by the core. |
+| `crumbs_i2c_read_fn` | `(user_ctx, addr, buffer, len, timeout_us)` → bytes read, negative on error. `crumbs_controller_read` passes `timeout_us = 0`; the scanners and `crumbs_i2c_dev_read` forward the caller's value. |
+| `crumbs_i2c_write_read_fn` | `(user_ctx, addr, tx, tx_len, rx, rx_len, timeout_us, require_repeated_start)` → bytes read, negative on error; `crumbs_i2c_dev_write_then_read` reports any negative as `CRUMBS_I2C_DEV_E_READ` except `-5`, which it passes through. |
+| `crumbs_i2c_scan_fn` | `(user_ctx, start, end, strict, found, max_found)`: the shape of the HAL address scanners. |
+| `crumbs_delay_fn` | `(us)`: blocking delay. |
+| `crumbs_platform_millis_fn` | `(void)` → milliseconds. |
+| `CRUMBS_ELAPSED_MS(start, now)` / `CRUMBS_TIMEOUT_EXPIRED(start, now, timeout_ms)` | Wrap-safe millisecond arithmetic for callers polling with a `millis` function. |
+
+## Arduino HAL — `crumbs_arduino.h`
+
+Uses the global `Wire`; one context per sketch. On AVR the clock is set to
+`CRUMBS_DEFAULT_TWI_FREQ` (100 kHz) at init.
+
+| Symbol | |
+| --- | --- |
+| `crumbs_arduino_init_controller(ctx)` | `crumbs_init` + `Wire.begin()`. No callbacks are attached. |
+| `crumbs_arduino_init_peripheral(ctx, address)` | `crumbs_init` + `Wire.begin(address)` + receive/request callbacks that call the two peripheral functions above, from the TWI interrupt on AVR. |
+| `crumbs_arduino_wire_write(wire_or_NULL, addr, data, len)` | A `crumbs_i2c_write_fn`. `0`, the positive `Wire.endTransmission()` code, `-1` `NULL` data, `-2` short write. |
+| `crumbs_arduino_read(wire_or_NULL, addr, buffer, len, timeout_us)` | A `crumbs_i2c_read_fn`: `requestFrom` then drain; `timeout_us` is a poll deadline, `0` takes what is buffered. `-1` bad args, else bytes read. |
+| `crumbs_arduino_write_then_read(wire_or_NULL, addr, tx, tx_len, rx, rx_len, timeout_us, require_repeated_start)` | A `crumbs_i2c_write_read_fn`; repeated start via `endTransmission(false)`. `-1` bad args, `-2` write failed, `-6` longer than the `Wire` buffer, else bytes read. |
+| `crumbs_arduino_millis()` / `crumbs_arduino_delay_us(us)` | `millis()` / `delayMicroseconds()`. |
+
+## Linux HAL — `crumbs_linux.h`
+
+Controller only, over linux-wire ≥ 0.1.3 and i2c-dev. `timeout_us` values are
+stored on the bus handle and not enforced.
+
+| Symbol | |
+| --- | --- |
+| `crumbs_linux_i2c_t` | Wraps one `lw_i2c_bus`. |
+| `crumbs_linux_init_controller(ctx, i2c, device_path, timeout_us)` | `crumbs_init` + open `/dev/i2c-N`. `-1` bad args, `-2` open failed (`errno` set). |
+| `crumbs_linux_close(i2c)` | Close the bus. |
+| `crumbs_linux_i2c_write(i2c, addr, data, len)` | A `crumbs_i2c_write_fn`. `-1` bad args or closed, `-2` address select failed, `-3` write failed, `-4` short write. |
+| `crumbs_linux_read(i2c, addr, buffer, len, timeout_us)` | A `crumbs_i2c_read_fn`. `-1` bad args or closed, `-2` address select failed, `-3` read failed, else bytes read. |
+| `crumbs_linux_write_then_read(i2c, addr, tx, tx_len, rx, rx_len, timeout_us, require_repeated_start)` | A `crumbs_i2c_write_read_fn`; repeated start via one `I2C_RDWR` ioctl. Same codes as the two above. |
+| `crumbs_linux_read_message(i2c, addr, ctx, *out_msg)` | Deprecated: read + trim + decode in one call. Use `crumbs_controller_read`. |
+| `crumbs_linux_millis()` / `crumbs_linux_delay_us(us)` | `CLOCK_MONOTONIC` / `nanosleep`. |
+
+## Statistics, debug, version
+
+| Symbol | |
+| --- | --- |
+| `crumbs_get_crc_error_count(ctx)` | Frames rejected for CRC since init or reset. — `crumbs.h` |
+| `crumbs_last_crc_ok(ctx)` | 1 if the last decode through this context passed, 0 after any decode failure or after init. — `crumbs.h` |
+| `crumbs_reset_crc_stats(ctx)` | Count to 0, `last_crc_ok` to 1. — `crumbs.h` |
+| `CRUMBS_DBG(fmt, ...)` | Core trace; a no-op unless `CRUMBS_DEBUG` is defined and routed through `CRUMBS_DEBUG_PRINT`. — `crumbs.h` |
+| `CRUMBS_VERSION_MAJOR`, `CRUMBS_VERSION_MINOR`, `CRUMBS_VERSION_PATCH`, `CRUMBS_VERSION_STRING` | Library version components. — `crumbs_version.h` |
+| `CRUMBS_VERSION` | `major × 10000 + minor × 100 + patch`, for `#if` comparisons and the version reply. — `crumbs_version.h` |
+
+## Return codes
+
+| Range | Meaning |
+| --- | --- |
+| `0` | Success; scanners return a count ≥ 0, and a HAL read returns its byte count, so `0` there means nothing was read. |
+| `-1` … `-6` | Function-specific: `-1` bad argument / wrong role / structural decode failure; `-2` CRC (codec), wrong role (`send`), address select (Linux); `-3` encode failed (`send`), read/write failed (Linux), read callback failed (helpers); `-4` short read/write; `-5` no repeated start; `-6` too long for a buffer. The tables above give each function's own set. |
+| `CRUMBS_RX_REPLY_MISMATCH` (`-7`), `CRUMBS_RX_TYPE_MISMATCH` (`-8`) | Protocol-level, deliberately below every transport code so a getter's caller can tell them apart. New `CRUMBS_RX_*` codes continue downward. |
+| positive | From an Arduino write: the `Wire.endTransmission()` code. |

@@ -208,12 +208,14 @@ The controller-side scanners take one of two probes:
   discriminator, so a foreign device whose first bytes happen to be
   CRC-consistent is reported as present; the tests keep a deliberate example.
   In non-strict mode an address whose read did not decode is written an
-  all-zero frame (`00 00 00 00`) and read once more; that write is a page
-  write to a 24Cxx EEPROM at the same address.
+  all-zero frame (`00 00 00 00`) and read once more. A CRUMBS peripheral
+  dispatches that frame as an opcode-`0x00` SET with no payload, so a family
+  that binds SET opcode `0x00` will see it; a 24Cxx EEPROM takes it as a page
+  write.
 - **Address probe** (`crumbs_arduino_scan`, `crumbs_linux_scan`): I²C-level only.
   Strict mode reads one byte, which consumes a byte from whatever device
   answers; non-strict mode is an address-only ACK check. Neither decodes a
   frame.
 
-See [api-reference.md](api-reference.md#discovery-and-scanning) for the signatures and
+See [api-reference.md](api-reference.md#discovery) for the signatures and
 return values.

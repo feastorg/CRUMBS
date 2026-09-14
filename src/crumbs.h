@@ -60,13 +60,12 @@ extern "C"
      * Define this before including crumbs.h to adjust memory usage.
      * Default is 16 which balances memory use and typical needs.
      *
-     * Memory usage: CRUMBS_MAX_HANDLERS * (sizeof(void*) * 2 + 2) bytes
-     * - 16 handlers: ~68 bytes on AVR, ~132 bytes on 32-bit
-     * - 8 handlers: ~36 bytes on AVR, ~68 bytes on 32-bit
-     * - 32 handlers: ~132 bytes on AVR, ~260 bytes on 32-bit
-     *
-     * Dispatch always uses O(n) linear search for portability.
-     * Set to 0 to disable handler dispatch entirely.
+     * Two tables (SET handlers and reply handlers) of this many entries each
+     * live in the context, so it sizes crumbs_context_t: 178 bytes on
+     * ATmega328P and 320 on Cortex-M0 at 16, against 16 and 28 at 0. Set it
+     * with a build flag, identically for the library and the sketch, and
+     * compare crumbs_context_size() with sizeof(crumbs_context_t) at startup.
+     * 0 compiles both tables out. Dispatch is a linear search.
      *
      * IMPORTANT: For Arduino/PlatformIO, you must add this to your
      * platformio.ini build_flags to affect the library compilation:
@@ -86,7 +85,9 @@ extern "C"
      * automatically stores the first payload byte in ctx->requested_opcode.
      * This opcode is NOT dispatched to user handlers or on_message callbacks.
      *
-     * Wire format: [type_id][0xFE][0x01][target_opcode][CRC8]
+     * The library sends [type_id][0xFE][0x01][target_opcode][CRC8]; a receiver
+     * accepts any data_len >= 1 and uses data[0]. An empty payload leaves
+     * requested_opcode unchanged.
      */
 #define CRUMBS_CMD_SET_REPLY 0xFE
 
@@ -150,7 +151,7 @@ extern "C"
         const crumbs_message_t *msg);
 
     /**
-     * @brief Called when the bus master requests a reply from a peripheral.
+     * @brief Called when the controller reads a reply from a peripheral.
      *
      * Callback must populate @p msg with the reply message.
      *
@@ -186,7 +187,7 @@ extern "C"
      *
      * @param ctx Pointer to the active CRUMBS context.
      * @param opcode The command type that triggered this handler.
-     * @param data Pointer to the payload bytes (may be NULL if data_len==0).
+     * @param data Pointer to the payload bytes; never NULL, even when data_len is 0.
      * @param data_len Number of payload bytes (0-27).
      * @param user_data Opaque pointer registered with the handler.
      */
@@ -221,7 +222,7 @@ extern "C"
         uint8_t last_crc_ok;      /**< Non-zero if the last decode had a valid CRC. */
 
         crumbs_message_cb_t on_message; /**< Called when a message is received (peripheral). */
-        crumbs_request_cb_t on_request; /**< Called when the bus master requests a reply. */
+        crumbs_request_cb_t on_request; /**< Called when the controller reads a reply. */
         void *user_data;                /**< Opaque pointer for user code (forwarded to callbacks). */
 
         /**
@@ -354,7 +355,8 @@ extern "C"
      * @param opcode The command type to handle (0-255).
      * @param fn Handler function to call (NULL to unregister).
      * @param user_data Opaque pointer passed to the handler when invoked.
-     * @return 0 on success, -1 if ctx is NULL or handler table is full.
+     * @return 0 on success, -1 if ctx is NULL, the table is full, or
+     *         CRUMBS_MAX_HANDLERS is 0.
      */
     int crumbs_register_handler(crumbs_context_t *ctx,
                                 uint8_t opcode,
@@ -368,7 +370,8 @@ extern "C"
      *
      * @param ctx Context to unregister from.
      * @param opcode The command type to unregister.
-     * @return 0 on success, -1 if ctx is NULL.
+     * @return 0 on success (also when nothing was registered), -1 if ctx is
+     *         NULL or CRUMBS_MAX_HANDLERS is 0.
      */
     int crumbs_unregister_handler(crumbs_context_t *ctx,
                                   uint8_t opcode);
@@ -388,7 +391,8 @@ extern "C"
      * @param opcode    GET opcode to handle (0-255).
      * @param fn        Reply-builder function (NULL to unregister).
      * @param user_data Opaque pointer passed to fn.
-     * @return 0 on success, -1 if ctx is NULL or handler table is full.
+     * @return 0 on success, -1 if ctx is NULL, the table is full, or
+     *         CRUMBS_MAX_HANDLERS is 0.
      */
     int crumbs_register_reply_handler(crumbs_context_t *ctx,
                                       uint8_t opcode,
@@ -400,7 +404,7 @@ extern "C"
     /**
      * @brief Encode a message into the CRUMBS wire frame.
      *
-     * Note: msg->address is not serialized on the wire.
+     * The CRC is written to the buffer only; msg->crc8 is not touched.
      *
      * @param msg Pointer to message to encode.
      * @param buffer Destination buffer.
@@ -471,10 +475,11 @@ extern "C"
      * Symmetric counterpart to crumbs_controller_send(). Reads raw bytes via
      * @p read_fn, trims them to the header-declared frame length with
      * crumbs_frame_length() (fixed-count transports pad reads past the frame),
-     * then decodes them with crumbs_decode_message(). Passes
-     * timeout_us=0 to @p read_fn so the HAL uses its own default; call
-     * delay_fn() before this to give the peripheral time to stage its reply
-     * after a SET_REPLY write.
+     * then decodes them with crumbs_decode_message(). Always passes
+     * timeout_us=0 to @p read_fn (the Arduino HAL then returns what is
+     * already buffered; the Linux HAL never enforces a timeout). After a
+     * SET_REPLY write, wait CRUMBS_DEFAULT_QUERY_DELAY_US before calling
+     * this, as the generated getters do.
      *
      * @param ctx         Initialized CRUMBS context in controller mode.
      * @param target_addr 7-bit I2C address of the peripheral.
@@ -532,7 +537,9 @@ extern "C"
      * @param start_addr Address range start (inclusive).
      * @param end_addr Address range end (inclusive).
      * @param strict Non-zero for strict read-only; 0 to also try probe writes.
-     *        The probe frame is 00 00 00 00: harmless to CRUMBS peripherals, but a
+     *        The probe frame is 00 00 00 00: a CRUMBS peripheral dispatches it as
+     *        an opcode-0x00 SET with no payload (to on_message and any handler
+     *        registered for 0x00), and a
      *        24Cxx-style EEPROM takes it as a page write at address 0.
      * @param write_fn Write function for probe writes (may be NULL if strict).
      * @param read_fn Read function to use for reading frames.
@@ -540,7 +547,7 @@ extern "C"
      * @param found Output buffer to receive discovered addresses.
      * @param max_found Capacity of @p found buffer.
      * @param timeout_us Read timeout hint in microseconds.
-     * @return Number of discovered devices (>=0) or negative on error.
+     * @return Number of discovered devices (0..max_found), or -1 on invalid arguments.
      */
     int crumbs_controller_scan_for_crumbs(const crumbs_context_t *ctx,
                                           uint8_t start_addr,
@@ -567,7 +574,9 @@ extern "C"
      * @param start_addr Address range start (inclusive).
      * @param end_addr Address range end (inclusive).
      * @param strict Non-zero for strict read-only; 0 to also try probe writes.
-     *        The probe frame is 00 00 00 00: harmless to CRUMBS peripherals, but a
+     *        The probe frame is 00 00 00 00: a CRUMBS peripheral dispatches it as
+     *        an opcode-0x00 SET with no payload (to on_message and any handler
+     *        registered for 0x00), and a
      *        24Cxx-style EEPROM takes it as a page write at address 0.
      * @param write_fn Write function for probe writes (may be NULL if strict).
      * @param read_fn Read function to use for reading frames.
@@ -577,7 +586,7 @@ extern "C"
      *              May be NULL if type IDs are not needed.
      * @param max_found Capacity of @p found (and @p types) buffers.
      * @param timeout_us Read timeout hint in microseconds.
-     * @return Number of discovered devices (>=0) or negative on error.
+     * @return Number of discovered devices (0..max_found), or -1 on invalid arguments.
      */
     int crumbs_controller_scan_for_crumbs_with_types(const crumbs_context_t *ctx,
                                                      uint8_t start_addr,
@@ -602,7 +611,9 @@ extern "C"
      * @param candidates Input list of candidate 7-bit addresses.
      * @param candidate_count Number of entries in @p candidates.
      * @param strict Non-zero for strict read-only; 0 to also try probe writes.
-     *        The probe frame is 00 00 00 00: harmless to CRUMBS peripherals, but a
+     *        The probe frame is 00 00 00 00: a CRUMBS peripheral dispatches it as
+     *        an opcode-0x00 SET with no payload (to on_message and any handler
+     *        registered for 0x00), and a
      *        24Cxx-style EEPROM takes it as a page write at address 0.
      * @param write_fn Write function for probe writes (may be NULL if strict).
      * @param read_fn Read function to use for reading frames.
@@ -611,7 +622,7 @@ extern "C"
      * @param types Output buffer for discovered type_id values (parallel to @p found), may be NULL.
      * @param max_found Capacity of @p found (and @p types when provided).
      * @param timeout_us Read timeout hint in microseconds.
-     * @return Number of discovered devices (>=0) or negative on error.
+     * @return Number of discovered devices (0..max_found), or -1 on invalid arguments.
      */
     int crumbs_controller_scan_for_crumbs_candidates(const crumbs_context_t *ctx,
                                                      const uint8_t *candidates,

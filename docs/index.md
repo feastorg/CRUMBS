@@ -94,7 +94,7 @@ void setup() {
 
 | Document                              | Description                                                      |
 | ------------------------------------- | ---------------------------------------------------------------- |
-| [API Reference](api-reference.md)     | Complete C API, handler dispatch, message helpers, platform HALs |
+| [API Reference](api-reference.md)     | Every public symbol by task, one line each; the headers hold the contracts |
 | [Architecture](architecture.md)       | Layers, dispatch order, handler tables, memory, HAL differences  |
 | [LHWIT Family](lhwit-family.md)       | Reference implementation (LEDs, servos, calculator, display)     |
 | [Create a Family](create-a-family.md) | Step-by-step guide for authoring custom device families          |

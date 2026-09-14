@@ -82,7 +82,7 @@ Documentation is available in the [docs](docs/) directory:
 
 **Reference:**
 
-- [API Reference](docs/api-reference.md) — Complete C API, handlers, message helpers, platform HALs
+- [API Reference](docs/api-reference.md) — Every public symbol by task; the headers hold the contracts
 - [Protocol Specification](docs/protocol.md) — Wire format, versioning, CRC-8
 - [Architecture](docs/architecture.md) — Design philosophy and system architecture
 - [Create a Family](docs/create-a-family.md) — Guide to authoring custom device families
