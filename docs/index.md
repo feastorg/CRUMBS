@@ -76,7 +76,7 @@ void setup() {
 - **Discovery** (scan for compatible devices)
 - **Bound-device handle** (`crumbs_device_t` groups transport fields per device)
 - **Platforms** (Arduino, PlatformIO, Linux)
-- **Zero allocation** (deterministic, RTOS-safe)
+- **Zero allocation** (no heap; every buffer is the caller's)
 
 ---
 
@@ -87,7 +87,7 @@ void setup() {
 | Document                              | Description                                                       |
 | ------------------------------------- | ----------------------------------------------------------------- |
 | [Platform Setup](platform-setup.md)   | Installation and configuration for Arduino, PlatformIO, and Linux |
-| [Protocol Specification](protocol.md) | Wire format, versioning, CRC-8, reserved opcodes                  |
+| [Protocol](protocol.md)               | Normative wire format: frame, CRC-8, SET_REPLY, address/type/opcode spaces |
 | [Examples](examples.md)               | Three-tier learning path with platform coverage                   |
 
 ### Reference
@@ -95,7 +95,7 @@ void setup() {
 | Document                              | Description                                                      |
 | ------------------------------------- | ---------------------------------------------------------------- |
 | [API Reference](api-reference.md)     | Complete C API, handler dispatch, message helpers, platform HALs |
-| [Architecture](architecture.md)       | Design philosophy, stakeholder roles, system architecture        |
+| [Architecture](architecture.md)       | Layers, dispatch order, handler tables, memory, HAL differences  |
 | [LHWIT Family](lhwit-family.md)       | Reference implementation (LEDs, servos, calculator, display)     |
 | [Create a Family](create-a-family.md) | Step-by-step guide for authoring custom device families          |
 
@@ -214,15 +214,6 @@ crumbs_msg_read_u16(data, len, offset, &out);
 crumbs_msg_read_u32(data, len, offset, &out);
 crumbs_msg_read_float(data, len, offset, &out);
 ```
-
----
-
-## Archived Documentation
-
-Historical and technical deep-dive documents are in [archive/](archive/):
-
-- `developer-notes.md` — Historical design decisions
-- `crc.md` — CRC-8 implementation details
 
 ---
 
