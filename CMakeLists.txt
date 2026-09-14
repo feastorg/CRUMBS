@@ -66,7 +66,7 @@ if(CRUMBS_ENABLE_LINUX_HAL)
                 INTERFACE_LINK_LIBRARIES linux_wire
             )
         else()
-            find_package(linux_wire CONFIG REQUIRED)
+            find_package(linux_wire 0.1.3 CONFIG REQUIRED) # lw_probe, lw_set_target
         endif()
     endif()
 

@@ -252,7 +252,7 @@ sudo dnf install cmake gcc git
 
 ### Install linux-wire Dependency
 
-CRUMBS Linux HAL requires the `linux-wire` library for I²C bus access.
+CRUMBS Linux HAL requires the `linux-wire` library (**0.1.3 or newer**) for I²C bus access.
 
 #### System-wide installation (recommended)
 

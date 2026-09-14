@@ -89,7 +89,7 @@ int crumbs_linux_i2c_write(void *user_ctx,
     }
 
     /* Select the slave. */
-    if (lw_set_slave(bus, target_addr) != 0)
+    if (lw_set_target(bus, target_addr) != 0)
     {
         return -2;
     }
@@ -125,7 +125,7 @@ int crumbs_linux_read_message(crumbs_linux_i2c_t *i2c,
         return -1;
     }
 
-    if (lw_set_slave(bus, target_addr) != 0)
+    if (lw_set_target(bus, target_addr) != 0)
     {
         return -2;
     }
@@ -196,40 +196,48 @@ int crumbs_linux_scan(void *user_ctx,
     size_t count = 0u;
     uint8_t dummy = 0u;
 
+    /* A NACK or a driver-owned address is the normal result of a sweep, not
+       an error to report; the CRUMBS-aware scanners already do the same. */
+    int prev_log = bus->log_errors;
+    lw_set_error_logging(bus, 0);
+
     for (int addr = start_addr; addr <= end_addr; ++addr)
     {
-        /* Select the slave address; skip if selection fails. */
-        if (lw_set_slave(bus, (uint8_t)addr) != 0)
-            continue;
+        int present;
 
         if (strict)
         {
-            /* Strict probe: attempt a small read and treat positive results as present. */
-            ssize_t r = lw_read(bus, &dummy, 1);
-            if (r > 0)
+            /* Strict probe: a one-byte read. An address a kernel driver owns
+               cannot be read from user space (EBUSY on selection) but is
+               present; anything else that fails selection is skipped. */
+            if (lw_set_target(bus, (uint8_t)addr) != 0)
             {
-                if (count < max_found)
-                    found[count] = (uint8_t)addr;
-                ++count;
+                present = (errno == EBUSY);
+            }
+            else
+            {
+                present = (lw_read(bus, &dummy, 1) > 0);
             }
         }
         else
         {
-            /* Non-strict probe: perform a zero-length write (address-only) and treat
-               any non-negative return as success (address ACK). */
-            ssize_t w = lw_write(bus, NULL, 0, 1);
-            if (w >= 0)
-            {
-                if (count < max_found)
-                    found[count] = (uint8_t)addr;
-                ++count;
-            }
+            /* Non-strict probe: address-only SMBus Quick Write, no data on the
+               bus. 0 = acknowledged, 1 = owned by a kernel driver; both present. */
+            present = (lw_probe(bus, (uint8_t)addr) >= 0);
+        }
+
+        if (present)
+        {
+            if (count < max_found)
+                found[count] = (uint8_t)addr;
+            ++count;
         }
 
         if (count >= max_found)
             break;
     }
 
+    lw_set_error_logging(bus, prev_log);
     return (int)count;
 }
 
@@ -250,7 +258,7 @@ int crumbs_linux_read(void *user_ctx,
     if (timeout_us > 0u)
         lw_set_timeout(bus, timeout_us);
 
-    if (lw_set_slave(bus, addr) != 0)
+    if (lw_set_target(bus, addr) != 0)
         return -2;
 
     size_t total = 0u;
@@ -293,7 +301,7 @@ int crumbs_linux_write_then_read(void *user_ctx,
         if (tx_len == 0u)
             return 0;
 
-        if (lw_set_slave(bus, addr) != 0)
+        if (lw_set_target(bus, addr) != 0)
             return -2;
 
         ssize_t w = lw_write(bus, tx, tx_len, 1);
@@ -314,7 +322,7 @@ int crumbs_linux_write_then_read(void *user_ctx,
 
     if (tx_len > 0u)
     {
-        if (lw_set_slave(bus, addr) != 0)
+        if (lw_set_target(bus, addr) != 0)
             return -2;
 
         ssize_t w = lw_write(bus, tx, tx_len, 1);
@@ -324,7 +332,7 @@ int crumbs_linux_write_then_read(void *user_ctx,
             return -4;
     }
 
-    if (lw_set_slave(bus, addr) != 0)
+    if (lw_set_target(bus, addr) != 0)
         return -2;
 
     size_t total = 0u;

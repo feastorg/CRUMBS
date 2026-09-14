@@ -12,8 +12,13 @@ All notable changes to CRUMBS are documented in this file.
 - `CRUMBS_TYPE_ID_ANY` (`0x00`): `type_id 0x00` in a frame is now defined as a wildcard that the type check never rejects. The library's own SET_REPLY frames and the scan probe already sent it. (#46)
 - `crumbs_controller_read_expect()`: `crumbs_controller_read()` plus a check that the reply's `(type_id, opcode)` is the pair that was requested, returning `CRUMBS_RX_REPLY_MISMATCH` (`-7`) with `out_msg` still filled otherwise (protocol-level `CRUMBS_RX_*` codes occupy `-7` and below, disjoint from transport and helper codes, so they are unambiguous through a getter). `expect_type_id == CRUMBS_TYPE_ID_ANY` skips the type half; the opcode is always checked (`0x00` is the version-info opcode, not a wildcard). The check previously existed only inside `CRUMBS_DEFINE_GET_OP` and, by hand, in every shipping getter. (#35)
 
+### Fixed
+
+- `crumbs_linux_scan()` non-strict mode never touched the bus (linux-wire's `lw_write` returns 0 for a zero-length request before writing), so it reported every address in the range as present. It now issues an address-only SMBus Quick Write through `lw_probe()`. Both modes now also report addresses owned by a kernel driver as present instead of skipping them, and expected failures are not logged during the sweep. (#65)
+
 ### Changed
 
+- The Linux HAL requires **linux-wire 0.1.3 or newer** (`lw_probe`, `lw_set_target`); `find_package(linux_wire 0.1.3 ...)` enforces it, and CI pins the 0.1.3 release tarball. The seven `lw_set_slave` calls are now `lw_set_target`. (#65)
 - `CRUMBS_DEFINE_GET_OP` getters now call `crumbs_controller_read_expect()`; on a reply identity mismatch they return `CRUMBS_RX_REPLY_MISMATCH` (`-7`) instead of `-1`. Callers that only test for non-zero are unaffected. (#35)
 
 ## [0.12.5] - 2026-07-13
