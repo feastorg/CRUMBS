@@ -1,16 +1,7 @@
 #!/usr/bin/env bash
+# Fails if any symbol in a public header lacks a Doxygen comment
+# (WARN_AS_ERROR = FAIL_ON_WARNINGS in docs/Doxyfile).
 set -euo pipefail
-
-OUT=docs/doxygen.log
-echo "Running doxygen..."
-if ! command -v doxygen >/dev/null 2>&1; then
-	echo "doxygen not installed; skipping doxygen run" | tee "$OUT"
-else
-	doxygen docs/Doxyfile 2>&1 | tee "$OUT" || true
-fi
-
-echo "Summary: (doxygen log)"
-grep -i "warning:" "$OUT" || echo "No warnings found."
-
-echo "Doc-check completed (warnings printed above)." 
-exit 0
+cd "$(dirname "$0")/.."
+doxygen docs/Doxyfile
+echo "doxygen: public headers fully documented, no warnings"

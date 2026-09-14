@@ -19,13 +19,15 @@
  * Define CRUMBS_DEBUG before including crumbs.h to enable debug messages.
  * You must also define CRUMBS_DEBUG_PRINT to specify how to output debug.
  *
- * Example for Arduino:
- *   #define CRUMBS_DEBUG
- *   #define CRUMBS_DEBUG_PRINT(fmt, ...) Serial.printf(fmt, ##__VA_ARGS__)
+ * @code
+ * // Arduino
+ * #define CRUMBS_DEBUG
+ * #define CRUMBS_DEBUG_PRINT(fmt, ...) Serial.printf(fmt, ##__VA_ARGS__)
  *
- * Example for Linux/stdio:
- *   #define CRUMBS_DEBUG
- *   #define CRUMBS_DEBUG_PRINT(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
+ * // Linux/stdio
+ * #define CRUMBS_DEBUG
+ * #define CRUMBS_DEBUG_PRINT(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
+ * @endcode
  *
  * When CRUMBS_DEBUG is not defined, all debug calls compile to nothing.
  */
@@ -626,13 +628,13 @@ extern "C"
     /** @name Raw I2C helper error codes
      *  Return codes used by crumbs_i2c_dev_* helpers.
      *  @{ */
-#define CRUMBS_I2C_DEV_OK 0
-#define CRUMBS_I2C_DEV_E_INVALID -1
-#define CRUMBS_I2C_DEV_E_WRITE -2
-#define CRUMBS_I2C_DEV_E_READ -3
-#define CRUMBS_I2C_DEV_E_SHORT_READ -4
-#define CRUMBS_I2C_DEV_E_NO_REPEATED_START -5
-#define CRUMBS_I2C_DEV_E_SIZE -6
+#define CRUMBS_I2C_DEV_OK 0                  /**< Success. */
+#define CRUMBS_I2C_DEV_E_INVALID -1          /**< NULL device or callback, or a NULL buffer with a non-zero length. */
+#define CRUMBS_I2C_DEV_E_WRITE -2            /**< The write callback failed. */
+#define CRUMBS_I2C_DEV_E_READ -3             /**< The read callback failed. */
+#define CRUMBS_I2C_DEV_E_SHORT_READ -4       /**< The read returned fewer bytes than requested. */
+#define CRUMBS_I2C_DEV_E_NO_REPEATED_START -5 /**< A repeated start was required but the device cannot provide one. */
+#define CRUMBS_I2C_DEV_E_SIZE -6             /**< Combined register+data write exceeds the 64-byte staging buffer. */
     /** @} */
 
     /**
