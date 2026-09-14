@@ -251,7 +251,7 @@ int crumbs_controller_read_expect(crumbs_context_t *ctx,
 
 `crumbs_controller_read()` followed by an identity check: the reply's `opcode` must equal `expect_opcode`, and its `type_id` must equal `expect_type_id` unless that is `CRUMBS_TYPE_ID_ANY`. A reply with a valid CRC can still be the wrong frame — another opcode's staged reply, or another device type answering at a duplicated address — and the CRC cannot tell; this does. `out_msg` is filled on success and on mismatch.
 
-**Returns:** `0`=match; `crumbs_controller_read()`'s codes on read/decode failure; `CRUMBS_RX_REPLY_MISMATCH` (`-4`)=well-formed reply, wrong identity.
+**Returns:** `0`=match; `crumbs_controller_read()`'s codes on read/decode failure; `CRUMBS_RX_REPLY_MISMATCH` (`-7`)=well-formed reply, wrong identity. `-7` is reserved for this: no HAL or helper returns it, so it survives pass-through.
 
 `CRUMBS_DEFINE_GET_OP` getters use this, so a hand-written getter should too rather than comparing the fields itself.
 
@@ -638,7 +638,7 @@ CRUMBS_DEFINE_GET_OP(family, name, type_id, opcode, result_t, parse_fn)
 Generates:
 
 - `static inline int family_query_name(const crumbs_device_t *dev)` — internal, sends the SET_REPLY frame only
-- `static inline int family_get_name(const crumbs_device_t *dev, result_t *out)` — public: query → `delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US)` → `crumbs_controller_read_expect(type_id, opcode)` → `parse_fn`. Returns `CRUMBS_RX_REPLY_MISMATCH` (`-4`) if the reply is well-formed but not the requested `(type_id, opcode)`; other non-zero codes pass through from the query's `crumbs_controller_send` (i.e. from `write_fn`), the read, and the parser. Note the Linux HAL's `crumbs_linux_i2c_write` also returns `-4` for an incomplete write, so from a Linux-bound getter `-4` is not unambiguous; treat it as "query/reply failed" unless you call `crumbs_controller_read_expect` yourself
+- `static inline int family_get_name(const crumbs_device_t *dev, result_t *out)` — public: query → `delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US)` → `crumbs_controller_read_expect(type_id, opcode)` → `parse_fn`. Returns `CRUMBS_RX_REPLY_MISMATCH` (`-7`) if the reply is well-formed but not the requested `(type_id, opcode)`; other non-zero codes pass through from the query's `crumbs_controller_send` (i.e. from `write_fn`), the read, and the parser. `-7` is used by nothing else in the library or the HALs, so it is unambiguous even through a getter
 
 Use for standard 1:1 opcode→result GETs. Multi-opcode GETs must still be written by hand.
 
@@ -961,7 +961,7 @@ All CRUMBS functions use consistent conventions:
 | `crumbs_peripheral_handle_receive()` | `0`                 | `-1` (args/decode), `-2` (CRC), `-3` (type mismatch)      |
 | `crumbs_peripheral_build_reply()`    | `0`                 | `-1` (args/role), `-2` (encode)                           |
 | `crumbs_controller_read()`           | `0`                 | `-1` (args/short read), decode error codes                |
-| `crumbs_controller_read_expect()`    | `0`                 | as `crumbs_controller_read()`, plus `-4` (reply identity mismatch) |
+| `crumbs_controller_read_expect()`    | `0`                 | as `crumbs_controller_read()`, plus `-7` (reply identity mismatch) |
 | `crumbs_register_handler()`          | `0`                 | `-1` (NULL ctx or table full)                             |
 | `crumbs_register_reply_handler()`    | `0`                 | `-1` (NULL ctx or table full)                             |
 | `crumbs_unregister_handler()`        | `0`                 | Never fails                                               |

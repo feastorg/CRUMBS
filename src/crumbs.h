@@ -111,7 +111,7 @@ extern "C"
  * The reply decoded correctly but its type_id/opcode are not the pair the
  * controller asked for. out_msg holds what was received.
  */
-#define CRUMBS_RX_REPLY_MISMATCH (-4)
+#define CRUMBS_RX_REPLY_MISMATCH (-7)
 
     /**
      * @brief Role of a CRUMBS endpoint on the I2C bus.
@@ -497,7 +497,8 @@ extern "C"
      * @param read_fn        I2C read function (crumbs_i2c_read_fn).
      * @param read_ctx       Opaque pointer passed to @p read_fn.
      * @return 0 on success; crumbs_controller_read()'s codes on read/decode
-     *         failure; CRUMBS_RX_REPLY_MISMATCH (-4) on an identity mismatch.
+     *         failure; CRUMBS_RX_REPLY_MISMATCH (-7) on an identity mismatch.
+ *         -7 is not used by any HAL or helper, so a getter's -7 is unambiguous.
      */
     int crumbs_controller_read_expect(crumbs_context_t *ctx,
                                       uint8_t target_addr,
