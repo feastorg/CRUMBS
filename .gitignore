@@ -64,3 +64,5 @@ _archive/
 
 # Logs
 *.log
+# Doxygen output (scripts/doccheck.sh)
+docs/doxygen_out/

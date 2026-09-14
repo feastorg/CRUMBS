@@ -1,11 +1,19 @@
+# Gate for the public API's in-source documentation: every symbol in a public
+# header must carry a Doxygen comment. Internals (.c/.cpp) are out of scope.
 PROJECT_NAME           = CRUMBS
 OUTPUT_DIRECTORY       = docs/doxygen_out
 INPUT                  = src
+FILE_PATTERNS          = *.h
 RECURSIVE              = YES
+EXCLUDE                = src/crc
 GENERATE_HTML          = NO
 GENERATE_LATEX         = NO
+GENERATE_XML           = YES
 WARN_IF_UNDOCUMENTED   = YES
-WARNINGS              = YES
-QUIET                  = NO
+WARN_IF_UNDOC_ENUM_VAL = YES
+EXTRACT_STATIC         = YES
+WARNINGS               = YES
+WARN_AS_ERROR          = FAIL_ON_WARNINGS
+QUIET                  = YES
 EXTRACT_ALL            = NO
 GENERATE_TREEVIEW      = NO

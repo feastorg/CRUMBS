@@ -254,7 +254,7 @@ jobs:
   # Doc Check
   # ---------------------------------------------------------------------------
   doxygen:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # apt doxygen 1.9.8; the gate should not move with the image
     timeout-minutes: 10
 
     steps:

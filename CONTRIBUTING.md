@@ -191,12 +191,12 @@ Before submitting a PR, run the documentation checker:
 ./scripts/doccheck.sh
 ```
 
-This runs Doxygen and reports warnings for missing/incomplete documentation.
+This runs Doxygen over the public headers and fails on any undocumented symbol or malformed comment.
 
 **CI behavior:**
 
 - Documentation check runs on pushes and PRs to `dev` and `main`
-- Doxygen warnings are printed in the workflow log but do not fail the check today
+- Any Doxygen warning fails the `doxygen` job, which the required `ok` check depends on
 - Goal: Keep public API documentation complete as the library evolves
 
 ### User Documentation

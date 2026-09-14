@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
+# Fails if any symbol in a public header lacks a Doxygen comment
+# (WARN_AS_ERROR = FAIL_ON_WARNINGS in docs/Doxyfile). Doxygen only checks
+# file-scope members of headers that carry a @file block, so require one.
 set -euo pipefail
-
-OUT=docs/doxygen.log
-echo "Running doxygen..."
-if ! command -v doxygen >/dev/null 2>&1; then
-	echo "doxygen not installed; skipping doxygen run" | tee "$OUT"
-else
-	doxygen docs/Doxyfile 2>&1 | tee "$OUT" || true
+cd "$(dirname "$0")/.."
+missing=$(grep -L '@file' src/*.h || true)
+if [ -n "$missing" ]; then
+    echo "headers without a @file block (their functions and macros would go unchecked):" >&2
+    echo "$missing" >&2
+    exit 1
 fi
-
-echo "Summary: (doxygen log)"
-grep -i "warning:" "$OUT" || echo "No warnings found."
-
-echo "Doc-check completed (warnings printed above)." 
-exit 0
+doxygen docs/Doxyfile
+echo "doxygen: public headers fully documented, no warnings"
