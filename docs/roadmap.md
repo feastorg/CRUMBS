@@ -1,5 +1,7 @@
 # CRUMBS Roadmap
 
+Work that is planned is tracked in [GitHub issues](https://github.com/feastorg/CRUMBS/issues). This file holds only what is *not* being worked on: directions that may be worth taking someday, and decisions not to take a direction, with the reasoning so they are not re-litigated by accident.
+
 **Note:** Items ordered by value/feasibility. No commitment is made regarding timing or whether any specific item will be implemented.
 
 ---
@@ -12,12 +14,13 @@
 **Feasibility:** Very high — Arduino Wire API compatible, minimal validation needed  
 **Effort:** Low — Primarily documentation and testing
 
-**Deliverables:**
+**Done:** CI builds the `simple_controller` / `simple_peripheral` PlatformIO examples for `esp32dev`; default I²C pins and a `platformio.ini` are in [platform-setup.md](platform-setup.md).
 
-- Platform validation: ESP32-DevKitC, ESP32-S3 at 100kHz–1MHz
-- Documentation: GPIO mappings (GPIO21/22), dual-core thread safety, gateway patterns
-- Examples: `hello_peripheral`, `hello_controller`, minimal WiFi bridge
-- CI: PlatformIO build validation
+**Remaining:**
+
+- Hardware validation: ESP32-DevKitC, ESP32-S3 at 100kHz–1MHz
+- Documentation: dual-core thread safety, gateway patterns
+- Example: minimal WiFi bridge
 
 ---
 
@@ -149,6 +152,15 @@ bus.send(0x20, type_id=0x01, opcode=0x01, data=[0xFF])
 
 ---
 
+## Possible Ideas
+
+Unranked. Each is a thought that has come up more than once, kept so it is not lost; none has a demonstrated need yet.
+
+- **Device classes.** Pre-defined `type_id` / opcode sets for common device kinds (in the spirit of USB device classes), so third parties can build compatible hardware without coordinating. Not a library requirement; would live alongside the reference families.
+- **Handler lookup strategy.** Handler dispatch is a linear scan bounded by `CRUMBS_MAX_HANDLERS`. A build-time option for a sorted table with binary search would only pay off at handler counts the current bound does not reach. Wait for a measured need.
+
+---
+
 ## Explicitly Out of Scope
 
 ### Gateway Services
@@ -159,12 +171,18 @@ Building REST/MQTT/WebSocket services is **application territory**, not library 
 
 ### Multi-Family Bus Sharing
 
-"One family per bus" is a **core design principle** providing compile-time type safety. Dynamic vocabulary discovery adds complexity for rare use cases. Real solution: use multiple I²C buses or bus bridging.
+"One family per bus" stays. A controller is compiled for one family and understands only that family's vocabulary; that gives compile-time checked command usage with no runtime negotiation or dynamic dispatch. Multi-family systems use multiple I²C buses or a gateway.
 
-**Alternative:** Document the constraint clearly and provide multi-bus setup examples if requested.
+**Why not lift it:** the only real blocker is that `type_id` is a per-family namespace (the lhwit LED and the BREAD RLHT module are both `0x01`), but resolving that moves dispatch from compile time to runtime, costs the controller every family's headers and parsers in flash, and makes the identity read a required discovery round trip. That trades away the design's main safety claim for flexibility nobody has needed yet.
+
+**Extension path, if it is ever needed:** append a family identifier to the opcode `0x00` identity reply. It rides in a reply that already exists, and existing parsers read fixed low offsets past a minimum length, so trailing bytes are backward compatible. Spending a payload byte on family in every frame was considered and rejected. Full analysis: [#38](https://github.com/feastorg/CRUMBS/issues/38).
+
+**Trigger to revisit:** a real deployment reaching for a second bus or a gateway purely to satisfy this rule. A `type_id` check on receive ([#37](https://github.com/feastorg/CRUMBS/issues/37)) is a prerequisite either way.
 
 ### Enhanced Discovery Protocols
 
 Current discovery (version query via opcode 0x00) is sufficient. Capability negotiation, hierarchical addressing, and multicast add protocol complexity without demonstrated user need.
+
+The same applies to further reserved opcodes that have been floated — a CAPABILITIES bitmap (multi-frame, low-power, streaming), CONFIG_GET/CONFIG_SET, and STATS counters. Only SET_REPLY (`0xFE`) is reserved today.
 
 **Alternative:** Wait for actual pain points; if needed, module families can extend version query payload.
