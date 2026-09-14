@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +10,15 @@
 // Default address of slice peripheral
 #define DEFAULT_SLICE_ADDR 0x08
 
+static void usage(const char *prog)
+{
+    printf("Usage:\n"
+           "  %s [i2c-device] [peripheral-addr]   send a test message "
+           "(default /dev/i2c-1 0x%02X)\n"
+           "  %s scan [strict]                    scan /dev/i2c-1 for CRUMBS devices\n",
+           prog, DEFAULT_SLICE_ADDR, prog);
+}
+
 int main(int argc, char **argv)
 {
     printf("CRUMBS Linux Controller Example\n");
@@ -16,35 +26,46 @@ int main(int argc, char **argv)
     crumbs_context_t ctx;
     crumbs_linux_i2c_t lw;
 
+    if (argc >= 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0))
+    {
+        usage(argv[0]);
+        return 0;
+    }
+
     //----------------------------------------------------------------------
-    // Parse optional arguments: device path, device address
-    // Usage: ./crumbs_simple_linux_controller [i2c-device] [slice-addr]
+    // Parse arguments. "scan" as the first argument selects scan mode on the
+    // default bus; otherwise the arguments are [i2c-device] [peripheral-addr].
     // Example: ./crumbs_simple_linux_controller /dev/i2c-1 0x08
     //----------------------------------------------------------------------
     const char *device_path = "/dev/i2c-1";
     uint8_t slice_addr = DEFAULT_SLICE_ADDR;
+    int scan_mode = (argc >= 2 && strcmp(argv[1], "scan") == 0);
 
-    if (argc >= 2 && argv[1] && argv[1][0] != '\0')
+    if (!scan_mode)
     {
-        device_path = argv[1];
-    }
-    if (argc >= 3 && argv[2])
-    {
-        unsigned long val = strtoul(argv[2], NULL, 0);
-        if (val <= 0x7F)
-            slice_addr = (uint8_t)val;
+        if (argc >= 2 && argv[1] && argv[1][0] != '\0')
+        {
+            device_path = argv[1];
+        }
+        if (argc >= 3 && argv[2])
+        {
+            unsigned long val = strtoul(argv[2], NULL, 0);
+            if (val <= 0x7F)
+                slice_addr = (uint8_t)val;
+        }
     }
 
     // Initialize the controller
     int rc = crumbs_linux_init_controller(&ctx, &lw, device_path, 25000);
     if (rc != 0)
     {
-        fprintf(stderr, "ERROR: crumbs_linux_init_controller failed (%d)\n", rc);
+        fprintf(stderr, "ERROR: crumbs_linux_init_controller failed (%d) opening %s: %s\n",
+                rc, device_path, strerror(errno));
         return 1;
     }
 
-    // If user asked for scan mode, run a CRUMBS-specific scan and exit.
-    if (argc >= 2 && strcmp(argv[1], "scan") == 0)
+    // Scan mode: run a CRUMBS-specific scan and exit.
+    if (scan_mode)
     {
         int strict = 0;
         if (argc >= 3 && strcmp(argv[2], "strict") == 0)
