@@ -66,7 +66,7 @@ typedef struct crumbs_linux_i2c_s
      * @brief I2C write adapter for CRUMBS on Linux; compatible with crumbs_i2c_write_fn.
      *
      * This uses linux-wire to:
-     *   - select the slave address with lw_set_slave()
+     *   - select the target address with lw_set_target()
      *   - write the frame with lw_write(..., send_stop=1)
      *
      * @param user_ctx     Must be a (crumbs_linux_i2c_t*).
@@ -100,7 +100,7 @@ typedef struct crumbs_linux_i2c_s
      * This is analogous to Arduino's `Wire.requestFrom()` + `crumbs_decode_message`.
      * It performs:
      *
-     *   1. lw_set_slave()
+     *   1. lw_set_target()
      *   2. one or more lw_read() calls until 0 or error, or buffer filled
      *   3. crumbs_decode_message() on the bytes actually read
      *
@@ -161,12 +161,17 @@ typedef struct crumbs_linux_i2c_s
     /**
      * @brief Scan for I2C devices on the bus for addresses in [start_addr, end_addr].
      *
-     * The scanner supports two modes:
-     *   - strict (strict != 0): attempt a small read from the address. This
-     *     performs a data-phase read which is stronger at detecting devices
-     *     that only respond to reads.
-     *   - non-strict (strict == 0): send an address probe (zero-length write)
-     *     to detect devices that ACK on address phase.
+     * Reports every address that acknowledges; no CRUMBS frame is read or
+     * decoded (use crumbs_linux_scan_for_crumbs() for that). Two probes:
+     *   - strict (strict != 0): a one-byte read. Present if the target ACKs a
+     *     read and returns a byte. Consumes one byte from register-addressed
+     *     or stream-style devices.
+     *   - non-strict (strict == 0): an address-only SMBus Quick Write via
+     *     lw_probe(). Present if the address ACKs. Puts no data on the bus.
+     * In both modes an address owned by a kernel driver (I2C_SLAVE refuses
+     * with EBUSY, what i2cdetect shows as "UU") is reported as present.
+     * Expected failures are not logged during the sweep. Requires
+     * linux-wire 0.1.3 or newer.
      *
      * @param user_ctx    Pointer to crumbs_linux_i2c_t handle.
      * @param start_addr  Start of address range (inclusive).
@@ -174,7 +179,10 @@ typedef struct crumbs_linux_i2c_s
      * @param strict      Non-zero = strict read probe, 0 = non-strict probe.
      * @param found       Buffer to receive discovered addresses.
      * @param max_found   Maximum number of entries the buffer can hold.
-     * @return Number of found addresses (>=0), or negative on error.
+     * @return Number of found addresses (>=0); -1 on invalid arguments or a
+     *         closed bus; -2 if the adapter cannot perform an SMBus Quick
+     *         Write (non-strict mode only; errno EOPNOTSUPP) - use strict
+     *         mode on that adapter.
      */
     int crumbs_linux_scan(void *user_ctx,
                           uint8_t start_addr,
