@@ -7,6 +7,11 @@ on:
     branches: [dev, main]
   workflow_dispatch:
 
+# Every job here only reads the repo and restores caches; nothing writes to
+# GitHub. Keep the token read-only (CodeQL actions/missing-workflow-permissions).
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
