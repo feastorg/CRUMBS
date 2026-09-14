@@ -49,7 +49,7 @@ void onReceiveHandler(int numBytes)
 void onRequestHandler()
 {
     // Respond with a short, non-CRUMBS payload (e.g., a simple text token)
-    // This is intentionally not 31 bytes and does not contain a valid CRC.
+    // Eight bytes; a CRUMBS decoder rejects it because byte 2 ('C' = 0x43) is not a valid data_len.
     Wire.write((const uint8_t *)NONCRUMBS_PAYLOAD, strlen(NONCRUMBS_PAYLOAD));
 }
 

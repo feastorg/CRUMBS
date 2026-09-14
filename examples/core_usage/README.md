@@ -10,6 +10,6 @@ SET_REPLY and decoding. No handler tables and no families.
 
 Start with the `hello_*` pair, then `basic_*`, then `advanced_controller`
 against `basic_peripheral`. Every CRUMBS peripheral here listens at `0x10`;
-every Arduino example blinks `LED_BUILTIN` every 500 ms so you can see it is
-alive; serial is 115200 baud. Each directory's README has the exact commands
+every Arduino IDE sketch blinks `LED_BUILTIN` every 500 ms so you can see it
+is alive; serial is 115200 baud everywhere. Each directory's README has the exact commands
 and output.

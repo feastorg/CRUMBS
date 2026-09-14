@@ -37,7 +37,7 @@ ms`, `getecho` → `Echo data: …`, `info` → `Device info: MockDev v1.0`, `sc
 `help`. The PlatformIO one reads them from the serial monitor (prompt `> `,
 target fixed at `0x10`; its `scan` is a plain address ping). The Linux one,
 `build-linux/crumbs_mock_controller [i2c-dev]`, runs the CRUMBS scan over
-`0x03`–`0x77` and adds `quit`.
+`0x03`–`0x77` and adds `quit` / `exit`.
 
 ## Build
 

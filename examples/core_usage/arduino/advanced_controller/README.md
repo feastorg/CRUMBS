@@ -2,7 +2,7 @@
 
 A serial line protocol for sending arbitrary frames, reading replies,
 scanning the bus and watching CRC statistics. Pair with `basic_peripheral`
-(the only example that answers opcode `0x80`) and put
+(the only core example that answers opcode `0x80`) and put
 `basic_peripheral_noncrumbs` on the bus to see a scan ignore it.
 
 Serial (115200), one command per line:

@@ -18,7 +18,7 @@ identical to `mixed_bus_controller`), plus:
 - `EZO DO addr=0x61` — queries the output configuration (`O,?`) once until
   it succeeds, then reads; prints ` output_mask=…`, ` present_mask=…` and
   ` mg_l=…` / ` sat_pct=…` as enabled.
-- `Bosch addr=0x76` followed by ` init=fail` or ` temp_c=… pressure_pa=…
+- `Bosch addr=0x76` and `Bosch addr=0x77`, each followed by ` init=fail` or ` temp_c=… pressure_pa=…
   pressure_hpa=… humidity_pct=<n|NA> model_hint=<BMP280_or_no_humidity|BME280>`.
 
 ## Build
@@ -31,4 +31,4 @@ arduino-cli compile --fqbn arduino:avr:nano --warnings more --library "$PWD" \
   examples/core_usage/arduino/mixed_bus_controller_vendor
 ```
 
-In the Arduino IDE install the two libraries by the same names.
+In the Arduino IDE, `SparkFun BME280` is in the Library Manager; ezo-driver is not, so clone it into `~/Arduino/libraries/` as above.

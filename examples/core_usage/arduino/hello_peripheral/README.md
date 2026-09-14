@@ -4,7 +4,7 @@ The smallest CRUMBS peripheral: count the frames it receives, hand the count
 back when read. Pair with `hello_controller`.
 
 - Address `0x10`, type `0x01` (`config.h`).
-- Every received frame runs `on_message`, which prints `RX cmd=<opcode>` and
+- Every received frame except SET_REPLY runs `on_message`, which prints `RX cmd=<opcode>` and
   increments a counter.
 - Every read runs `on_request`, which replies `type 0x01, opcode 0x00,
   data = [counter]` whatever opcode was requested.
