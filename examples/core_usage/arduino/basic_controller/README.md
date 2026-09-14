@@ -8,6 +8,8 @@
 - Two-step query pattern (SET_REPLY + read)
 - Decoding replies
 
+Talks to the peripheral at `0x10` (`TARGET_ADDR` in `config.h`), the `basic_peripheral` default.
+
 ## Commands
 
 - **s** - Store data (sends 3 bytes)

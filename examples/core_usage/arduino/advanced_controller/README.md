@@ -24,7 +24,7 @@ Format: `address,type_id,opcode,byte0,byte1,...`
 Example:
 
 ```
-8,1,1,0xAA,0xBB,0xCC
+0x10,1,1,0xAA,0xBB,0xCC
 ```
 
 ### Scan I2C Bus

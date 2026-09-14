@@ -4,7 +4,7 @@
 
 ## What it does
 
-- Listens at I2C address 0x08
+- Listens at I2C address 0x10
 - Prints when it receives messages
 - Counts received messages
 - Returns counter when queried
@@ -13,7 +13,7 @@
 
 1. Upload to Arduino Nano
 2. Open Serial Monitor (115200 baud)
-3. You should see: "Hello peripheral at 0x08"
+3. You should see: "Hello peripheral at 0x10"
 4. Use hello_controller to send messages
 
 ## Key Concepts

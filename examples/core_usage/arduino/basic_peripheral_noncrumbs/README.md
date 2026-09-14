@@ -18,7 +18,7 @@ This is a **raw I²C peripheral** without CRUMBS, implementing the same function
 
 ## What it does
 
-- Listens at I2C address 0x08
+- Listens at I2C address 0x45
 - Receives raw bytes via Wire.onReceive()
 - No message structure or validation
 - No CRC checking

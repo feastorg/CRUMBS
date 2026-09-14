@@ -31,5 +31,5 @@ static const size_t BMP280_RAW_LEN = 6u;
 static const size_t BME280_RAW_LEN = 8u;
 
 // Probe only known CRUMBS addresses on mixed buses.
-static const uint8_t kCrumbsCandidates[] = {0x08, 0x09, 0x0A};
+static const uint8_t kCrumbsCandidates[] = {0x10, 0x11, 0x12};
 static const uint8_t CRUMBS_QUERY_OPCODE = 0x00;
