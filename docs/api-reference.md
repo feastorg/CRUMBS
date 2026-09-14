@@ -737,7 +737,7 @@ int crumbs_arduino_scan(void *user_ctx, uint8_t start_addr, uint8_t end_addr,
 
 Address probe. Reports **every** address that acknowledges — register-addressed sensors, EEPROMs, anything — with no CRUMBS frame read or decoded in either mode. For discovery that validates a CRUMBS frame, use `crumbs_controller_scan_for_crumbs()` (Core Scanner below) with `crumbs_arduino_read`.
 
-`crumbs_linux_scan()` has the same two modes, so portable code gets the same bus behaviour from the same argument.
+`crumbs_linux_scan()` (linux-wire 0.1.3+) puts the same transactions on the wire in both modes — strict is a one-byte read, non-strict is address + write bit + STOP (an SMBus Quick Write there) — so portable code gets the same bus behaviour from the same argument. Two differences: Linux also reports an address owned by a kernel driver as present (`i2cdetect`'s `UU`; no such notion on Arduino), and Linux stops at `max_found` while Arduino keeps counting. Linux non-strict returns `-2` if the adapter cannot perform a Quick Write.
 
 **Parameters:**
 

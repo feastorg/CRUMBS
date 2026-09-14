@@ -173,12 +173,6 @@ typedef struct crumbs_linux_i2c_s
      * Expected failures are not logged during the sweep. Requires
      * linux-wire 0.1.3 or newer.
      *
-     * Reports every address that acknowledges; no frame is read or decoded.
-     * For CRUMBS-aware discovery use crumbs_linux_scan_for_crumbs(). The
-     * strict read consumes one byte from register-addressed or stream-style
-     * devices; the non-strict probe writes nothing. crumbs_arduino_scan()
-     * has the same semantics.
-     *
      * @param user_ctx    Pointer to crumbs_linux_i2c_t handle.
      * @param start_addr  Start of address range (inclusive).
      * @param end_addr    End of address range (inclusive).

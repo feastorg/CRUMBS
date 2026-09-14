@@ -67,12 +67,17 @@ extern "C"
      * for CRUMBS-aware discovery use crumbs_controller_scan_for_crumbs()
      * with crumbs_arduino_read as the read function.
      *
-     * Same probe semantics as crumbs_linux_scan():
+     * The two probes put the same transactions on the wire as
+     * crumbs_linux_scan() (linux-wire 0.1.3+):
      * - strict != 0: one-byte read. Present if the target ACKs a read and
      *   clocks a byte out. Writes nothing, but consumes one byte from
      *   register-addressed or stream-style devices.
-     * - strict == 0: address-only write with no data phase. Present if the
-     *   target ACKs its address. Writes nothing.
+     * - strict == 0: address + write bit, then STOP, no data phase (Linux
+     *   does this as an SMBus Quick Write). Present if the address ACKs.
+     *   Writes nothing.
+     * Two differences remain: Linux also reports an address a kernel driver
+     * owns as present (there is no such notion here), and this function
+     * keeps counting past @p max_found while Linux stops there.
      *
      * @param user_ctx     Pointer to TwoWire instance or NULL to use &Wire
      * @param start_addr   Start address (inclusive) to probe, typically 0x03
