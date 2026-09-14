@@ -1,126 +1,54 @@
-# Discovery Controller
+# LHWIT discovery controller (Linux)
 
-Auto-discovery controller for CRUMBS lhwit_family peripherals on Linux I2C.
-
-## Overview
-
-This controller demonstrates proper CRUMBS usage with auto-discovery:
-
-**CRUMBS Patterns Demonstrated:**
-
-- `crumbs_linux_scan_for_crumbs_with_types()` - Type-aware bus scanning (auto-suppresses scan noise)
-- Canonical `*_ops.h` helper functions - Protocol-defined command builders
-- SET_REPLY query pattern - Two-step query/read for GET operations
-- Platform-specific `crumbs_linux_read_message()` - Linux I2C read wrapper
-- Version querying and compatibility checking per [protocol.md](../../../docs/protocol.md#opcode-0x00-version-information)
-
-**Application Features:**
-
-- Automatically finds Calculator (0x03), LED (0x01), Servo (0x02), and Display (0x04) devices
-- Queries and verifies version compatibility during scan
-- Blocks incompatible devices with clear guidance
-- Interactive shell for controlling discovered peripherals
-- Device-found checks before executing commands
-
-## Usage
-
-```bash
-# Build
-cd examples/families_usage/controller_discovery
-mkdir build && cd build
-cmake ..
-make
-
-# Run (default /dev/i2c-1)
-./controller_discovery
-
-# Run with specific I2C device
-./controller_discovery /dev/i2c-0
-```
-
-## Commands
-
-### Discovery
-
-- `scan` - Scan I2C bus for CRUMBS devices
-
-### Calculator
-
-- `calculator add <a> <b>` - Add two numbers
-- `calculator sub <a> <b>` - Subtract
-- `calculator mul <a> <b>` - Multiply
-- `calculator div <a> <b>` - Divide
-- `calculator result` - Get last result
-- `calculator history` - Show operation history
-
-### LED
-
-- `led set_all <mask>` - Set all LEDs (e.g., 0x0F for all on)
-- `led set_one <idx> <state>` - Set single LED
-- `led blink <idx> <enable> <period_ms>` - Configure blink
-- `led get_state` - Get current LED state
-
-### Servo
-
-- `servo set_pos <idx> <angle>` - Set position (0–180°)
-- `servo set_speed <idx> <speed>` - Set speed (0–20)
-- `servo sweep <idx> <enable> <min> <max> <step>` - Configure sweep
-- `servo get_pos` - Get current positions
-
-## Example Session
+Finds LHWIT devices on the bus, checks each one's version against the
+headers it was built with, and drives the compatible ones. The command
+grammar is in the [family README](../lhwit_family/README.md#shell).
 
 ```sh
-lhwit> scan
-Scanning for CRUMBS devices...
-Found Calculator at 0x10 (CRUMBS 0.12.5, Module 1.0.0) - Compatible
-Found LED Array at 0x20 (CRUMBS 0.12.5, Module 1.0.0) - Compatible
-Found Servo Controller at 0x30 (CRUMBS 0.12.5, Module 1.0.0) - Compatible
-
-Found 3 CRUMBS device(s):
-  [0] Address 0x10, Type 0x03 (Calculator)
-  [1] Address 0x20, Type 0x01 (LED)
-  [2] Address 0x30, Type 0x02 (Servo)
-
-lhwit> calculator add 42 8
-OK: add(42, 8) sent. Use 'calculator result' to get answer.
-
-lhwit> calculator result
-Result: 50
-
-lhwit> led set_all 0x0F
-OK: LEDs set to 0x0F
-
-lhwit> servo set_pos 0 90
-OK: Servo 0 position set to 90°
+build-linux/crumbs_controller_discovery [/dev/i2c-1]
 ```
 
-## When to Use This Controller
+Built by the root CMake with `CRUMBS_ENABLE_LINUX_HAL=ON`, or on its own
+against an installed CRUMBS (`cmake -S examples/families_usage/controller_discovery -B build -DCRUMBS_BUILD_IN_TREE=OFF`).
 
-**Use discovery controller when:**
+## What `scan` does
 
-- Testing with unknown device addresses
-- Working with dynamic bus configurations
-- Prototyping with multiple device setups
-- Need to identify available devices
-- Need automatic version compatibility checking
+Sweeps `0x08`–`0x77` with the non-strict CRUMBS probe
+(`crumbs_linux_scan_for_crumbs_with_types`, 100 ms timeout, up to 16
+devices), names each by `type_id`, then sends SET_REPLY `0x00` and reads the
+version reply. A device is bound only if its reply parses, its CRUMBS
+version is at least 0.10.0 and its module major matches and minor is at
+least the header's:
 
-**Use manual controller when:**
+```text
+Scanning I2C bus for CRUMBS devices (0x08-0x77)...
 
-- Addresses are fixed and known
-- Production deployments
-- Faster startup (no scan required)
-- Simpler code for reference
+Found 1 device(s):
+--------------------------------------------
+[0x20] LED
+       CRUMBS: v0.12.5 (controller: v0.12.5)
+       Module: v1.0.0 (expected: v1.0.x)
+       OK Compatible
+--------------------------------------------
+Usable: 1/1 devices
+```
 
-**Version Compatibility:**
+Failure lines in the same slot: `X CRUMBS version too old`, `X Module major
+version mismatch`, `X Module minor version too old`, `! Version query
+failed`, `! Invalid version format`. `list` shows what is bound, with
+`OK` or `INCOMPATIBLE`; an incompatible device can still be addressed with
+`@addr`, which prints `Device at 0x.. is incompatible. Run 'scan' again after
+updating firmware.` Index selectors (`led 0 …`) count compatible devices
+only.
 
-- Controller queries peripheral versions during scan via opcode 0x00
-- Checks CRUMBS version >= 0.10.0 (encoded as 1000)
-- Verifies module major version match, minor version peripheral >= controller
-- Incompatible devices are blocked from commands with clear error messages
-- See [protocol.md](../../../docs/protocol.md#opcode-0x00-version-information) for compatibility rules
+The version reply is read with `crumbs_linux_read_message()`, which is
+deprecated in favour of `crumbs_controller_read()`; this is its last use in
+the examples.
 
-## Requirements
+## Compatibility rules
 
-- Linux with I2C support (Raspberry Pi, etc.)
-- libi2c-dev installed
-- User permissions for I2C access (or sudo)
+From `lhwit_ops.h`: `lhwit_check_crumbs_compat()` requires `CRUMBS_VERSION ≥
+1000`; `lhwit_check_module_compat()` returns `-1` on a major mismatch and
+`-2` when the peripheral's minor is below the expected one. A family bumps
+major for incompatible opcode or payload changes and minor for additions, so
+a newer peripheral serves an older controller but not the reverse.

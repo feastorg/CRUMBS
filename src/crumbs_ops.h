@@ -31,7 +31,7 @@
  *     functions (see any lhwit_family ops header for reference).
  *   - CRUMBS_DEFINE_GET_OP covers the standard 1:1 opcode->result fetch only.
  *     Parameterized queries (e.g. "get history entry N") require a custom
- *     _query_* that packs the index into the message payload.
+ *     SET that stores the parameter on the peripheral before the query.
  *
  * Requires: crumbs.h (crumbs_device_t, crumbs_controller_*),
  *           crumbs_message_helpers.h (for crumbs_msg_init, crumbs_msg_add_*)

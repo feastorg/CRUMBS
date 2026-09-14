@@ -1,246 +1,53 @@
-# LHWIT Display Peripheral
+# Display peripheral
 
-**Type ID:** `0x04` (DISPLAY_TYPE_ID)  
-**Default Address:** `0x40`  
-**Hardware:** Arduino Nano + 5641AS Quad 7-Segment Display
+Type `0x04`, address `0x40`, a 5641AS four-digit common-cathode 7-segment
+display multiplexed from `loop()`.
 
-## Overview
+## Hardware
 
-The Display peripheral provides control of a 4-digit 7-segment display (5641AS or compatible). It supports displaying numbers with decimal points, custom segment patterns, brightness control, and querying the current displayed value.
+Arduino Nano and the `Simple5641AS` library (`adrian200223/Simple5641AS`,
+in `platformio.ini`). Pins as `src/main.cpp` defines them:
 
-## Hardware Setup
+| Segment | a | b | c | d | e | f | g | dp |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Pin | D9 | D13 | D4 | D6 | D7 | D10 | D3 | D5 |
 
-### Components
+| Digit | 1 (left) | 2 | 3 | 4 |
+| --- | --- | --- | --- | --- |
+| Pin | D8 | D11 | D12 | D2 |
 
-- Arduino Nano (ATmega328P)
-- 5641AS quad 7-segment display (common cathode)
-- Jumper wires
+The display is refreshed every 2 ms with 500 µs per digit.
 
-### Wiring
+## Protocol (`../display_ops.h`)
 
-**Segment Pins (a-g, dp) → Arduino Digital Pins:**
+| Opcode | Name | Payload | Effect |
+| --- | --- | --- | --- |
+| `0x01` | `DISPLAY_OP_SET_NUMBER` | `[number:u16][decimal_pos:u8]` | show `number`; `decimal_pos` 1–4 lights that digit's point, 0 none |
+| `0x02` | `DISPLAY_OP_SET_SEGMENTS` | `[seg0][seg1][seg2][seg3]` | raw segments per digit, bit 7 = `a` … bit 0 = `dp` |
+| `0x03` | `DISPLAY_OP_SET_BRIGHTNESS` | `[level:u8]` | stored and reported; the library has no brightness control, so no visible effect |
+| `0x04` | `DISPLAY_OP_CLEAR` | — | blank the display; number and decimal position are kept |
+| `0x00` | version | reply 5 bytes | |
+| `0x80` | `DISPLAY_OP_GET_VALUE` | reply `[number:u16][decimal_pos:u8][brightness:u8]` | |
 
-```text
-Segment  Arduino Pin
--------------------
-   a        D9
-   b        D13
-   c        D4
-   d        D6
-   e        D7
-   f        D10
-   g        D3
-   dp       D5
+Numbers render with leading zeros (`42` shows `0042`); keep them at 9999 or
+below — the library has no handling for more digits. Digit `0` in segment
+form is `0xFC`.
+
+Wrappers: `display_send_set_number(dev, number, decimal_pos)`,
+`display_send_set_segments(dev, segments[4])`,
+`display_send_set_brightness(dev, level)`, `display_send_clear(dev)`,
+`display_get_value(dev, &display_value_result_t)`.
+
+## Serial
+
+115200 baud (boot waits up to 2 s for the port). Prints a banner with type,
+address and versions, then `Display peripheral ready`; each command echoes,
+e.g. `Display: 1234 (decimal on digit 2)`, `Brightness: 7`, `Display cleared`.
+
+## Build
+
+```sh
+pio run -e nanoatmega328new -t upload
 ```
 
-**Digit Select Pins → Arduino Digital Pins:**
-
-```text
-Digit    Arduino Pin
---------------------
- D1         D8
- D2         D11
- D3         D12
- D4         D2
-```
-
-**I2C Pins:**
-
-```text
-I2C Pin   Arduino Pin
----------------------
- SDA        A4
- SCL        A5
-```
-
-### 5641AS Pin Mapping
-
-The 5641AS has the following pinout (view from component side):
-
-```text
-         11 7  4  2  1 10  5
-         ┌──────────────────┐
-         │ 5641AS Quad 7seg │
-         └──────────────────┘
-          6 12 15 3 13 9  14 8
-
-Pin    Function
------------------
-1      e (segment)
-2      d (segment)
-3      dp (decimal point)
-4      c (segment)
-5      g (segment)
-6      D4 (digit 4 select)
-7      b (segment)
-8      D3 (digit 3 select)
-9      D2 (digit 2 select)
-10     f (segment)
-11     a (segment)
-12     D1 (digit 1 select)
-13     (not connected)
-14     (not connected)
-15     (not connected)
-```
-
-## Operations
-
-### SET Commands
-
-| Opcode | Name           | Payload                        | Description                       |
-| ------ | -------------- | ------------------------------ | --------------------------------- |
-| 0x01   | SET_NUMBER     | `[number:u16][decimal_pos:u8]` | Display number with decimal point |
-| 0x02   | SET_SEGMENTS   | `[d0:u8][d1:u8][d2:u8][d3:u8]` | Set custom segment patterns       |
-| 0x03   | SET_BRIGHTNESS | `[level:u8]`                   | Set brightness (0–10)             |
-| 0x04   | CLEAR          | none                           | Clear display                     |
-
-### GET Commands (via SET_REPLY)
-
-| Opcode | Name      | Reply Payload                             | Description           |
-| ------ | --------- | ----------------------------------------- | --------------------- |
-| 0x80   | GET_VALUE | `[number:u16][decimal:u8][brightness:u8]` | Current display state |
-
-## Usage Examples
-
-### Display Number
-
-```text
-> display 0 set_number 1234 0
-Displays: 1234 (no decimal)
-
-> display 0 set_number 1234 3
-Displays: 123.4 (decimal on digit 3)
-
-> display 0 set_number 1234 2
-Displays: 12.34 (decimal on digit 2)
-
-> display 0 set_number 42 0
-Displays:   42 (right-aligned)
-```
-
-**Decimal Position:**
-
-- 0 = no decimal
-- 1 = decimal on leftmost digit (D1)
-- 2 = decimal on digit 2
-- 3 = decimal on digit 3
-- 4 = decimal on rightmost digit (D4)
-
-### Custom Segments
-
-```text
-> display 0 set_segments 0x7E 0x30 0x6D 0x79
-Displays custom patterns (e.g., "HELP" or similar)
-```
-
-Segment bit mapping:
-
-```text
-Bit 7 ⇒ 0:  [a][b][c][d][e][f][g][dot]
-
-        a (bit 7)
-     f     b (bit 6)
-        g (bit 1)
-     e     c (bit 5)
-        d (bit 4)  dot (bit 0)
-
-Example: 0x7E = 0b01111110 = segments b,c,d,e,f,g ON = digit "0"
-```
-
-### Brightness Control
-
-```text
-> display 0 set_brightness 5
-Sets brightness to medium (5/10)
-```
-
-### Clear Display
-
-```text
-> display 0 clear
-Clears all segments
-```
-
-### Query Current Value
-
-```text
-> display 0 get_value
-Returns: number=1234, decimal=2, brightness=5
-```
-
-## Building & Uploading
-
-```bash
-cd examples/families_usage/lhwit_family/display
-pio run -t upload
-```
-
-Or specify the upload port:
-
-```bash
-pio run -t upload --upload-port /dev/ttyUSB0   # Linux
-pio run -t upload --upload-port COM5           # Windows
-```
-
-## Testing
-
-### Monitor Serial Output
-
-```bash
-pio device monitor
-```
-
-### Test with Controller
-
-From the discovery or manual controller:
-
-```text
-> scan
-> display 0 set_number 1234 0
-> display 0 get_value
-```
-
-## Implementation Notes
-
-### Display Multiplexing
-
-The 7-segment display requires continuous multiplexing to show all 4 digits. The `refresh_display()` function is called frequently from `loop()` to cycle through digits at ~2ms intervals, creating the illusion of all digits being lit simultaneously.
-
-### Brightness (Implementation)
-
-The current implementation stores the brightness value but doesn't actively control it (Simple5641AS library limitation). For hardware PWM control, you would need to add PWM to the digit select pins.
-
-### Number Display Format
-
-- Numbers 0–9999 are supported
-- Numbers < 1000 are right-aligned with leading spaces
-- Decimal position: 0=none, 1-4=after digit 1-4
-
-### Custom Segments (Implementation)
-
-Advanced users can set individual segments to create custom characters or symbols using `SET_SEGMENTS`. Each byte controls 8 segments (7 + decimal point).
-
-## Troubleshooting
-
-**Display is blank:**
-
-- Check wiring, especially digit select pins (D10-D13)
-- Verify I2C address (default 0x40)
-- Check serial monitor for boot messages
-
-**Display flickers:**
-
-- Normal during message processing
-- If persistent, check `refresh_display()` timing
-
-**Incorrect segments lit:**
-
-- Verify segment pin mapping matches your display
-- Different 7-segment displays may have different pinouts
-- Consult your display's datasheet
-
-## References
-
-- [display_ops.h](../display_ops.h) - Operation definitions
-- [lhwit_ops.h](../lhwit_ops.h) - Family-wide helpers
-- [Simple5641AS Library](https://github.com/adrian200223/Simple5641AS) - Display driver
+`-DCRUMBS_MAX_HANDLERS=6` in `platformio.ini`.

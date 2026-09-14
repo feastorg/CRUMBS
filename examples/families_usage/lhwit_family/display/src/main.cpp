@@ -12,8 +12,8 @@
  * - Arduino Nano (ATmega328P)
  * - I2C address: 0x40
  * - 5641AS quad 7-segment display
- * - Segment pins: D2-D9 (a,b,c,d,e,f,g,dp)
- * - Digit select pins: D10-D13 (D1,D2,D3,D4)
+ * - Segment pins: D9,D13,D4,D6,D7,D10,D3,D5 (a,b,c,d,e,f,g,dp), see segmentPins[]
+ * - Digit select pins: D8,D11,D12,D2 (digits 1-4), see digitSelectionPins[]
  * - I2C pins: A4 (SDA), A5 (SCL)
  *
  * Operations:
