@@ -14,6 +14,7 @@ All notable changes to CRUMBS are documented in this file.
 
 ### Fixed
 
+- `crumbs_linux_close()` left the handle zeroed, so `bus.fd` was `0` and a second close shut the process's stdin; every HAL "bus open" guard also accepted the closed handle. The handle now reads `fd == -1` after close, as `crumbs_linux.h` always promised. (#69)
 - `crumbs_linux_scan()` non-strict mode never touched the bus (linux-wire's `lw_write` returns 0 for a zero-length request before writing), so it reported every address in the range as present. It now issues an address-only SMBus Quick Write through `lw_probe()`. Both modes now also report addresses owned by a kernel driver as present instead of skipping them, and expected failures are not logged during the sweep. (#65)
 
 ### Changed

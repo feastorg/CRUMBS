@@ -203,6 +203,12 @@ if(CRUMBS_ENABLE_TESTS)
     add_executable(test_padded_read tests/test_padded_read.c)
     target_link_libraries(test_padded_read PRIVATE crumbs)
     add_test(NAME padded_read_test COMMAND test_padded_read)
+
+    if(CRUMBS_ENABLE_LINUX_HAL)
+        add_executable(test_linux_close tests/test_linux_close.c)
+        target_link_libraries(test_linux_close PRIVATE crumbs)
+        add_test(NAME linux_close_test COMMAND test_linux_close)
+    endif()
 endif()
 
 # -----------------------------------------------------------------------------
