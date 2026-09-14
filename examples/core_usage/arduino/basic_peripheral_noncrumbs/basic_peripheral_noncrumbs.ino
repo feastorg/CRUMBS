@@ -1,5 +1,5 @@
 /*
- * peripheral_noncrumbs.ino
+ * basic_peripheral_noncrumbs.ino
  *
  * Minimal Arduino 'non-CRUMBS' peripheral for testing scanner false-positives.
  *
@@ -7,7 +7,7 @@
  *  - Joins I2C as a target (peripheral) at address 69 (0x45)
  *  - On receive: drains the bytes and logs count to Serial
  *  - On request: responds with a short, non-CRUMBS payload (will NOT be a
- *    valid 31-byte CRUMBS frame) so the CRUMBS-aware scanner should *not*
+ *    valid 4-31 byte CRUMBS frame) so the CRUMBS-aware scanner should *not*
  *    identify this device as CRUMBS.
  *
  * Usage: Upload to your microcontroller and run the scanner (Arduino serial
@@ -49,7 +49,7 @@ void onReceiveHandler(int numBytes)
 void onRequestHandler()
 {
     // Respond with a short, non-CRUMBS payload (e.g., a simple text token)
-    // This is intentionally not 31 bytes and does not contain a valid CRC.
+    // Eight bytes; a CRUMBS decoder rejects it because byte 2 ('C' = 0x43) is not a valid data_len.
     Wire.write((const uint8_t *)NONCRUMBS_PAYLOAD, strlen(NONCRUMBS_PAYLOAD));
 }
 

@@ -10,7 +10,7 @@
  *
  * Hardware Setup:
  * - Linux SBC (Raspberry Pi, etc.) as controller
- * - Mock peripheral at I2C address 0x10 (default, configurable)
+ * - Mock peripheral at I2C address 0x10 (PERIPHERAL_ADDR below)
  *
  * Build:
  *   mkdir -p build && cd build

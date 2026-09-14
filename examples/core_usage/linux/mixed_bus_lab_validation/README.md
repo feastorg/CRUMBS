@@ -1,50 +1,24 @@
-# Mixed Bus Lab Validation (Linux)
+# mixed_bus_lab_validation (Linux)
 
-Lab-focused mixed-bus validation example for one Linux controller running all devices on one I2C bus:
+The pass/fail check for the lab's shared bus: three CRUMBS slices, two Atlas
+Scientific EZO circuits and an optional Bosch sensor. Built by the root
+CMake as `build-linux/crumbs_mixed_bus_lab_validation [i2c-dev]`
+(default `/dev/i2c-1`); prints `RESULT: PASS` or `RESULT: FAIL` and exits
+0/1.
 
-1. CRUMBS slices: RLHT (`0x0A`), DCMT (`0x14`), DCMT (`0x15`)
-2. EZO command/response sensors: pH (`0x63`), DO (`0x61`)
-3. Optional Bosch register sensor: BMP/BME280 (`0x76` or `0x77`)
+Expected devices (constants at the top of `main.c`): CRUMBS at `0x0A`,
+`0x14`, `0x15` — the lab hardware keeps these addresses; the shipped
+examples moved to `0x10` — EZO pH at `0x63`, EZO DO at `0x61`, Bosch at
+`0x76`/`0x77`.
 
-This example is intentionally topology-specific so you can validate your full bench before provider-level mixed-bus tests.
+What decides the result:
 
-## What It Does
-
-Single pass, then exits:
-
-1. Scans only the expected CRUMBS addresses with protocol-aware scan (informational).
-2. Sends a default `SET_REPLY` query to each expected CRUMBS device and prints reply data.
-3. Sends `R` command to EZO pH and DO sensors, waits, reads response frame, prints status + text payload.
-4. Optionally probes Bosch candidates (`0x76`, `0x77`) for chip ID register (`0xD0`) and prints one raw sample read (`0xF7`, 6 bytes) when present.
-   Missing optional Bosch addresses are reported as `not present`.
-
-Exit code is non-zero on validation failure.
-
-## Build
-
-From the CRUMBS repo root:
-
-```bash
-cmake --preset linux
-cmake --build --preset linux
-```
-
-## Run
-
-```bash
-./build-linux/crumbs_mixed_bus_lab_validation /dev/i2c-1
-```
-
-Device path is optional; default is `/dev/i2c-1`.
-
-## Pass Criteria
-
-1. CRUMBS default query/reply succeeds for all expected addresses: `0x0A`, `0x14`, `0x15`.
-2. EZO pH and DO return status byte `0x01` (`SUCCESS`).
-3. Optional: if a Bosch sensor is connected, at least one reports chip ID `0x58` (BMP280) or `0x60` (BME280). If none are connected, the example logs a skip message and can still pass.
-
-## Notes
-
-1. This example uses CRUMBS Linux HAL and raw I2C helper APIs only.
-2. For typed EZO parsing/workflows, use `ezo-driver` examples separately.
-3. If your lab addresses differ, edit constants at top of `main.c`.
+1. The bus opens.
+2. A strict candidate scan runs and its findings are printed, but they are
+   informational: since `4695a30` the criterion is the direct query below,
+   not the scan.
+3. Every CRUMBS address must answer a SET_REPLY `0x00` query with a frame
+   `crumbs_controller_read()` decodes; the reply's identity is not checked.
+   Failure prints `CRUMBS validation failed at expected addr=0x..`.
+4. Both EZO circuits must answer `R` (after a 1 s wait) with status byte 1.
+5. The Bosch sensor never affects the result; it is reported if present.

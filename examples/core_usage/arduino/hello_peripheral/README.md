@@ -1,25 +1,16 @@
-# Hello Peripheral
+# hello_peripheral
 
-**Start here!** This is the absolute simplest CRUMBS peripheral.
+The smallest CRUMBS peripheral: count the frames it receives, hand the count
+back when read. Pair with `hello_controller`.
 
-## What it does
+- Address `0x10`, type `0x01` (`config.h`).
+- Every received frame except SET_REPLY runs `on_message`, which prints `RX cmd=<opcode>` and
+  increments a counter.
+- Every read runs `on_request`, which replies `type 0x01, opcode 0x00,
+  data = [counter]` whatever opcode was requested.
+- Boot checks `crumbs_context_size()` against `sizeof(crumbs_context_t)` and
+  halts with `FATAL: CRUMBS_MAX_HANDLERS mismatch! See crumbs.h.` if the
+  library and sketch disagree; otherwise prints `Hello peripheral at 0x10`.
 
-- Listens at I2C address 0x10
-- Prints when it receives messages
-- Counts received messages
-- Returns counter when queried
-
-## Upload & Test
-
-1. Upload to Arduino Nano
-2. Open Serial Monitor (115200 baud)
-3. You should see: "Hello peripheral at 0x10"
-4. Use hello_controller to send messages
-
-## Key Concepts
-
-- `crumbs_arduino_init_peripheral()` - Setup peripheral
-- `on_message()` - Called when message received
-- `on_request()` - Called when controller queries us
-
-**Next:** See [basic_peripheral](../basic_peripheral/) for handling different commands
+Build: open in the Arduino IDE, or
+`arduino-cli compile --fqbn arduino:avr:nano --library "$PWD" examples/core_usage/arduino/hello_peripheral`.

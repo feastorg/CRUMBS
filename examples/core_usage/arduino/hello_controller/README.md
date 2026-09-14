@@ -1,25 +1,15 @@
-# Hello Controller
+# hello_controller
 
-**Pair with hello_peripheral** - Upload peripheral first, then this.
+Sends a frame to `hello_peripheral` and reads its counter back.
 
-## What it does
+- Target `0x10`, type `0x01` (`config.h`).
+- Serial (115200) prints `Commands: s=send, r=request`, then reads one
+  character at a time:
+  - `s` — `crumbs_controller_send` of opcode `0x01` with payload `AA BB`,
+    then `Sent!`. The peripheral prints `RX cmd=1`.
+  - `r` — SET_REPLY for opcode `0x00`, a 10 ms delay, then a raw
+    `crumbs_arduino_read` of up to 32 bytes; prints `Received <n> bytes`
+    if anything came back. The bytes are not decoded — that is
+    `basic_controller`'s job.
 
-- Sends messages with 's' key
-- Requests data with 'r' key
-- Shows simple command/response pattern
-
-## Upload & Test
-
-1. Wire Arduino to peripheral (SDA/SCL + GND)
-2. Upload this sketch
-3. Open Serial Monitor (115200 baud)
-4. Type 's' to send message
-5. Type 'r' to request data
-
-## Key Concepts
-
-- `crumbs_arduino_init_controller()` - Setup controller
-- `crumbs_controller_send()` - Send command
-- Two-step query: SET_REPLY + read
-
-**Next:** See [basic_controller](../basic_controller/) for multiple commands
+Build: Arduino IDE, or `arduino-cli compile --fqbn arduino:avr:nano --library "$PWD" examples/core_usage/arduino/hello_controller`.
