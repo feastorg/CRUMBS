@@ -1,8 +1,9 @@
 # Protocol
 
 **CRUMBS protocol 1.0.** The frame below has been the wire format since library
-0.7; SET_REPLY (opcode `0xFE`) was added in 0.10.0. Nothing on the wire changes
-without a new protocol major version. This document is normative; the library
+0.7; SET_REPLY (opcode `0xFE`) was added in 0.10.0, and receivers have rejected
+over-long buffers since 0.12.4. Nothing on the wire changes without a new
+protocol major version. This document is normative; the library
 version (`CRUMBS_VERSION`) is a separate number and moves independently.
 
 CRUMBS is a message layer over plain I²C. The I²C address selects the device;
@@ -81,9 +82,10 @@ The only opcode the protocol reserves. The library intercepts it before any
 user code runs: it is never delivered to `on_message` or to a handler, and a
 handler registered for `0xFE` is never called.
 
-- The library sends it with `type_id 0x00` and a one-byte payload. A receiver
-  accepts any `data_len ≥ 1` and uses `data[0]`; an empty payload leaves the
-  requested opcode unchanged.
+- The generated wrappers send it with `type_id 0x00` and a one-byte payload
+  (hand-written senders may use the target's type). A receiver accepts any
+  `data_len ≥ 1` and uses `data[0]`; an empty payload leaves the requested
+  opcode unchanged.
 - The initial requested opcode after initialisation is `0x00`.
 - A SET_REPLY frame is subject to the type check below like any other frame.
 
@@ -93,22 +95,34 @@ A controller reads 31 bytes and trims to the length the reply's own header
 declares; on both Arduino and Linux a peripheral that has finished its frame
 leaves the remaining bytes reading as `0xFF`, and a decoder that receives the
 untrimmed buffer rejects it as over-long. A peripheral with neither a reply
-handler for the requested opcode nor an `on_request` callback writes nothing,
-and the read fails to decode; a handler that returns without filling the reply
-sends the empty frame `00 00 00 00`.
+handler for the requested opcode nor an `on_request` callback gives the HAL
+nothing to write (the AVR `Wire` core then clocks out a single `0x00`), and
+the read fails to decode either way; a handler that returns without filling
+the reply sends the empty frame `00 00 00 00`.
 
 ### When the reply is built
 
 The peripheral builds its reply inside the I²C request callback — after the
 controller has addressed it for reading and before the first byte is clocked
 out. On AVR that callback runs in the TWI interrupt with SCL held low by the
-hardware (clock stretching), so the controller's read simply waits for the
-reply to be encoded. Incoming frames are likewise processed in the receive
-interrupt. `CRUMBS_DEFAULT_QUERY_DELAY_US` (10 ms), the pause the generated
-getters insert between the SET_REPLY write and the read, gives that receive
-processing time to finish before the read starts; it is not there for the reply
-build, which clock stretching covers. The controller's I²C master must therefore
-support clock stretching.
+hardware (clock stretching), so the controller's read waits for the reply to
+be encoded. Incoming frames are processed in the receive interrupt the same
+way, and a read that arrives while that is still running is address-ACKed by
+the hardware and stretched until the interrupt returns. The controller must
+therefore tolerate clock stretching. `CRUMBS_DEFAULT_QUERY_DELAY_US` (10 ms),
+the pause the generated getters insert between the SET_REPLY write and the
+read, is margin on top of that, chosen conservatively; the header says to
+reduce it only with an oscilloscope on the bus.
+
+Two limits apply. The Raspberry Pi's Broadcom I²C controller does not honour
+clock stretching: when a peripheral's interrupt is late it reads `0xFF` bytes
+instead of waiting, which fails the CRC — measured as a few percent of first
+reads in [feastorg/Slice_DCMT#3](https://github.com/feastorg/Slice_DCMT/issues/3),
+unchanged by halving the bus clock or lengthening the pre-read delay. And
+SMBus, whose CRC this protocol shares, caps a target's cumulative stretching at
+25 ms per message (T_LOW:SEXT) and a controller's at 10 ms per byte
+(T_LOW:MEXT); a reply handler that finishes well inside 25 ms keeps CRUMBS
+usable on SMBus-timed controllers.
 
 ### Type check
 
@@ -128,14 +142,14 @@ expected type is `0x00`.
 ### I²C address
 
 CRUMBS uses 7-bit addressing. I²C reserves `0x00`–`0x07` and `0x78`–`0x7F`,
-leaving `0x08`–`0x77`, the range the example scanners sweep. Within it,
+leaving `0x08`–`0x77`. Within it,
 avoid addresses another standard on the same bus may drive, worst first:
 
 | Avoid          | Why                                                             |
 | -------------- | --------------------------------------------------------------- |
 | `0x0C`         | SMBus Alert Response Address: a host reads it expecting every alerting device to answer |
 | `0x08`–`0x0B`  | SMBus Host, Smart Battery Charger, Selector and Battery (SMBus 3.3.1, Table 17) |
-| `0x48`–`0x4B`  | SMBus prototype addresses, "never to be assigned to any device" (SMBus §6.2.2.3); LM75-class temperature sensors occupy `0x48`–`0x4F` |
+| `0x48`–`0x4B`  | SMBus prototype addresses, "not intended for production parts and should never be assigned to any device" (SMBus §6.2.2.3); LM75-class temperature sensors occupy `0x48`–`0x4F` |
 | `0x50`–`0x57`  | 24Cxx EEPROMs and DIMM SPD, the most contested block on a real bus |
 | `0x61`         | SMBus Device Default Address (ARP); the Atlas Scientific EZO-DO also ships here |
 
@@ -174,15 +188,16 @@ A peripheral should answer opcode `0x00` with five bytes:
 
 `crumbs_build_version_reply(reply, type_id, major, minor, patch)` produces
 exactly this frame. A controller that reads it can tell the device's type,
-its firmware version and which CRUMBS release it runs. It is also what a
-freshly initialised peripheral answers to a bare read, since the requested
-opcode starts at `0x00`; `crumbs_controller_scan_for_crumbs_with_types()`
-reports the `type_id` of whatever frame each device returns.
+its firmware version and which CRUMBS release it runs; a peripheral that
+implements it answers a bare read with it, since the requested opcode starts
+at `0x00`. For compatibility, treat the module version as semantic: a major
+mismatch is incompatible, and a peripheral's minor must be at least the
+controller's. `crumbs_controller_scan_for_crumbs_with_types()` reports the
+`type_id` of whatever frame each device returns.
 
 `CRUMBS_VERSION` is `major × 10000 + minor × 100 + patch` (`0.12.5` → `1205`).
-For a family's own module version, semantic versioning is the recommendation:
-bump major for an incompatible opcode or payload change, minor for additions,
-patch for fixes.
+For the module version, bump major for an incompatible opcode or payload
+change, minor for additions, patch for fixes.
 
 ## Discovery
 

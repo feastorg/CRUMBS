@@ -27,7 +27,7 @@ crumbs_message_t msg;
 crumbs_msg_init(&msg, 0x01, 0x01);  // type_id=1, opcode=1
 crumbs_msg_add_u8(&msg, 1);         // payload: LED ON
 
-crumbs_controller_send(&ctx, 0x08, &msg, crumbs_arduino_wire_write, NULL);
+crumbs_controller_send(&ctx, 0x10, &msg, crumbs_arduino_wire_write, NULL);
 ```
 
 ```c
@@ -57,7 +57,7 @@ void on_message(crumbs_context_t *ctx, const crumbs_message_t *msg) {
 }
 
 void setup() {
-    crumbs_arduino_init_peripheral(&ctx, 0x08);
+    crumbs_arduino_init_peripheral(&ctx, 0x10);
     crumbs_set_callbacks(&ctx, on_message, NULL, NULL);
     crumbs_register_reply_handler(&ctx, 0x00, reply_version,   NULL);
     crumbs_register_reply_handler(&ctx, 0x80, reply_get_state, NULL);
@@ -67,7 +67,7 @@ void setup() {
 ## Features
 
 - **Variable-length payload** (0–27 bytes, 4–31 total frame)
-- **Controller/peripheral** (one controller, up to 112 devices)
+- **Controller/peripheral** (one controller, any number of peripherals)
 - **Handler dispatch** (per-opcode SET handlers via `crumbs_register_handler`)
 - **Reply handler dispatch** (per-opcode GET handlers via `crumbs_register_reply_handler`)
 - **Message helpers** (type-safe: u8, u16, u32, i32, float)
