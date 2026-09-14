@@ -40,11 +40,13 @@
 #include "crumbs.h"
 #include "crumbs_message_helpers.h"
 
+/** @brief True if @p dev is bound to a context and has a write callback. */
 static inline int crumbs_ops_can_send(const crumbs_device_t *dev)
 {
     return dev && dev->ctx && dev->write_fn;
 }
 
+/** @brief True if @p dev can send and also has read and delay callbacks. */
 static inline int crumbs_ops_can_get(const crumbs_device_t *dev)
 {
     return crumbs_ops_can_send(dev) && dev->read_fn && dev->delay_fn;
@@ -53,7 +55,7 @@ static inline int crumbs_ops_can_get(const crumbs_device_t *dev)
 /**
  * @brief Define `family_query_name(dev)` and `family_get_name(dev, out)` for one GET opcode.
  *
- * `family_query_name()` sends the SET_REPLY probe and is @internal.
+ * `family_query_name()` sends the SET_REPLY probe and is internal.
  * `family_get_name()` queries, waits `CRUMBS_DEFAULT_QUERY_DELAY_US`, reads the
  * reply with crumbs_controller_read_expect() and parses it. It returns -1 for
  * a NULL `out` or an unbound device, the send/read code on transport failure,
