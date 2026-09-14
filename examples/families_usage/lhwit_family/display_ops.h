@@ -57,7 +57,7 @@ extern "C"
  *   number=1234, decimal_pos=0 -> "1234" (no decimal)
  *   number=1234, decimal_pos=3 -> "123.4" (decimal on digit 3)
  *   number=1234, decimal_pos=2 -> "12.34" (decimal on digit 2)
- *   number=42, decimal_pos=0   -> "  42" (right-aligned, leading spaces)
+ *   number=42, decimal_pos=0   -> "0042" (the library shows leading zeros)
  */
 #define DISPLAY_OP_SET_NUMBER 0x01
 

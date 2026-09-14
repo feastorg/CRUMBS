@@ -4,7 +4,9 @@ A family is one header that gives a device class its `type_id`, its opcodes
 and the layout of every payload, plus the controller-side functions that speak
 it. Peripheral firmware and controller programs both include it, so the two
 sides cannot disagree about the vocabulary. This walks through a two-channel
-thermometer, `therm`; every snippet below compiles as shown.
+thermometer, `therm`; every snippet below compiles as shown (the peripheral
+needs the library release that ships `crumbs_set_type_id()` and
+`crumbs_controller_read_expect()`, i.e. newer than 0.12.5).
 `examples/families_usage/lhwit_family/` is a complete four-device family;
 it predates `crumbs_ops.h` and writes its wrappers by hand, in the shape of
 [section 5](#5-when-the-macros-do-not-fit).
@@ -89,7 +91,8 @@ CRUMBS_DEFINE_GET_OP(therm, sample_rate, THERM_TYPE_ID, THERM_OP_GET_SAMPLE_RATE
 
 The parse function's signature is fixed: `int (const uint8_t *data, size_t
 len, result_t *out)`, returning 0 on success. A `_get_` wrapper returns `-1`
-for an unbound device, the send or read code on transport failure,
+for an unbound device or a `NULL` result pointer, the send or read code on
+transport failure,
 `CRUMBS_RX_REPLY_MISMATCH` (`-7`) if the reply's type or opcode is not the one
 asked for, and otherwise whatever the parser returned. `SEND_OP` takes exactly
 one parameter; an operation with two or more is written by hand (below).
@@ -169,19 +172,26 @@ Bind a `crumbs_device_t` once per peripheral, then call the wrappers.
 Linux:
 
 ```c
+#include <stdio.h>
+#include <stdlib.h>
 #include "crumbs_linux.h"
 #include "therm_ops.h"
 
-crumbs_context_t ctx;
-crumbs_linux_i2c_t bus;
-crumbs_linux_init_controller(&ctx, &bus, "/dev/i2c-1", 0);
+int main(void)
+{
+    crumbs_context_t ctx;
+    crumbs_linux_i2c_t bus;
+    if (crumbs_linux_init_controller(&ctx, &bus, "/dev/i2c-1", 0) != 0) return 1;
 
-crumbs_device_t dev = { &ctx, 0x11, crumbs_linux_i2c_write, crumbs_linux_read,
-                        crumbs_linux_delay_us, &bus };
+    crumbs_device_t dev = { &ctx, 0x11, crumbs_linux_i2c_write, crumbs_linux_read,
+                            crumbs_linux_delay_us, &bus };
 
-therm_temp_t t;
-if (therm_get_temp(&dev, &t) == 0)
-    printf("%d.%02d C\n", t.ch0 / 100, abs(t.ch0 % 100));
+    therm_temp_t t;
+    if (therm_get_temp(&dev, &t) == 0)
+        printf("%d.%02d C\n", t.ch0 / 100, abs(t.ch0 % 100));
+    crumbs_linux_close(&bus);
+    return 0;
+}
 ```
 
 Arduino:
@@ -190,11 +200,17 @@ Arduino:
 #include "crumbs_arduino.h"
 #include "therm_ops.h"
 
-crumbs_context_t ctx;
-crumbs_arduino_init_controller(&ctx);
-crumbs_device_t dev = { &ctx, 0x11, crumbs_arduino_wire_write, crumbs_arduino_read,
-                        crumbs_arduino_delay_us, NULL };
-therm_send_sample_rate(&dev, 4);
+static crumbs_context_t ctx;
+static crumbs_device_t dev = { &ctx, 0x11, crumbs_arduino_wire_write, crumbs_arduino_read,
+                               crumbs_arduino_delay_us, NULL };
+
+void setup(void)
+{
+    crumbs_arduino_init_controller(&ctx);
+    therm_send_sample_rate(&dev, 4);
+}
+
+void loop(void) {}
 ```
 
 The field order is `ctx, addr, write_fn, read_fn, delay_fn, io`; the last is
@@ -207,6 +223,8 @@ Write the wrapper by hand in the same shape the macro would have produced.
 A two-parameter SET:
 
 ```c
+#include "therm_ops.h"
+
 static inline int therm_send_alarm(const crumbs_device_t *dev, uint8_t ch, int16_t limit)
 {
     crumbs_message_t m;
@@ -218,12 +236,12 @@ static inline int therm_send_alarm(const crumbs_device_t *dev, uint8_t ch, int16
 }
 ```
 
-A parameterised GET puts its argument in the SET_REPLY payload after the
-opcode byte — the peripheral reads `data[0]` as the opcode and can read
-`data[1..]` itself in `on_message` before the reply is requested — then reads
-with `crumbs_controller_read_expect()` exactly as the macro does. The LHWIT
-calculator's history uses one opcode per slot instead, which needs no
-parameter at all.
+A GET with a parameter cannot smuggle it in the SET_REPLY frame: the
+library intercepts `0xFE` and stores only `data[0]`, and neither `on_message`
+nor any handler sees that frame. Send the parameter first as an ordinary SET
+that the peripheral stores, then SET_REPLY and read with
+`crumbs_controller_read_expect()` as the macro does; or give each value its
+own GET opcode, as the LHWIT calculator's twelve history slots do.
 
 ## Checklist
 

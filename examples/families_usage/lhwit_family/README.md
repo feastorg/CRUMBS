@@ -33,11 +33,13 @@ Each device is a PlatformIO project with envs `nanoatmega328new` (default),
 pio run -d examples/families_usage/lhwit_family/led -e nanoatmega328new -t upload
 ```
 
-The projects pin the published library (`lib_deps = cameronbrooks11/CRUMBS`),
+The projects depend on the published library (`lib_deps =
+cameronbrooks11/CRUMBS@^0.12.5`),
 set `-DCRUMBS_MAX_HANDLERS=8` (6 for the display) and add `-I ..` so the ops
-headers resolve. Each peripheral prints a banner and `Ready` on its serial
-port at 115200 baud and is otherwise silent, except where a device README
-says so.
+headers resolve. Each peripheral prints a banner and a ready line on its
+serial port at 115200 baud; after that the LED array is silent, the
+calculator speaks only on divide-by-zero, and the servo and display echo
+every command.
 
 ## Controllers
 
@@ -57,7 +59,7 @@ with no scan and no version check. Their READMEs show each one's output.
 
 ### Shell
 
-Prompt `lhwit> `. `help`, `list`, `quit`. Every device command names its
+Prompt `lhwit> `. `help`, `list`, `quit` (or `exit`). Every device command names its
 target, by index among devices of that type or by address:
 
 ```text
@@ -96,11 +98,13 @@ lhwit> scan
 Scanning I2C bus for CRUMBS devices (0x08-0x77)...
 
 Found 4 device(s):
+--------------------------------------------
 [0x10] Calculator
        CRUMBS: v0.12.5 (controller: v0.12.5)
        Module: v1.0.0 (expected: v1.0.x)
        OK Compatible
 ...
+--------------------------------------------
 Usable: 4/4 devices
 
 lhwit> calculator 0 add 40 2
@@ -115,9 +119,10 @@ lhwit> display 0 set_number 1234 2
 OK: Display showing 1234 (decimal pos 2)
 ```
 
-(`controller_discovery` output; `controller_manual` appends `to 0x10` /
-`at 0x20` to its confirmations. The `...` elides the other three devices'
-identical blocks.)
+(`controller_discovery` output; the `...` elides the other three devices'
+identical blocks. `controller_manual` adds `to 0x10` / `at 0x20` to the
+calculator, LED and servo confirmations and query lines; its display lines
+and `Result:` / `History:` are the same as above.)
 
 ## Adopting the family
 

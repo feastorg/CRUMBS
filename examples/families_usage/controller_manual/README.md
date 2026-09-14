@@ -22,7 +22,9 @@ see devices)`.
 
 ## Output
 
-Confirmations name the target, unlike the discovery controller's:
+Calculator, LED and servo confirmations and query lines name the target,
+unlike the discovery controller's; display lines, `Result:` and `History:`
+are identical in both:
 
 ```text
 lhwit> calculator 0 add 42 8
@@ -33,9 +35,6 @@ lhwit> servo 0 set_pos 0 90
 OK: Servo 0 at 0x30 position set to 90deg
 ```
 
-Queries print the same lines as the discovery controller with `at 0x..`
-added, e.g. `LED state at 0x20: 0x0F (1111)`.
-
-Binding a device is three lines (`main.c`): a `crumbs_device_t` with the
-context, the address and the Linux HAL's write, read and delay functions.
-That is the whole integration surface for a family.
+Binding a device is one `crumbs_device_t` per entry (`main.c`): the
+context, the address, the Linux HAL's write, read and delay functions, and
+the bus handle. That is the whole integration surface for a family.

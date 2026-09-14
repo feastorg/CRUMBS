@@ -24,10 +24,12 @@ least the header's:
 Scanning I2C bus for CRUMBS devices (0x08-0x77)...
 
 Found 1 device(s):
+--------------------------------------------
 [0x20] LED
        CRUMBS: v0.12.5 (controller: v0.12.5)
        Module: v1.0.0 (expected: v1.0.x)
        OK Compatible
+--------------------------------------------
 Usable: 1/1 devices
 ```
 

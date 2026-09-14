@@ -29,8 +29,9 @@ The display is refreshed every 2 ms with 500 µs per digit.
 | `0x00` | version | reply 5 bytes | |
 | `0x80` | `DISPLAY_OP_GET_VALUE` | reply `[number:u16][decimal_pos:u8][brightness:u8]` | |
 
-Numbers render with leading zeros (`42` shows `0042`); values above 9999 lose
-their upper digits. Digit `0` in segment form is `0xFC`.
+Numbers render with leading zeros (`42` shows `0042`); keep them at 9999 or
+below — the library has no handling for more digits. Digit `0` in segment
+form is `0xFC`.
 
 Wrappers: `display_send_set_number(dev, number, decimal_pos)`,
 `display_send_set_segments(dev, segments[4])`,
