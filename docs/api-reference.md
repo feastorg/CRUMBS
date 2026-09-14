@@ -150,7 +150,7 @@ Install callbacks for message handling.
 void crumbs_set_type_id(crumbs_context_t *ctx, uint8_t type_id);
 ```
 
-Declare the peripheral's device type. Afterwards `crumbs_peripheral_handle_receive()` drops frames whose `type_id` is neither this value nor `CRUMBS_TYPE_ID_ANY` (`0x00`), returning `CRUMBS_RX_TYPE_MISMATCH` before any callback or handler runs. Default is `0` (not declared: every frame is dispatched); passing `0` restores that.
+Declare the peripheral's device type. Afterwards `crumbs_peripheral_handle_receive()` drops frames whose `type_id` is neither this value nor `CRUMBS_TYPE_ID_ANY` (`0x00`), returning `CRUMBS_RX_TYPE_MISMATCH` (`-8`) before any callback or handler runs. Default is `0` (not declared: every frame is dispatched); passing `0` restores that.
 
 **Callback Execution Order:**
 
@@ -251,7 +251,7 @@ int crumbs_controller_read_expect(crumbs_context_t *ctx,
 
 `crumbs_controller_read()` followed by an identity check: the reply's `opcode` must equal `expect_opcode`, and its `type_id` must equal `expect_type_id` unless that is `CRUMBS_TYPE_ID_ANY`. A reply with a valid CRC can still be the wrong frame — another opcode's staged reply, or another device type answering at a duplicated address — and the CRC cannot tell; this does. `out_msg` is filled on success and on mismatch.
 
-**Returns:** `0`=match; `crumbs_controller_read()`'s codes on read/decode failure; `CRUMBS_RX_REPLY_MISMATCH` (`-7`)=well-formed reply, wrong identity. `-7` is reserved for this: no HAL or helper returns it, so it survives pass-through.
+**Returns:** `0`=match; `crumbs_controller_read()`'s codes on read/decode failure; `CRUMBS_RX_REPLY_MISMATCH` (`-7`)=well-formed reply, wrong identity. Protocol-level `CRUMBS_RX_*` codes start at `-7`, disjoint from transport-level codes (`-1`..`-6`), so the value survives pass-through.
 
 `CRUMBS_DEFINE_GET_OP` getters use this, so a hand-written getter should too rather than comparing the fields itself.
 
@@ -267,7 +267,7 @@ int crumbs_peripheral_handle_receive(crumbs_context_t *ctx,
 
 Process incoming data on a peripheral device. Decodes the message, validates CRC, and invokes callbacks/handlers.
 
-**Returns:** `0`=success, `-1`=invalid/decode fail, `-2`=CRC error (check wiring, use `crumbs_get_crc_error_count()`), `CRUMBS_RX_TYPE_MISMATCH` (`-3`)=valid frame for another declared type (see `crumbs_set_type_id()`; not counted as a CRC error)
+**Returns:** `0`=success, `-1`=invalid/decode fail, `-2`=CRC error (check wiring, use `crumbs_get_crc_error_count()`), `CRUMBS_RX_TYPE_MISMATCH` (`-8`)=valid frame for another declared type (see `crumbs_set_type_id()`; not counted as a CRC error)
 
 Called from Wire `onReceive()` on Arduino.
 
@@ -638,7 +638,7 @@ CRUMBS_DEFINE_GET_OP(family, name, type_id, opcode, result_t, parse_fn)
 Generates:
 
 - `static inline int family_query_name(const crumbs_device_t *dev)` — internal, sends the SET_REPLY frame only
-- `static inline int family_get_name(const crumbs_device_t *dev, result_t *out)` — public: query → `delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US)` → `crumbs_controller_read_expect(type_id, opcode)` → `parse_fn`. Returns `CRUMBS_RX_REPLY_MISMATCH` (`-7`) if the reply is well-formed but not the requested `(type_id, opcode)`; other non-zero codes pass through from the query's `crumbs_controller_send` (i.e. from `write_fn`), the read, and the parser. `-7` is used by nothing else in the library or the HALs, so it is unambiguous even through a getter
+- `static inline int family_get_name(const crumbs_device_t *dev, result_t *out)` — public: query → `delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US)` → `crumbs_controller_read_expect(type_id, opcode)` → `parse_fn`. Returns `CRUMBS_RX_REPLY_MISMATCH` (`-7`) if the reply is well-formed but not the requested `(type_id, opcode)`; other non-zero codes pass through from the query's `crumbs_controller_send` (i.e. from `write_fn`), the read, and the parser. protocol-level `CRUMBS_RX_*` codes occupy `-7` and below, disjoint from every transport and helper code, so they are unambiguous even through a getter
 
 Use for standard 1:1 opcode→result GETs. Multi-opcode GETs must still be written by hand.
 
@@ -958,7 +958,7 @@ All CRUMBS functions use consistent conventions:
 | `crumbs_encode_message()`            | `>0` (frame length) | `0` (buffer too small)                                    |
 | `crumbs_decode_message()`            | `0`                 | `-1` (frame error), `-2` (CRC mismatch)                   |
 | `crumbs_controller_send()`           | `0`                 | `-1` (args), `-2` (role), `-3` (encode), `>0` (I2C error) |
-| `crumbs_peripheral_handle_receive()` | `0`                 | `-1` (args/decode), `-2` (CRC), `-3` (type mismatch)      |
+| `crumbs_peripheral_handle_receive()` | `0`                 | `-1` (args/decode), `-2` (CRC), `-8` (type mismatch)      |
 | `crumbs_peripheral_build_reply()`    | `0`                 | `-1` (args/role), `-2` (encode)                           |
 | `crumbs_controller_read()`           | `0`                 | `-1` (args/short read), decode error codes                |
 | `crumbs_controller_read_expect()`    | `0`                 | as `crumbs_controller_read()`, plus `-7` (reply identity mismatch) |

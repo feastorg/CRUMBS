@@ -97,13 +97,13 @@ extern "C"
  */
 #define CRUMBS_TYPE_ID_ANY 0x00
 
-/**
- * @brief crumbs_peripheral_handle_receive() result: valid frame, wrong type.
- *
- * The frame decoded correctly but its type_id is neither the peripheral's
- * declared type_id nor CRUMBS_TYPE_ID_ANY. Nothing was dispatched.
+/*
+ * Protocol-level result codes (CRUMBS_RX_*) start at -7, deliberately above
+ * every transport- and helper-level code (-1..-6: decode, HAL I/O, and the
+ * CRUMBS_I2C_DEV_E_* helpers). Getters pass transport codes through, so the
+ * ranges must stay disjoint for a caller to tell the two apart. Add new
+ * CRUMBS_RX_* codes downward from -9.
  */
-#define CRUMBS_RX_TYPE_MISMATCH (-3)
 
 /**
  * @brief crumbs_controller_read_expect() result: valid reply, wrong identity.
@@ -112,6 +112,14 @@ extern "C"
  * controller asked for. out_msg holds what was received.
  */
 #define CRUMBS_RX_REPLY_MISMATCH (-7)
+
+/**
+ * @brief crumbs_peripheral_handle_receive() result: valid frame, wrong type.
+ *
+ * The frame decoded correctly but its type_id is neither the peripheral's
+ * declared type_id nor CRUMBS_TYPE_ID_ANY. Nothing was dispatched.
+ */
+#define CRUMBS_RX_TYPE_MISMATCH (-8)
 
     /**
      * @brief Role of a CRUMBS endpoint on the I2C bus.
@@ -498,7 +506,8 @@ extern "C"
      * @param read_ctx       Opaque pointer passed to @p read_fn.
      * @return 0 on success; crumbs_controller_read()'s codes on read/decode
      *         failure; CRUMBS_RX_REPLY_MISMATCH (-7) on an identity mismatch.
- *         -7 is not used by any HAL or helper, so a getter's -7 is unambiguous.
+ *         CRUMBS_RX_* codes are disjoint from every HAL and helper code, so
+ *         the value survives pass-through from a getter.
      */
     int crumbs_controller_read_expect(crumbs_context_t *ctx,
                                       uint8_t target_addr,
@@ -729,7 +738,7 @@ extern "C"
      * @param buffer Raw bytes received.
      * @param len Number of bytes in @p buffer.
      * @return 0 on success; -1 on invalid arguments or a malformed frame;
-     *         -2 on CRC mismatch; CRUMBS_RX_TYPE_MISMATCH (-3) when the frame
+     *         -2 on CRC mismatch; CRUMBS_RX_TYPE_MISMATCH (-8) when the frame
      *         is valid but its type_id is neither the declared type nor
      *         CRUMBS_TYPE_ID_ANY (see crumbs_set_type_id()).
      */
