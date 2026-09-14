@@ -68,6 +68,7 @@ void crumbs_linux_close(crumbs_linux_i2c_t *i2c)
 
     lw_close_bus(&i2c->bus);
     memset(i2c, 0, sizeof(*i2c));
+    i2c->bus.fd = -1; /* a zeroed handle would look like an open bus on fd 0 (stdin) */
 }
 
 int crumbs_linux_i2c_write(void *user_ctx,
