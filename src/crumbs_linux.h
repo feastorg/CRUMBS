@@ -56,7 +56,9 @@ typedef struct crumbs_linux_i2c_s
     /**
      * @brief Close the underlying Linux I2C bus and clear the handle.
      *
-     * Safe to call multiple times.
+     * Safe to call multiple times on a handle that has been through
+     * crumbs_linux_init_controller(). A handle the caller zeroed and never
+     * opened has fd 0 (stdin), which this would close.
      *
      * @param i2c Linux I2C handle to close.
      */
