@@ -254,12 +254,45 @@ jobs:
       - name: Run doc-check script
         run: bash ./scripts/doccheck.sh
 
+  # ─── CRC source is generated; the committed copy must match the generator ──
+  crc-regen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Install pycrc (version pinned to the banner in src/crc)
+        run: python -m pip install pycrc==0.11.0
+
+      - name: Regenerate CRC-8 sources
+        run: python scripts/generate_crc8.py --no-stage
+
+      - name: Diff generated sources against src/crc (ignoring the timestamp line)
+        run: |
+          rc=0
+          for f in crc8_nibble.h crc8_nibble.c; do
+            if ! diff -u \
+                <(grep -v '^ \* Generated on ' "src/crc/$f") \
+                <(grep -v '^ \* Generated on ' "dist/crc/c99/$f"); then
+              echo "::error file=src/crc/$f::committed CRC source differs from generator output"
+              rc=1
+            fi
+          done
+          exit $rc
+
   # ─── Unified gate ─────────────────────────────────────────────────────────
   # Branch protection requires only: CI / ok
   ok:
     name: ok
     if: always()
-    needs: [core-only-install, build-and-test, platformio, doxygen]
+    needs: [core-only-install, build-and-test, platformio, doxygen, crc-regen]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

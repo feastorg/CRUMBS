@@ -114,6 +114,7 @@ ctest --test-dir build --output-on-failure
 
 - `test_encode_decode` — Frame encoding/decoding
 - `test_crc_failure` — CRC validation and error handling
+- `test_crc_kat` — CRC-8 known-answer vectors (pins the algorithm to CRC-8/SMBUS)
 - `test_handlers` — Handler registration and dispatch
 - `test_msg_helpers` — Message builder/reader helpers
 - `test_version` — Version macro validation

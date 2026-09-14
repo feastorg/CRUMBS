@@ -142,6 +142,10 @@ if(CRUMBS_ENABLE_TESTS)
     target_link_libraries(test_crc_failure PRIVATE crumbs)
     add_test(NAME crc_failure_test COMMAND test_crc_failure)
 
+    add_executable(test_crc_kat tests/test_crc_kat.c)
+    target_link_libraries(test_crc_kat PRIVATE crumbs)
+    add_test(NAME crc_kat_test COMMAND test_crc_kat)
+
     add_executable(test_handlers tests/test_handlers.c)
     target_link_libraries(test_handlers PRIVATE crumbs)
     add_test(NAME handlers_test COMMAND test_handlers)
