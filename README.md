@@ -67,7 +67,7 @@ at 115200 and press `s` and `r`.
 
 ## Install
 
-- **PlatformIO:** `lib_deps = cameronbrooks11/CRUMBS@^0.12.5`
+- **PlatformIO:** `lib_deps = cameronbrooks11/CRUMBS@^0.13.0`
 - **Arduino IDE:** clone into `~/Arduino/libraries/CRUMBS` (not in the
   Library Manager)
 - **Linux:** CMake, with [linux-wire](https://github.com/feastorg/linux-wire) ≥ 0.1.3
