@@ -42,7 +42,8 @@ arduino-cli compile --fqbn arduino:avr:nano --warnings more --library "$PWD" exa
 PlatformIO examples pin the published package (`lib_deps =
 cameronbrooks11/CRUMBS@^x.y.z`), so `pio run` in them builds the registry
 version, not your checkout. To build a PlatformIO project against the tree,
-set `lib_deps = symlink:///path/to/CRUMBS` in a scratch copy.
+set `lib_deps = symlink:///path/to/CRUMBS` in a scratch copy; CI does the
+same rewrite before its `platformio` job, so that job tests the tree.
 
 ## Documentation checks
 
@@ -98,7 +99,7 @@ changed, why, and how it was verified. Add a `[Unreleased]` entry to
 | --- | --- |
 | `core-only-install` | Core build, tests, install, and a `find_package(crumbs)` consumer without the HAL; `crumbs_linux.h` must not leak into that install |
 | `build-and-test` | Linux HAL build and tests against the pinned, checksum-verified linux-wire release; install; the four out-of-tree example builds and the five in-tree ones (which must pull in the library only); a smoke run of `crumbs_simple_linux_controller` |
-| `platformio` | The eight PlatformIO projects for `nanoatmega328new` and `esp32dev` — against the registry package |
+| `platformio` | The eight PlatformIO projects for `nanoatmega328new` and `esp32dev`, their `lib_deps` rewritten to this checkout |
 | `arduino-cli` | The two mixed-bus Arduino sketches with ezo-driver and SparkFun BME280 pinned by tag and SHA |
 | `build-configs` | Core and Arduino-HAL host tests under ASan+UBSan and with `CRUMBS_MAX_HANDLERS=0`, the flags given to both languages |
 | `doxygen` | `doccheck.sh` and `check_api_index.py` (pinned to `ubuntu-24.04` for a fixed Doxygen) |
