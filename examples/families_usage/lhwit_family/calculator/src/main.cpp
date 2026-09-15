@@ -40,18 +40,6 @@
 #define HISTORY_SIZE CALC_HISTORY_SIZE
 
 /* ============================================================================
- * History Entry Structure
- * ============================================================================ */
-
-/**
- * @brief History entry: 16 bytes
- * - op: Operation name (4 bytes, null-terminated)
- * - a: First operand (4 bytes, little-endian)
- * - b: Second operand (4 bytes, little-endian)
- * - result: Result (4 bytes, little-endian)
- */
-
-/* ============================================================================
  * State
  * ============================================================================ */
 

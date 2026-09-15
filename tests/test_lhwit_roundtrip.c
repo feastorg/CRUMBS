@@ -100,6 +100,8 @@ static int test_led(void)
     TEST_ASSERT_EQ(t, led_send_blink(&g_dev, &blink), 0, "send blink");
     SENT(t, LED_TYPE_ID, LED_OP_BLINK);
     TEST_ASSERT_EQ(t, g_bus.last_write.data_len, 4, "blink is 4 bytes on the wire");
+    TEST_ASSERT(t, memcmp(g_bus.last_write.data, "\x02\x01\xEE\x02", 4) == 0,
+                "blink bytes: [led_idx][enable][period_ms LE], as the layout comment and old firmware say");
     TEST_ASSERT_EQ(t, led_blink_unpack(g_bus.last_write.data, g_bus.last_write.data_len, &blink_rx), 0, "unpack blink");
     TEST_ASSERT(t, blink_rx.led_idx == 2 && blink_rx.enable == 1 && blink_rx.period_ms == 750, "blink fields");
 
@@ -114,6 +116,8 @@ static int test_led(void)
     crumbs_msg_init(&reply, LED_TYPE_ID, LED_OP_GET_BLINK);
     TEST_ASSERT_EQ(t, led_blink_result_pack(&reply, &bl), 0, "pack blink result");
     TEST_ASSERT_EQ(t, reply.data_len, 12, "blink result is 12 bytes");
+    TEST_ASSERT(t, memcmp(reply.data, "\x01\x64\x00\x00\xC8\x00\x01\x2C\x01\x00\xFF\xFF", 12) == 0,
+                "blink result bytes: [enable][period LE] x 4");
     serve(&g_bus, &reply);
     TEST_ASSERT_EQ(t, led_get_blink(&g_dev, &bl_rx), 0, "get blink");
     for (i = 0; i < 4; i++)
@@ -238,6 +242,7 @@ static int test_display(void)
     TEST_ASSERT_EQ(t, display_send_set_number(&g_dev, &num), 0, "send set_number");
     SENT(t, DISPLAY_TYPE_ID, DISPLAY_OP_SET_NUMBER);
     TEST_ASSERT_EQ(t, g_bus.last_write.data_len, 3, "set_number is 3 bytes on the wire");
+    TEST_ASSERT(t, memcmp(g_bus.last_write.data, "\x0F\x27\x02", 3) == 0, "set_number bytes: [number LE][decimal_pos]");
     TEST_ASSERT_EQ(t, display_set_number_unpack(g_bus.last_write.data, g_bus.last_write.data_len, &num_rx), 0, "unpack");
     TEST_ASSERT(t, num_rx.number == 9999 && num_rx.decimal_pos == 2, "set_number fields");
 

@@ -28,7 +28,8 @@ extern "C" {
     X(THERM_OP_SET_ALARM, 0x02)       /* [ch:u8][limit:i16] */                \
     X(THERM_OP_RESET, 0x03)           /* no payload */                        \
     X(THERM_OP_GET_TEMP, 0x80)        /* reply [ch0:i16][ch1:i16] */          \
-    X(THERM_OP_GET_SAMPLE_RATE, 0x81) /* reply [rate:u8] */
+    X(THERM_OP_GET_SAMPLE_RATE, 0x81) /* reply [rate:u8] */                   \
+    X(THERM_OP_GET_NAMED, 0x82)       /* reply [name:8 bytes][value:i16], section 5 */
 CRUMBS_DEFINE_FAMILY(THERM, 0x07, THERM_OPS)
 
 #define THERM_VERSION_MAJOR 1
@@ -268,8 +269,11 @@ static inline int therm_named_unpack(const uint8_t *data, size_t len, therm_name
 }
 
 /* therm_get_named(dev, &out), exactly as for a generated payload */
-CRUMBS_DEFINE_GET_OP(therm, named, THERM_TYPE_ID, 0x82, therm_named_t, therm_named_unpack)
+CRUMBS_DEFINE_GET_OP(therm, named, THERM_TYPE_ID, THERM_OP_GET_NAMED, therm_named_t, therm_named_unpack)
 ```
+
+The peripheral's reply handler for `THERM_OP_GET_NAMED` calls
+`therm_named_pack()` the way `reply_temp` calls `therm_temp_pack()`.
 
 The LHWIT LED family's blink table (four `enable`/`period` pairs) and the
 calculator's history entry (a 4-byte operation name) are written this way.
