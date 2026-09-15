@@ -37,26 +37,7 @@
  * ============================================================================ */
 
 #define PERIPHERAL_ADDR 0x10
-#define HISTORY_SIZE 12
-
-/* ============================================================================
- * History Entry Structure
- * ============================================================================ */
-
-/**
- * @brief History entry: 16 bytes
- * - op: Operation name (4 bytes, null-terminated)
- * - a: First operand (4 bytes, little-endian)
- * - b: Second operand (4 bytes, little-endian)
- * - result: Result (4 bytes, little-endian)
- */
-typedef struct
-{
-    char op[4];      /* "ADD\0", "SUB\0", "MUL\0", "DIV\0" */
-    uint32_t a;      /* First operand */
-    uint32_t b;      /* Second operand */
-    uint32_t result; /* Result of operation */
-} calc_history_entry_t;
+#define HISTORY_SIZE CALC_HISTORY_SIZE
 
 /* ============================================================================
  * State
@@ -64,7 +45,7 @@ typedef struct
 
 static crumbs_context_t ctx;
 static uint32_t g_last_result = 0;                   /* Last calculation result */
-static calc_history_entry_t g_history[HISTORY_SIZE]; /* Circular history buffer */
+static calc_hist_entry_t g_history[HISTORY_SIZE]; /* Circular history buffer */
 static uint8_t g_history_count = 0;                  /* Valid entries (0-12) */
 static uint8_t g_history_write_pos = 0;              /* Next write slot (0-11) */
 
@@ -82,11 +63,11 @@ static uint8_t g_history_write_pos = 0;              /* Next write slot (0-11) *
  */
 static void append_to_history(const char *op, uint32_t a, uint32_t b, uint32_t result)
 {
-    calc_history_entry_t *entry = &g_history[g_history_write_pos];
+    calc_hist_entry_t *entry = &g_history[g_history_write_pos];
 
     /* Copy operation name (ensure null-termination) */
     strncpy(entry->op, op, 4);
-    entry->op[3] = '\0';
+    entry->op[4] = '\0';
 
     /* Store operands and result */
     entry->a = a;
@@ -115,14 +96,12 @@ static void handler_add(crumbs_context_t *ctx, uint8_t opcode,
     (void)opcode;
     (void)user_data;
 
-    uint32_t a, b;
-
-    /* Extract operands */
-    if (crumbs_msg_read_u32(data, data_len, 0, &a) != 0 ||
-        crumbs_msg_read_u32(data, data_len, 4, &b) != 0)
+    calc_operands_t v;
+    if (calc_operands_unpack(data, data_len, &v) != 0)
     {
         return;
     }
+    uint32_t a = v.a, b = v.b;
 
     /* Perform addition */
     uint32_t result = a + b;
@@ -146,14 +125,12 @@ static void handler_sub(crumbs_context_t *ctx, uint8_t opcode,
     (void)opcode;
     (void)user_data;
 
-    uint32_t a, b;
-
-    /* Extract operands */
-    if (crumbs_msg_read_u32(data, data_len, 0, &a) != 0 ||
-        crumbs_msg_read_u32(data, data_len, 4, &b) != 0)
+    calc_operands_t v;
+    if (calc_operands_unpack(data, data_len, &v) != 0)
     {
         return;
     }
+    uint32_t a = v.a, b = v.b;
 
     /* Perform subtraction */
     uint32_t result = a - b;
@@ -177,14 +154,12 @@ static void handler_mul(crumbs_context_t *ctx, uint8_t opcode,
     (void)opcode;
     (void)user_data;
 
-    uint32_t a, b;
-
-    /* Extract operands */
-    if (crumbs_msg_read_u32(data, data_len, 0, &a) != 0 ||
-        crumbs_msg_read_u32(data, data_len, 4, &b) != 0)
+    calc_operands_t v;
+    if (calc_operands_unpack(data, data_len, &v) != 0)
     {
         return;
     }
+    uint32_t a = v.a, b = v.b;
 
     /* Perform multiplication */
     uint32_t result = a * b;
@@ -209,14 +184,12 @@ static void handler_div(crumbs_context_t *ctx, uint8_t opcode,
     (void)opcode;
     (void)user_data;
 
-    uint32_t a, b;
-
-    /* Extract operands */
-    if (crumbs_msg_read_u32(data, data_len, 0, &a) != 0 ||
-        crumbs_msg_read_u32(data, data_len, 4, &b) != 0)
+    calc_operands_t v;
+    if (calc_operands_unpack(data, data_len, &v) != 0)
     {
         return;
     }
+    uint32_t a = v.a, b = v.b;
 
     /* Perform division (handle division by zero) */
     uint32_t result;
@@ -252,16 +225,20 @@ static void reply_handler_version(crumbs_context_t *ctx, crumbs_message_t *reply
 static void reply_handler_get_result(crumbs_context_t *ctx, crumbs_message_t *reply, void *user)
 {
     (void)ctx; (void)user;
+    calc_result_t r;
+    r.result = g_last_result;
     crumbs_msg_init(reply, CALC_TYPE_ID, CALC_OP_GET_RESULT);
-    crumbs_msg_add_u32(reply, g_last_result);
+    calc_result_pack(reply, &r);
 }
 
 static void reply_handler_get_hist_meta(crumbs_context_t *ctx, crumbs_message_t *reply, void *user)
 {
     (void)ctx; (void)user;
+    calc_hist_meta_t r;
+    r.count = g_history_count;
+    r.write_pos = g_history_write_pos;
     crumbs_msg_init(reply, CALC_TYPE_ID, CALC_OP_GET_HIST_META);
-    crumbs_msg_add_u8(reply, g_history_count);
-    crumbs_msg_add_u8(reply, g_history_write_pos);
+    calc_hist_meta_pack(reply, &r);
 }
 
 /*
@@ -279,9 +256,7 @@ static void on_request_hist(crumbs_context_t *ctx, crumbs_message_t *reply)
 
     if (entry_idx < g_history_count)
     {
-        /* Copy 16-byte entry directly to reply data */
-        memcpy(reply->data, &g_history[entry_idx], 16);
-        reply->data_len = 16;
+        calc_hist_entry_pack(reply, &g_history[entry_idx]);
     }
     /* else data_len stays 0 - empty reply for non-existent entry */
 }

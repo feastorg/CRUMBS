@@ -207,6 +207,13 @@ if(CRUMBS_ENABLE_TESTS)
     target_link_libraries(test_padded_read PRIVATE crumbs)
     add_test(NAME padded_read_test COMMAND test_padded_read)
 
+    add_executable(test_lhwit_roundtrip tests/test_lhwit_roundtrip.c)
+    target_link_libraries(test_lhwit_roundtrip PRIVATE crumbs)
+    target_include_directories(test_lhwit_roundtrip PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/families_usage/lhwit_family
+    )
+    add_test(NAME lhwit_roundtrip_test COMMAND test_lhwit_roundtrip)
+
     add_executable(test_payload tests/test_payload.c)
     target_link_libraries(test_payload PRIVATE crumbs)
     add_test(NAME payload_test COMMAND test_payload)

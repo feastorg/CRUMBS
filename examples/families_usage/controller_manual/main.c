@@ -262,14 +262,15 @@ static int cmd_calculator(const crumbs_device_t *dev, const char *rest)
             return -1;
         }
 
+        calc_operands_t v = {a, b};
         if (strcmp(subcmd, "add") == 0)
-            rc = calc_send_add(dev, a, b);
+            rc = calc_send_add(dev, &v);
         else if (strcmp(subcmd, "sub") == 0)
-            rc = calc_send_sub(dev, a, b);
+            rc = calc_send_sub(dev, &v);
         else if (strcmp(subcmd, "mul") == 0)
-            rc = calc_send_mul(dev, a, b);
+            rc = calc_send_mul(dev, &v);
         else
-            rc = calc_send_div(dev, a, b);
+            rc = calc_send_div(dev, &v);
 
         if (rc != 0)
         {
@@ -345,7 +346,8 @@ static int cmd_led(const crumbs_device_t *dev, const char *rest)
             return -1;
         }
 
-        rc = led_send_set_all(dev, (uint8_t)mask);
+        led_set_all_t v = {(uint8_t)mask};
+        rc = led_send_set_all(dev, &v);
         if (rc == 0)
             printf("OK: LEDs at 0x%02X set to 0x%02X\n", dev->addr, (uint8_t)mask);
         return rc;
@@ -359,7 +361,8 @@ static int cmd_led(const crumbs_device_t *dev, const char *rest)
             return -1;
         }
 
-        rc = led_send_set_one(dev, (uint8_t)idx, (uint8_t)state);
+        led_set_one_t v = {(uint8_t)idx, (uint8_t)state};
+        rc = led_send_set_one(dev, &v);
         if (rc == 0)
             printf("OK: LED %u at 0x%02X set to %s\n", idx, dev->addr, state ? "ON" : "OFF");
         return rc;
@@ -374,7 +377,8 @@ static int cmd_led(const crumbs_device_t *dev, const char *rest)
             return -1;
         }
 
-        rc = led_send_blink(dev, (uint8_t)idx, (uint8_t)enable, period_ms);
+        led_blink_t v = {(uint8_t)idx, (uint8_t)enable, period_ms};
+        rc = led_send_blink(dev, &v);
         if (rc == 0)
             printf("OK: LED %u at 0x%02X blink %s\n", idx, dev->addr, enable ? "enabled" : "disabled");
         return rc;
@@ -439,7 +443,8 @@ static int cmd_servo(const crumbs_device_t *dev, const char *rest)
             return -1;
         }
 
-        rc = servo_send_set_pos(dev, (uint8_t)idx, (uint8_t)angle);
+        servo_set_pos_t v = {(uint8_t)idx, (uint8_t)angle};
+        rc = servo_send_set_pos(dev, &v);
         if (rc == 0)
             printf("OK: Servo %u at 0x%02X position set to %udeg\n", idx, dev->addr, angle);
         return rc;
@@ -453,7 +458,8 @@ static int cmd_servo(const crumbs_device_t *dev, const char *rest)
             return -1;
         }
 
-        rc = servo_send_set_speed(dev, (uint8_t)idx, (uint8_t)speed);
+        servo_set_speed_t v = {(uint8_t)idx, (uint8_t)speed};
+        rc = servo_send_set_speed(dev, &v);
         if (rc == 0)
             printf("OK: Servo %u at 0x%02X speed set to %u\n", idx, dev->addr, speed);
         return rc;
@@ -467,8 +473,8 @@ static int cmd_servo(const crumbs_device_t *dev, const char *rest)
             return -1;
         }
 
-        rc = servo_send_sweep(dev, (uint8_t)idx, (uint8_t)enable,
-                              (uint8_t)min_pos, (uint8_t)max_pos, (uint8_t)step);
+        servo_sweep_t v = {(uint8_t)idx, (uint8_t)enable, (uint8_t)min_pos, (uint8_t)max_pos, (uint8_t)step};
+        rc = servo_send_sweep(dev, &v);
         if (rc == 0)
             printf("OK: Servo %u at 0x%02X sweep %s\n", idx, dev->addr, enable ? "enabled" : "disabled");
         return rc;
@@ -480,7 +486,7 @@ static int cmd_servo(const crumbs_device_t *dev, const char *rest)
         if (rc != 0)
             return rc;
 
-        printf("Servo positions at 0x%02X: [0]=%udeg, [1]=%udeg\n", dev->addr, res.pos[0], res.pos[1]);
+        printf("Servo positions at 0x%02X: [0]=%udeg, [1]=%udeg\n", dev->addr, res.pos0, res.pos1);
         return 0;
     }
     else if (strcmp(subcmd, "get_speed") == 0)
@@ -490,7 +496,7 @@ static int cmd_servo(const crumbs_device_t *dev, const char *rest)
         if (rc != 0)
             return rc;
 
-        printf("Servo speeds at 0x%02X: [0]=%u, [1]=%u\n", dev->addr, res.speed[0], res.speed[1]);
+        printf("Servo speeds at 0x%02X: [0]=%u, [1]=%u\n", dev->addr, res.speed0, res.speed1);
         return 0;
     }
 
@@ -528,7 +534,8 @@ static int cmd_display(const crumbs_device_t *dev, const char *rest)
             return -1;
         }
 
-        rc = display_send_set_number(dev, (uint16_t)number, (uint8_t)decimal_pos);
+        display_set_number_t v = {(uint16_t)number, (uint8_t)decimal_pos};
+        rc = display_send_set_number(dev, &v);
         if (rc == 0)
             printf("OK: Display showing %u (decimal pos %u)\n", number, decimal_pos);
         return rc;
@@ -543,7 +550,8 @@ static int cmd_display(const crumbs_device_t *dev, const char *rest)
             return -1;
         }
 
-        rc = display_send_set_brightness(dev, (uint8_t)level);
+        display_set_brightness_t v = {(uint8_t)level};
+        rc = display_send_set_brightness(dev, &v);
         if (rc == 0)
             printf("OK: Brightness set to %u\n", level);
         return rc;

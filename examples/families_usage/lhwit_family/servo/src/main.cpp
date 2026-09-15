@@ -171,14 +171,15 @@ static void handler_set_pos(crumbs_context_t *ctx, uint8_t opcode,
     (void)opcode;
     (void)user_data;
 
-    if (data_len < 2)
+    servo_set_pos_t v;
+    if (servo_set_pos_unpack(data, data_len, &v) != 0)
     {
         Serial.println(F("SET_POS: Invalid payload"));
         return;
     }
 
-    uint8_t servo_idx = data[0];
-    uint8_t position = data[1];
+    uint8_t servo_idx = v.servo_idx;
+    uint8_t position = v.position;
 
     if (servo_idx >= NUM_SERVOS)
     {
@@ -222,14 +223,15 @@ static void handler_set_speed(crumbs_context_t *ctx, uint8_t opcode,
     (void)opcode;
     (void)user_data;
 
-    if (data_len < 2)
+    servo_set_speed_t v;
+    if (servo_set_speed_unpack(data, data_len, &v) != 0)
     {
         Serial.println(F("SET_SPEED: Invalid payload"));
         return;
     }
 
-    uint8_t servo_idx = data[0];
-    uint8_t speed = data[1];
+    uint8_t servo_idx = v.servo_idx;
+    uint8_t speed = v.speed;
 
     if (servo_idx >= NUM_SERVOS)
     {
@@ -266,17 +268,18 @@ static void handler_sweep(crumbs_context_t *ctx, uint8_t opcode,
     (void)opcode;
     (void)user_data;
 
-    if (data_len < 5)
+    servo_sweep_t v;
+    if (servo_sweep_unpack(data, data_len, &v) != 0)
     {
         Serial.println(F("SWEEP: Invalid payload"));
         return;
     }
 
-    uint8_t servo_idx = data[0];
-    uint8_t enable = data[1];
-    uint8_t min_pos = data[2];
-    uint8_t max_pos = data[3];
-    uint8_t step = data[4];
+    uint8_t servo_idx = v.servo_idx;
+    uint8_t enable = v.enable;
+    uint8_t min_pos = v.min_pos;
+    uint8_t max_pos = v.max_pos;
+    uint8_t step = v.step;
 
     if (servo_idx >= NUM_SERVOS)
     {
@@ -345,21 +348,21 @@ static void reply_handler_version(crumbs_context_t *ctx, crumbs_message_t *reply
 static void reply_handler_get_pos(crumbs_context_t *ctx, crumbs_message_t *reply, void *user)
 {
     (void)ctx; (void)user;
+    servo_pos_result_t r;
+    r.pos0 = g_positions[0];
+    r.pos1 = g_positions[1];
     crumbs_msg_init(reply, SERVO_TYPE_ID, SERVO_OP_GET_POS);
-    for (int i = 0; i < NUM_SERVOS; i++)
-    {
-        crumbs_msg_add_u8(reply, g_positions[i]);
-    }
+    servo_pos_result_pack(reply, &r);
 }
 
 static void reply_handler_get_speed(crumbs_context_t *ctx, crumbs_message_t *reply, void *user)
 {
     (void)ctx; (void)user;
+    servo_speed_result_t r;
+    r.speed0 = g_speeds[0];
+    r.speed1 = g_speeds[1];
     crumbs_msg_init(reply, SERVO_TYPE_ID, SERVO_OP_GET_SPEED);
-    for (int i = 0; i < NUM_SERVOS; i++)
-    {
-        crumbs_msg_add_u8(reply, g_speeds[i]);
-    }
+    servo_speed_result_pack(reply, &r);
 }
 
 /* ============================================================================

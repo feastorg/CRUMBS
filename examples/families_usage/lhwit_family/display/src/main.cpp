@@ -187,16 +187,14 @@ static void handler_set_number(crumbs_context_t *ctx, uint8_t opcode,
     (void)opcode;
     (void)user_data;
 
-    if (data_len < 3)
+    display_set_number_t v;
+    if (display_set_number_unpack(data, data_len, &v) != 0)
     {
         Serial.println(F("SET_NUMBER: Invalid payload"));
         return;
     }
 
-    uint16_t number = data[0] | ((uint16_t)data[1] << 8);
-    uint8_t decimal_pos = data[2];
-
-    set_display_number(number, decimal_pos);
+    set_display_number(v.number, v.decimal_pos);
 }
 
 /* ============================================================================
@@ -210,13 +208,15 @@ static void handler_set_segments(crumbs_context_t *ctx, uint8_t opcode,
     (void)opcode;
     (void)user_data;
 
-    if (data_len < 4)
+    display_set_segments_t v;
+    if (display_set_segments_unpack(data, data_len, &v) != 0)
     {
         Serial.println(F("SET_SEGMENTS: Invalid payload"));
         return;
     }
 
-    set_custom_segments(data);
+    const uint8_t segments[4] = {v.digit0, v.digit1, v.digit2, v.digit3};
+    set_custom_segments(segments);
 }
 
 /* ============================================================================
@@ -230,14 +230,14 @@ static void handler_set_brightness(crumbs_context_t *ctx, uint8_t opcode,
     (void)opcode;
     (void)user_data;
 
-    if (data_len < 1)
+    display_set_brightness_t v;
+    if (display_set_brightness_unpack(data, data_len, &v) != 0)
     {
         Serial.println(F("SET_BRIGHTNESS: Invalid payload"));
         return;
     }
 
-    uint8_t level = data[0];
-    set_brightness(level);
+    set_brightness(v.level);
 }
 
 /* ============================================================================
@@ -280,10 +280,12 @@ static void reply_handler_version(crumbs_context_t *ctx, crumbs_message_t *reply
 static void reply_handler_get_value(crumbs_context_t *ctx, crumbs_message_t *reply, void *user)
 {
     (void)ctx; (void)user;
+    display_value_result_t r;
+    r.number = g_current_number;
+    r.decimal_pos = g_decimal_pos;
+    r.brightness = g_brightness;
     crumbs_msg_init(reply, DISPLAY_TYPE_ID, DISPLAY_OP_GET_VALUE);
-    crumbs_msg_add_u16(reply, g_current_number);
-    crumbs_msg_add_u8(reply, g_decimal_pos);
-    crumbs_msg_add_u8(reply, g_brightness);
+    display_value_result_pack(reply, &r);
     Serial.print(F("GET_VALUE: number="));
     Serial.print(g_current_number);
     Serial.print(F(" decimal="));

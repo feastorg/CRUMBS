@@ -16,7 +16,7 @@ in [roadmap.md](roadmap.md).
 ```text
  application / family header      what a type_id, opcode and payload mean
  ─────────────────────────────────────────────────────────────────────────
- crumbs_ops.h                     generated send/query/get wrappers
+ crumbs_ops.h                     family identity, payload codecs, generated wrappers
  crumbs.h  crumbs_message_helpers.h   core: encode, decode, dispatch, scan
  ─────────────────────────────────────────────────────────────────────────
  crumbs_arduino.h  crumbs_linux.h HAL: put bytes on the bus, run callbacks

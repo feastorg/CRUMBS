@@ -218,6 +218,16 @@ jobs:
           python -m pip install -U pip
           python -m pip install -U platformio
 
+      # The projects pin the registry package so that a user's `pio run`
+      # builds a release; CI builds the tree, so point every lib_deps at it.
+      - name: Build against this checkout, not the registry
+        run: |
+          count=$(grep -l 'cameronbrooks11/CRUMBS@' examples/*/platformio/*/platformio.ini examples/families_usage/lhwit_family/*/platformio.ini | wc -l)
+          test "$count" -eq 8
+          sed -i "s|cameronbrooks11/CRUMBS@\^[0-9.]*|symlink://$GITHUB_WORKSPACE|" \
+            examples/*/platformio/*/platformio.ini examples/families_usage/lhwit_family/*/platformio.ini
+          grep -c "symlink://$GITHUB_WORKSPACE" examples/families_usage/lhwit_family/led/platformio.ini
+
       - name: Build simple_controller (core_usage)
         run: pio run -d examples/core_usage/platformio/simple_controller -e nanoatmega328new
 

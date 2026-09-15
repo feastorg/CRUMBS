@@ -107,15 +107,14 @@ static void handler_set_all(crumbs_context_t *ctx, uint8_t opcode,
     (void)opcode;
     (void)user_data;
 
-    if (data_len < 1)
+    led_set_all_t v;
+    if (led_set_all_unpack(data, data_len, &v) != 0)
     {
         return;
     }
 
-    uint8_t mask = data[0];
-
     /* Update state */
-    g_led_states = mask & 0x0F; /* Only lower 4 bits */
+    g_led_states = v.mask & 0x0F; /* Only lower 4 bits */
 
     /* Update hardware */
     update_all_leds();
@@ -135,31 +134,24 @@ static void handler_set_one(crumbs_context_t *ctx, uint8_t opcode,
     (void)opcode;
     (void)user_data;
 
-    if (data_len < 2)
-    {
-        return;
-    }
-
-    uint8_t led_idx = data[0];
-    uint8_t state = data[1];
-
-    if (led_idx >= NUM_LEDS)
+    led_set_one_t v;
+    if (led_set_one_unpack(data, data_len, &v) != 0 || v.led_idx >= NUM_LEDS)
     {
         return;
     }
 
     /* Update state */
-    if (state)
+    if (v.state)
     {
-        g_led_states |= (1 << led_idx); /* Set bit */
+        g_led_states |= (1 << v.led_idx); /* Set bit */
     }
     else
     {
-        g_led_states &= ~(1 << led_idx); /* Clear bit */
+        g_led_states &= ~(1 << v.led_idx); /* Clear bit */
     }
 
     /* Update hardware */
-    set_led_physical(led_idx, state);
+    set_led_physical(v.led_idx, v.state);
 }
 
 /* ============================================================================
@@ -176,30 +168,17 @@ static void handler_blink(crumbs_context_t *ctx, uint8_t opcode,
     (void)opcode;
     (void)user_data;
 
-    if (data_len < 4)
-    {
-        return;
-    }
-
-    uint8_t led_idx = data[0];
-    uint8_t enable = data[1];
-    uint16_t period_ms;
-
-    if (crumbs_msg_read_u16(data, data_len, 2, &period_ms) != 0)
-    {
-        return;
-    }
-
-    if (led_idx >= NUM_LEDS)
+    led_blink_t v;
+    if (led_blink_unpack(data, data_len, &v) != 0 || v.led_idx >= NUM_LEDS)
     {
         return;
     }
 
     /* Update blink configuration */
-    g_blink[led_idx].enable = enable ? 1 : 0;
-    g_blink[led_idx].period_ms = period_ms;
-    g_blink[led_idx].last_toggle = millis();
-    g_blink[led_idx].current_state = 0;
+    g_blink[v.led_idx].enable = v.enable ? 1 : 0;
+    g_blink[v.led_idx].period_ms = v.period_ms;
+    g_blink[v.led_idx].last_toggle = millis();
+    g_blink[v.led_idx].current_state = 0;
 }
 
 /* ============================================================================
@@ -218,20 +197,23 @@ static void reply_handler_version(crumbs_context_t *ctx, crumbs_message_t *reply
 static void reply_handler_get_state(crumbs_context_t *ctx, crumbs_message_t *reply, void *user)
 {
     (void)ctx; (void)user;
+    led_state_result_t r;
+    r.states = g_led_states;
     crumbs_msg_init(reply, LED_TYPE_ID, LED_OP_GET_STATE);
-    crumbs_msg_add_u8(reply, g_led_states);
+    led_state_result_pack(reply, &r);
 }
 
 static void reply_handler_get_blink(crumbs_context_t *ctx, crumbs_message_t *reply, void *user)
 {
     (void)ctx; (void)user;
-    crumbs_msg_init(reply, LED_TYPE_ID, LED_OP_GET_BLINK);
-    /* Pack blink configuration: [enable:u8][period:u16] x 4 LEDs = 12 bytes */
+    led_blink_result_t r;
     for (uint8_t i = 0; i < NUM_LEDS; i++)
     {
-        crumbs_msg_add_u8(reply, g_blink[i].enable);
-        crumbs_msg_add_u16(reply, g_blink[i].period_ms);
+        r.enable[i] = g_blink[i].enable;
+        r.period_ms[i] = g_blink[i].period_ms;
     }
+    crumbs_msg_init(reply, LED_TYPE_ID, LED_OP_GET_BLINK);
+    led_blink_result_pack(reply, &r);
 }
 
 /* ============================================================================

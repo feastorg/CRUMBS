@@ -33,10 +33,11 @@ Numbers render with leading zeros (`42` shows `0042`); keep them at 9999 or
 below — the library has no handling for more digits. Digit `0` in segment
 form is `0xFC`.
 
-Wrappers: `display_send_set_number(dev, number, decimal_pos)`,
-`display_send_set_segments(dev, segments[4])`,
-`display_send_set_brightness(dev, level)`, `display_send_clear(dev)`,
-`display_get_value(dev, &display_value_result_t)`.
+Wrappers, each taking a pointer to its payload struct:
+`display_send_set_number(dev, &display_set_number_t)`,
+`display_send_set_segments(dev, &display_set_segments_t)`,
+`display_send_set_brightness(dev, &display_set_brightness_t)`,
+`display_send_clear(dev)`, `display_get_value(dev, &display_value_result_t)`.
 
 ## Serial
 

@@ -127,10 +127,15 @@ and `Result:` / `History:` are the same as above.)
 ## Adopting the family
 
 Copy the four headers, keep their type IDs, and bind a `crumbs_device_t` per
-device the way `controller_manual/main.c` does. The headers predate
-`crumbs_ops.h` and hand-write every wrapper in the shape the macros would
-produce; every getter reads with `crumbs_controller_read_expect()`, so a
-reply of the wrong type or opcode returns `CRUMBS_RX_REPLY_MISMATCH`. Each
+device the way `controller_manual/main.c` does. Each header declares its
+type and opcodes with `CRUMBS_DEFINE_FAMILY`, each payload layout once with
+`CRUMBS_DEFINE_PAYLOAD`, and its wrappers with the `crumbs_ops.h` macros; the
+peripherals unpack and pack through the same generated codec, and
+`tests/test_lhwit_roundtrip.c` sends every operation through it in both
+directions. Two layouts the codec cannot express — the LED blink table and
+the calculator's history entry — have hand-written `pack`/`unpack` pairs in
+the same shape. Every getter reads with `crumbs_controller_read_expect()`,
+so a reply of the wrong type or opcode returns `CRUMBS_RX_REPLY_MISMATCH`. Each
 peripheral declares its type with `crumbs_set_type_id()`, so a frame
 addressed to another family's type is dropped before any handler runs — the
 controllers' `@addr` selector still does not check types, but the device

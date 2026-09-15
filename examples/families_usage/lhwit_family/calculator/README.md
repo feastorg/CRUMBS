@@ -18,9 +18,9 @@ History is a ring: slot index is physical, not chronological. `op` is
 are answered by an `on_request` fallback rather than twelve reply handlers,
 which is what keeps the project inside `-DCRUMBS_MAX_HANDLERS=8`.
 
-Wrappers: `calc_send_add/sub/mul/div(dev, a, b)`, `calc_get_result(dev,
-&calc_result_t)`, `calc_get_hist_meta(dev, &calc_hist_meta_t)`,
-`calc_get_hist_entry(dev, idx, &calc_hist_entry_t)`.
+Wrappers: `calc_send_add/sub/mul/div(dev, &calc_operands_t)`,
+`calc_get_result(dev, &calc_result_t)`, `calc_get_hist_meta(dev,
+&calc_hist_meta_t)`, `calc_get_hist_entry(dev, idx, &calc_hist_entry_t)`.
 
 ## Serial
 
