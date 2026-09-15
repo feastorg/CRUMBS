@@ -23,8 +23,10 @@ exit 77) and ASan+UBSan.
 
 Tests are one binary per `tests/test_*.c`, registered in the root
 `CMakeLists.txt`; `tests/test_common.h` has the assertion macros. A test that
-needs the Linux HAL is registered under `if(CRUMBS_ENABLE_LINUX_HAL)`.
-Arduino and PlatformIO builds have no host tests; CI compiles the sketches.
+needs the Linux HAL is registered under `if(CRUMBS_ENABLE_LINUX_HAL)`;
+`test_linux_hal` compiles the HAL against `tests/fake_linux_wire.c`, a scripted
+stand-in for the linux-wire calls it makes, so no bus is needed. Arduino and
+PlatformIO builds have no host tests; CI compiles the sketches.
 
 Arduino sketches compile with the tree as the library:
 
