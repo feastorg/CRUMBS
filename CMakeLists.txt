@@ -35,17 +35,20 @@ set(CRUMBS_CORE_SOURCES
     src/crc/crc8_nibble.c
 )
 
+set(CRUMBS_LINUX_HAL_SOURCES
+    src/hal/linux/crumbs_i2c_linux.c
+)
+
+set(CRUMBS_SOURCES ${CRUMBS_CORE_SOURCES})
 if(CRUMBS_ENABLE_LINUX_HAL)
-    list(APPEND CRUMBS_CORE_SOURCES
-        src/hal/linux/crumbs_i2c_linux.c
-    )
+    list(APPEND CRUMBS_SOURCES ${CRUMBS_LINUX_HAL_SOURCES})
 endif()
 
 # -----------------------------------------------------------------------------
 # Library target
 # -----------------------------------------------------------------------------
 
-add_library(crumbs STATIC ${CRUMBS_CORE_SOURCES})
+add_library(crumbs STATIC ${CRUMBS_SOURCES})
 add_library(crumbs::crumbs ALIAS crumbs)
 
 target_include_directories(crumbs
@@ -204,10 +207,47 @@ if(CRUMBS_ENABLE_TESTS)
     target_link_libraries(test_padded_read PRIVATE crumbs)
     add_test(NAME padded_read_test COMMAND test_padded_read)
 
+    # The Arduino HAL on the host, against the scripted core and Wire in
+    # tests/fake_arduino/. The HAL is C++, so this one test needs a C++
+    # compiler; without one it is skipped, not failed.
+    include(CheckLanguage)
+    check_language(CXX)
+    if(CMAKE_CXX_COMPILER)
+        enable_language(CXX)
+        add_executable(test_arduino_hal
+            tests/test_arduino_hal.cpp
+            tests/fake_arduino/fake_arduino.cpp
+            src/hal/arduino/crumbs_i2c_arduino.cpp
+            ${CRUMBS_CORE_SOURCES}
+        )
+        target_include_directories(test_arduino_hal PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/fake_arduino
+        )
+        set_target_properties(test_arduino_hal PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)
+        add_test(NAME arduino_hal_test COMMAND test_arduino_hal)
+    else()
+        message(STATUS "No C++ compiler: test_arduino_hal skipped")
+    endif()
+
     if(CRUMBS_ENABLE_LINUX_HAL)
         add_executable(test_linux_close tests/test_linux_close.c)
         target_link_libraries(test_linux_close PRIVATE crumbs)
         add_test(NAME linux_close_test COMMAND test_linux_close)
+
+        # The HAL compiled against a scripted linux-wire. The fake defines
+        # every lw_* function the HAL calls, so nothing is pulled from the
+        # real archive (linked for its header); an lw_* call the fake lacks
+        # pulls it in and fails the link with duplicate symbols.
+        add_executable(test_linux_hal
+            tests/test_linux_hal.c
+            tests/fake_linux_wire.c
+            ${CRUMBS_CORE_SOURCES}
+            ${CRUMBS_LINUX_HAL_SOURCES}
+        )
+        target_include_directories(test_linux_hal PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_link_libraries(test_linux_hal PRIVATE linux_wire::linux_wire)
+        add_test(NAME linux_hal_test COMMAND test_linux_hal)
     endif()
 endif()
 

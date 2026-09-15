@@ -6,8 +6,14 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Host tests for the Arduino HAL: `tests/test_arduino_hal.cpp` compiles `crumbs_i2c_arduino.cpp` against a scripted `Arduino.h` and `Wire.h` in `tests/fake_arduino/` and drives the `onReceive`/`onRequest` handlers the HAL registers, as the controller's traffic would. It checks the peripheral path (dispatch, CRC rejection, draining a full 32-byte Wire buffer, the 31-byte frame, SET_REPLY selection, the empty and untouched reply cases, callback-after-init order) and every documented return code of the controller functions, including the read poll loop's deadline and the STOP-versus-repeated-start write phase. Needs a C++ compiler; skipped without one. (#25)
+- Host tests for the Linux HAL: `tests/test_linux_hal.c` runs `crumbs_i2c_linux.c` against `tests/fake_linux_wire.c`, a scripted stand-in for the nine linux-wire calls it makes, and checks every documented return code, the padded and short-count read loops, both scan probes, error-logging restoration, and the write-then-read transaction shapes (STOP between phases versus one combined transfer). Runs in the Linux HAL lane. (#25)
+
 ### Fixed
 
+- `crumbs_arduino.h` said callbacks could be installed before or after `crumbs_arduino_init_peripheral()`; `crumbs_init()`, which it calls, clears them, so they must be installed after (as every example does). The header now says so, and `test_arduino_hal` pins it.
 - Configuring `examples/core_usage/linux/simple_controller` or `mixed_bus_probe` from its own directory (the default in-tree mode) failed with a duplicate-target error, because the root subbuild also defined the example; the other three Linux examples configured but built every test and root example alongside. The in-tree branch now turns the root's tests and examples off, so the subbuild contributes the library only, and the standalone binaries carry the same names as the root build's (`crumbs_mock_controller`, `crumbs_controller_discovery`, `crumbs_controller_manual`). CI builds all five in-tree. (#70)
 
 ### Changed

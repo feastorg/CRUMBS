@@ -18,13 +18,17 @@ Each configures into its own `build*/` directory.
 
 Options: `CRUMBS_ENABLE_LINUX_HAL` (off), `CRUMBS_BUILD_EXAMPLES` (on, but only
 built when the HAL is on), `CRUMBS_ENABLE_TESTS` (on). Two configurations CI
-also runs: `-DCMAKE_C_FLAGS=-DCRUMBS_MAX_HANDLERS=0` (two tests then skip with
-exit 77) and ASan+UBSan.
+also runs, with the flags given to both `CMAKE_C_FLAGS` and `CMAKE_CXX_FLAGS`:
+`-DCRUMBS_MAX_HANDLERS=0` (two tests then skip with exit 77) and ASan+UBSan.
 
-Tests are one binary per `tests/test_*.c`, registered in the root
-`CMakeLists.txt`; `tests/test_common.h` has the assertion macros. A test that
-needs the Linux HAL is registered under `if(CRUMBS_ENABLE_LINUX_HAL)`.
-Arduino and PlatformIO builds have no host tests; CI compiles the sketches.
+Tests are one binary per `tests/test_*.c` (or `.cpp`), registered in the root
+`CMakeLists.txt`; `tests/test_common.h` has the assertion macros. Both HALs
+run on the host against a scripted bus: `test_linux_hal` compiles the Linux
+HAL against `tests/fake_linux_wire.c` (registered under
+`if(CRUMBS_ENABLE_LINUX_HAL)`, since it needs the linux-wire header), and
+`test_arduino_hal` compiles the Arduino HAL against the `Arduino.h` and
+`Wire.h` in `tests/fake_arduino/` (needs a C++ compiler; skipped without one).
+The real sketches are compiled by the `arduino-cli` and `platformio` CI jobs.
 
 Arduino sketches compile with the tree as the library:
 
@@ -93,7 +97,7 @@ changed, why, and how it was verified. Add a `[Unreleased]` entry to
 | `build-and-test` | Linux HAL build and tests against the pinned, checksum-verified linux-wire release; install; the four out-of-tree example builds and the five in-tree ones (which must pull in the library only); a smoke run of `crumbs_simple_linux_controller` |
 | `platformio` | The eight PlatformIO projects for `nanoatmega328new` and `esp32dev` — against the registry package |
 | `arduino-cli` | The two mixed-bus Arduino sketches with ezo-driver and SparkFun BME280 pinned by tag and SHA |
-| `build-configs` | Core tests under ASan+UBSan and with `CRUMBS_MAX_HANDLERS=0` |
+| `build-configs` | Core and Arduino-HAL host tests under ASan+UBSan and with `CRUMBS_MAX_HANDLERS=0`, the flags given to both languages |
 | `doxygen` | `doccheck.sh` and `check_api_index.py` (pinned to `ubuntu-24.04` for a fixed Doxygen) |
 | `docs-links` | `check_docs_links.py` |
 | `crc-regen` | Committed CRC source matches the pycrc output |
