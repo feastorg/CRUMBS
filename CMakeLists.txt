@@ -207,6 +207,28 @@ if(CRUMBS_ENABLE_TESTS)
     target_link_libraries(test_padded_read PRIVATE crumbs)
     add_test(NAME padded_read_test COMMAND test_padded_read)
 
+    add_executable(test_payload tests/test_payload.c)
+    target_link_libraries(test_payload PRIVATE crumbs)
+    add_test(NAME payload_test COMMAND test_payload)
+
+    # The compile-time checks in crumbs_ops.h: each source must fail to
+    # compile with its own message. The targets are built only by their
+    # tests, and a build that fails for any other reason fails the test.
+    foreach(case size_mismatch too_large type_zero opcode_set_reply opcode_too_large opcode_duplicate)
+        add_library(compile_fail_${case} OBJECT EXCLUDE_FROM_ALL tests/compile_fail/${case}.c)
+        target_include_directories(compile_fail_${case} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS tests/compile_fail/${case}.c)
+        file(STRINGS tests/compile_fail/${case}.c compile_fail_${case}_line LIMIT_COUNT 1)
+        if(NOT compile_fail_${case}_line MATCHES "^/\\* Must fail to compile with: (.+) \\*/$")
+            message(FATAL_ERROR "tests/compile_fail/${case}.c: first line must name the expected message")
+        endif()
+        add_test(NAME compile_fail_${case}
+                 COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target compile_fail_${case})
+        set_tests_properties(compile_fail_${case} PROPERTIES
+            PASS_REGULAR_EXPRESSION "${CMAKE_MATCH_1}"
+            ENVIRONMENT "LC_ALL=C")
+    endforeach()
+
     # The Arduino HAL on the host, against the scripted core and Wire in
     # tests/fake_arduino/. The HAL is C++, so this one test needs a C++
     # compiler; without one it is skipped, not failed.
@@ -226,6 +248,13 @@ if(CRUMBS_ENABLE_TESTS)
         )
         set_target_properties(test_arduino_hal PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)
         add_test(NAME arduino_hal_test COMMAND test_arduino_hal)
+
+        # The family and payload macros are used from sketches, so the same
+        # test also compiles as C++.
+        add_executable(test_payload_cxx tests/test_payload_cxx.cpp)
+        target_link_libraries(test_payload_cxx PRIVATE crumbs)
+        set_target_properties(test_payload_cxx PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)
+        add_test(NAME payload_cxx_test COMMAND test_payload_cxx)
     else()
         message(STATUS "No C++ compiler: test_arduino_hal skipped")
     endif()

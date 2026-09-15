@@ -29,6 +29,9 @@ HAL against `tests/fake_linux_wire.c` (registered under
 `test_arduino_hal` compiles the Arduino HAL against the `Arduino.h` and
 `Wire.h` in `tests/fake_arduino/` (needs a C++ compiler; skipped without one).
 The real sketches are compiled by the `arduino-cli` and `platformio` CI jobs.
+`tests/compile_fail/*.c` must each *fail* to compile with the message on their
+first line; CTest builds them on demand and matches the compiler's output, so
+`ctest -R compile_fail` is how the `crumbs_ops.h` static checks are tested.
 
 Arduino sketches compile with the tree as the library:
 

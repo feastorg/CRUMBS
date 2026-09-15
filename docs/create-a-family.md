@@ -43,8 +43,11 @@ extern "C" {
 Pick a `type_id` other than `0x00` (the wildcard) and unused by any other
 family that will share a controller. Put SET opcodes low and GET opcodes from
 `0x80` so a reply's opcode says what it is. State each payload's byte layout
-beside its opcode: that comment is the specification, since the library
-does not check payloads.
+beside its opcode. This walkthrough writes the layouts by hand; `crumbs_ops.h`
+can instead generate each layout's struct, pack and unpack from one field list
+(`CRUMBS_DEFINE_PAYLOAD`) and check the type and opcodes at compile time
+(`CRUMBS_DEFINE_FAMILY`) — see its file comment and
+[architecture.md](architecture.md#the-family-contract).
 
 ## 2. Controller side: generated wrappers
 

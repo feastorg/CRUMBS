@@ -9,7 +9,7 @@ are collected at the end.
 | --- | --- |
 | `crumbs.h` | always — context, codec, dispatch, controller, scanners, raw I²C helpers |
 | `crumbs_message_helpers.h` | building or reading payloads |
-| `crumbs_ops.h` | writing a family's controller-side wrappers |
+| `crumbs_ops.h` | defining a family: identity, payload codecs, controller-side wrappers |
 | `crumbs_arduino.h` / `crumbs_linux.h` | the HAL for your platform |
 | `crumbs_message.h`, `crumbs_i2c.h`, `crumbs_crc.h`, `crumbs_version.h` | pulled in by `crumbs.h` |
 
@@ -79,6 +79,9 @@ bytes; every read fails with `-1` when `offset + width > len`.
 | `CRUMBS_RX_REPLY_MISMATCH` | `-7`. |
 | `crumbs_device_t` | `ctx`, `addr`, `write_fn`, `read_fn`, `delay_fn`, `io`: one bound target for the wrappers and raw helpers. |
 | `crumbs_ops_can_send(dev)` / `crumbs_ops_can_get(dev)` | Whether `dev` has what a send (context + write) or a get (also read + delay) needs. |
+| `CRUMBS_DEFINE_FAMILY(PREFIX, type_id, OPS)` | From an `X(NAME, value)` list: `PREFIX_TYPE_ID` and one enum constant per opcode. Fails the build if the type is not `0x01`–`0xFF`, an opcode is above `0xFF` or is `0xFE`, or two opcodes share a value. |
+| `CRUMBS_DEFINE_PAYLOAD(name, wire_bytes, FIELDS)` | From an `X(type, name)` list (`u8 u16 u32 i8 i16 i32 float`, wire order): `name_t`, `name_wire_size`, `name_pack(msg, *v)` (appends; `-1` if it would exceed 27) and `name_unpack(data, len, *v)` (`-1` if `len < name_wire_size`; longer accepted). Fails the build if the list does not sum to `wire_bytes` or `wire_bytes` exceeds 27. `name_unpack` is a `parse_fn` for `CRUMBS_DEFINE_GET_OP`. |
+| `CRUMBS_STATIC_ASSERT(cond, msg)` | `static_assert` / `_Static_assert`, usable at file scope in C11 and C++11. |
 | `CRUMBS_DEFINE_SEND_OP(family, name, type_id, opcode, param_decl, pack_stmt)` | Defines `family_send_name(dev, param)`: one SET with one packed parameter. |
 | `CRUMBS_DEFINE_SEND_OP_0(family, name, type_id, opcode)` | Defines `family_send_name(dev)`: a payload-less SET. |
 | `CRUMBS_DEFINE_GET_OP(family, name, type_id, opcode, result_t, parse_fn)` | Defines `family_query_name(dev)` and `family_get_name(dev, *out)`: SET_REPLY, `delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US)`, `read_expect`, `parse_fn`. `-1` unbound device or `NULL` `out`, else the send/read code, `-7` on identity mismatch, else `parse_fn`'s return. |

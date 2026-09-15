@@ -93,15 +93,24 @@ the reply-identity check. The generated `_get_` wrappers chain SET_REPLY →
 
 A family is one header shared by controller and peripheral firmware:
 
-- a `type_id` per device class;
-- opcodes per type, with each payload's layout stated beside it;
+- a `type_id` and its opcodes, declared once with `CRUMBS_DEFINE_FAMILY`;
+- one field list per payload layout, from which `CRUMBS_DEFINE_PAYLOAD`
+  generates the struct, the wire size, and the `pack` and `unpack` both
+  sides call;
 - for the controller, one function per operation, generated with
   `CRUMBS_DEFINE_SEND_OP` / `CRUMBS_DEFINE_SEND_OP_0` / `CRUMBS_DEFINE_GET_OP`
   over a `crumbs_device_t` that binds context, address and bus functions.
 
-The compiler then checks argument types and the reply parser checks length and
-identity; the payload layout itself is a documented agreement, not a checked
-one. By design a controller build understands one family's vocabulary. It can still share
+What the compiler enforces: the type is `0x01`–`0xFF`; every opcode is
+`0x00`–`0xFF`, not `0xFE`, and distinct from the others (a duplicate would
+otherwise make one `crumbs_register_handler` call silently replace another);
+each payload's field list sums to the length declared beside it and fits in
+27 bytes; and two sides that go through the generated codec read and write
+the same bytes. What it does not: which code paths go through the codec — a
+handler that indexes `data[]` by hand compiles just as well — and agreement
+between sides built from different revisions of the header, which is what
+the opcode `0x00` version reply is for. By design a controller build
+understands one family's vocabulary. It can still share
 the physical bus with devices that are not CRUMBS at all — the `crumbs_i2c_dev_*`
 helpers exist for talking raw registers to those, and the mixed-bus examples
 run CRUMBS peripherals beside Bosch and Atlas Scientific sensors.
