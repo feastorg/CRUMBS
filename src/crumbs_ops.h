@@ -73,7 +73,8 @@
 #endif
 
 /* Field type tokens and their C types, wire widths and codecs. The codecs
-   do no bounds checking: pack and unpack check the whole payload once. */
+   are internal to the generated pack/unpack and do no bounds checking:
+   those check the whole payload once. */
 #define CRUMBS_FIELD_CTYPE_u8 uint8_t
 #define CRUMBS_FIELD_CTYPE_u16 uint16_t
 #define CRUMBS_FIELD_CTYPE_u32 uint32_t
@@ -89,49 +90,49 @@
 #define CRUMBS_FIELD_WIRE_i32 4
 #define CRUMBS_FIELD_WIRE_float 4
 
-static inline uint8_t crumbs_field_read_u8(const uint8_t *p) { return p[0]; }
-static inline uint16_t crumbs_field_read_u16(const uint8_t *p)
+static inline uint8_t crumbs_field_read_u8_(const uint8_t *p) { return p[0]; }
+static inline uint16_t crumbs_field_read_u16_(const uint8_t *p)
 {
     return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
 }
-static inline uint32_t crumbs_field_read_u32(const uint8_t *p)
+static inline uint32_t crumbs_field_read_u32_(const uint8_t *p)
 {
     return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
 }
-static inline int8_t crumbs_field_read_i8(const uint8_t *p) { return (int8_t)p[0]; }
-static inline int16_t crumbs_field_read_i16(const uint8_t *p) { return (int16_t)crumbs_field_read_u16(p); }
-static inline int32_t crumbs_field_read_i32(const uint8_t *p) { return (int32_t)crumbs_field_read_u32(p); }
-static inline float crumbs_field_read_float(const uint8_t *p) /* native order, as crumbs_msg_add_float() */
+static inline int8_t crumbs_field_read_i8_(const uint8_t *p) { return (int8_t)p[0]; }
+static inline int16_t crumbs_field_read_i16_(const uint8_t *p) { return (int16_t)crumbs_field_read_u16_(p); }
+static inline int32_t crumbs_field_read_i32_(const uint8_t *p) { return (int32_t)crumbs_field_read_u32_(p); }
+static inline float crumbs_field_read_float_(const uint8_t *p) /* native order, as crumbs_msg_add_float() */
 {
     float f;
     memcpy(&f, p, sizeof f);
     return f;
 }
-static inline void crumbs_field_write_u8(uint8_t *p, uint8_t v) { p[0] = v; }
-static inline void crumbs_field_write_u16(uint8_t *p, uint16_t v)
+static inline void crumbs_field_write_u8_(uint8_t *p, uint8_t v) { p[0] = v; }
+static inline void crumbs_field_write_u16_(uint8_t *p, uint16_t v)
 {
     p[0] = (uint8_t)(v & 0xFFu);
     p[1] = (uint8_t)(v >> 8);
 }
-static inline void crumbs_field_write_u32(uint8_t *p, uint32_t v)
+static inline void crumbs_field_write_u32_(uint8_t *p, uint32_t v)
 {
     p[0] = (uint8_t)(v & 0xFFu);
     p[1] = (uint8_t)((v >> 8) & 0xFFu);
     p[2] = (uint8_t)((v >> 16) & 0xFFu);
     p[3] = (uint8_t)(v >> 24);
 }
-static inline void crumbs_field_write_i8(uint8_t *p, int8_t v) { p[0] = (uint8_t)v; }
-static inline void crumbs_field_write_i16(uint8_t *p, int16_t v) { crumbs_field_write_u16(p, (uint16_t)v); }
-static inline void crumbs_field_write_i32(uint8_t *p, int32_t v) { crumbs_field_write_u32(p, (uint32_t)v); }
-static inline void crumbs_field_write_float(uint8_t *p, float v) { memcpy(p, &v, sizeof v); }
+static inline void crumbs_field_write_i8_(uint8_t *p, int8_t v) { p[0] = (uint8_t)v; }
+static inline void crumbs_field_write_i16_(uint8_t *p, int16_t v) { crumbs_field_write_u16_(p, (uint16_t)v); }
+static inline void crumbs_field_write_i32_(uint8_t *p, int32_t v) { crumbs_field_write_u32_(p, (uint32_t)v); }
+static inline void crumbs_field_write_float_(uint8_t *p, float v) { memcpy(p, &v, sizeof v); }
 
 #define CRUMBS_FIELD_MEMBER_(t, n) CRUMBS_FIELD_CTYPE_##t n;
 #define CRUMBS_FIELD_SIZE_(t, n) +CRUMBS_FIELD_WIRE_##t
 #define CRUMBS_FIELD_PACK_(t, n) \
-    crumbs_field_write_##t(_p, v->n);  \
+    crumbs_field_write_##t##_(_p, v->n);  \
     _p += CRUMBS_FIELD_WIRE_##t;
 #define CRUMBS_FIELD_UNPACK_(t, n) \
-    v->n = crumbs_field_read_##t(_p);   \
+    v->n = crumbs_field_read_##t##_(_p);   \
     _p += CRUMBS_FIELD_WIRE_##t;
 
 #define CRUMBS_OP_ENUM_(n, v) n = (v),

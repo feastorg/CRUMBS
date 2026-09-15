@@ -87,6 +87,13 @@ static int test_round_trip_all_types(void)
     TEST_ASSERT(t, out.f == in.f, "i32");
     TEST_ASSERT(t, out.g == in.g, "float");
 
+    /* The struct members have the declared widths and signedness. */
+    TEST_ASSERT(t, sizeof out.a == 1 && sizeof out.b == 2 && sizeof out.c == 4, "unsigned widths");
+    TEST_ASSERT(t, sizeof out.d == 1 && sizeof out.e == 2 && sizeof out.f == 4, "signed widths");
+    TEST_ASSERT(t, sizeof out.g == 4, "float is 4 bytes");
+    TEST_ASSERT(t, out.d < 0 && out.e < 0 && out.f < 0, "signed members hold negative values");
+    TEST_ASSERT(t, out.a > 0 && out.b > 0 && out.c > 0, "unsigned members hold the high-bit values");
+
     /* The generated codec agrees with the hand helpers byte for byte. */
     {
         crumbs_message_t h;
