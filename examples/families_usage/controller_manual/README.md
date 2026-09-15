@@ -8,8 +8,8 @@ is in the [family README](../lhwit_family/README.md#shell).
 build-linux/crumbs_controller_manual [/dev/i2c-1]
 ```
 
-Built by the root CMake with `CRUMBS_ENABLE_LINUX_HAL=ON`, or on its own
-against an installed CRUMBS (`cmake -S examples/families_usage/controller_manual -B build -DCRUMBS_BUILD_IN_TREE=OFF`).
+Built by the root CMake with `CRUMBS_ENABLE_LINUX_HAL=ON`, or on its own from its directory (`cmake -S examples/families_usage/controller_manual -B build`,
+which builds the library alongside; add `-DCRUMBS_BUILD_IN_TREE=OFF` to use an installed CRUMBS instead).
 
 ## Configuration
 

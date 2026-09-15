@@ -18,8 +18,8 @@
  *   cmake --build .
  *
  * Usage:
- *   ./crumbs_mock_linux_controller [i2c-device]
- *   ./crumbs_mock_linux_controller /dev/i2c-1
+ *   ./crumbs_mock_controller [i2c-device]
+ *   ./crumbs_mock_controller /dev/i2c-1
  *
  * Type 'help' at the prompt for available commands.
  */

@@ -90,7 +90,7 @@ changed, why, and how it was verified. Add a `[Unreleased]` entry to
 | Job | What it proves |
 | --- | --- |
 | `core-only-install` | Core build, tests, install, and a `find_package(crumbs)` consumer without the HAL; `crumbs_linux.h` must not leak into that install |
-| `build-and-test` | Linux HAL build and tests against the pinned, checksum-verified linux-wire release; install; the four out-of-tree example builds; a smoke run of `crumbs_simple_linux_controller` |
+| `build-and-test` | Linux HAL build and tests against the pinned, checksum-verified linux-wire release; install; the four out-of-tree example builds and the five in-tree ones (which must pull in the library only); a smoke run of `crumbs_simple_linux_controller` |
 | `platformio` | The eight PlatformIO projects for `nanoatmega328new` and `esp32dev` — against the registry package |
 | `arduino-cli` | The two mixed-bus Arduino sketches with ezo-driver and SparkFun BME280 pinned by tag and SHA |
 | `build-configs` | Core tests under ASan+UBSan and with `CRUMBS_MAX_HANDLERS=0` |
