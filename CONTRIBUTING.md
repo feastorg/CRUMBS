@@ -118,7 +118,8 @@ package must be published before the merge.
 
 1. On a branch, bump the version in `CMakeLists.txt`, `library.json`,
    `library.properties`, `src/crumbs_version.h`, the examples' `lib_deps` and
-   any doc that quotes it (`git grep 'X.Y.Z'` for the old one); date the
+   any doc that quotes it (`git grep 'X.Y.Z'` for the old one, and its
+   `CRUMBS_VERSION` word in hex, e.g. `0x0578` for 1400); date the
    `[Unreleased]` section. Open the PR. Its `platformio` lane builds the
    checkout, not the pin, so it passes before the package exists.
 2. Tag that commit (`git tag -a vX.Y.Z -m "Release vX.Y.Z"`, push the tag).
