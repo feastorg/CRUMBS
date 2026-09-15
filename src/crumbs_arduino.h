@@ -36,10 +36,10 @@ extern "C"
      *   - registers internal Wire.onReceive/onRequest handlers that forward
      *     into the CRUMBS C core.
      *
-     * Install callbacks and handlers (crumbs_set_callbacks(),
-     * crumbs_register_handler(), crumbs_register_reply_handler()) after this
-     * call and before traffic arrives: crumbs_init(), which it calls, clears
-     * them.
+     * Install callbacks, handlers and the type declaration
+     * (crumbs_set_callbacks(), crumbs_register_handler(),
+     * crumbs_register_reply_handler(), crumbs_set_type_id()) after this call
+     * and before traffic arrives: crumbs_init(), which it calls, clears them.
      *
      * @param ctx     Pointer to the CRUMBS context to initialize.
      * @param address I2C peripheral address (7-bit).
