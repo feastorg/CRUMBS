@@ -312,11 +312,10 @@ extern "C"
         if (rc != 0)
             return rc;
         dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);
-        rc = crumbs_controller_read(dev->ctx, dev->addr, &reply, dev->read_fn, dev->io);
+        rc = crumbs_controller_read_expect(dev->ctx, dev->addr, CALC_TYPE_ID, CALC_OP_GET_RESULT,
+                                          &reply, dev->read_fn, dev->io);
         if (rc != 0)
             return rc;
-        if (reply.type_id != CALC_TYPE_ID || reply.opcode != CALC_OP_GET_RESULT)
-            return -1;
         return crumbs_msg_read_u32(reply.data, reply.data_len, 0, &out->result);
     }
 
@@ -337,11 +336,10 @@ extern "C"
         if (rc != 0)
             return rc;
         dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);
-        rc = crumbs_controller_read(dev->ctx, dev->addr, &reply, dev->read_fn, dev->io);
+        rc = crumbs_controller_read_expect(dev->ctx, dev->addr, CALC_TYPE_ID, CALC_OP_GET_HIST_META,
+                                          &reply, dev->read_fn, dev->io);
         if (rc != 0)
             return rc;
-        if (reply.type_id != CALC_TYPE_ID || reply.opcode != CALC_OP_GET_HIST_META)
-            return -1;
         rc = crumbs_msg_read_u8(reply.data, reply.data_len, 0, &out->count);
         if (rc != 0)
             return rc;
@@ -371,11 +369,10 @@ extern "C"
         if (rc != 0)
             return rc;
         dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);
-        rc = crumbs_controller_read(dev->ctx, dev->addr, &reply, dev->read_fn, dev->io);
+        rc = crumbs_controller_read_expect(dev->ctx, dev->addr, CALC_TYPE_ID, (uint8_t)(CALC_OP_GET_HIST_0 + entry_idx),
+                                          &reply, dev->read_fn, dev->io);
         if (rc != 0)
             return rc;
-        if (reply.type_id != CALC_TYPE_ID || reply.opcode != (uint8_t)(CALC_OP_GET_HIST_0 + entry_idx))
-            return -1;
         if (reply.data_len < 16)
             return -1; /* Entry is empty or malformed */
         /* Parse: [op:4][a:u32][b:u32][result:u32] */

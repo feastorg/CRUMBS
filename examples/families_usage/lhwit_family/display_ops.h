@@ -363,11 +363,10 @@ extern "C"
         if (rc != 0)
             return rc;
         dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);
-        rc = crumbs_controller_read(dev->ctx, dev->addr, &reply, dev->read_fn, dev->io);
+        rc = crumbs_controller_read_expect(dev->ctx, dev->addr, DISPLAY_TYPE_ID, DISPLAY_OP_GET_VALUE,
+                                          &reply, dev->read_fn, dev->io);
         if (rc != 0)
             return rc;
-        if (reply.type_id != DISPLAY_TYPE_ID || reply.opcode != DISPLAY_OP_GET_VALUE)
-            return -1;
         /* Reply: [number:u16][decimal_pos:u8][brightness:u8] */
         return display_parse_get_value(reply.data, reply.data_len,
                                        &out->number, &out->decimal_pos, &out->brightness);

@@ -26,9 +26,15 @@
     "examples/core_usage/arduino/basic_controller",
     "examples/core_usage/arduino/advanced_controller",
     "examples/core_usage/arduino/basic_peripheral_noncrumbs",
+    "examples/core_usage/arduino/mixed_bus_controller",
+    "examples/core_usage/arduino/mixed_bus_controller_vendor",
     "examples/core_usage/platformio/simple_controller",
     "examples/core_usage/platformio/simple_peripheral",
     "examples/handlers_usage/platformio/mock_controller",
-    "examples/handlers_usage/platformio/mock_peripheral"
+    "examples/handlers_usage/platformio/mock_peripheral",
+    "examples/families_usage/lhwit_family/calculator",
+    "examples/families_usage/lhwit_family/display",
+    "examples/families_usage/lhwit_family/led",
+    "examples/families_usage/lhwit_family/servo"
   ]
 }

@@ -220,7 +220,7 @@ extern "C"
      * @brief Combined SET_REPLY query + read + parse for LED states.
      *
      * Sends the query, waits dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US),
-     * reads the reply via crumbs_controller_read(), and parses the payload.
+     * reads the reply via crumbs_controller_read_expect(), and parses the payload.
      *
      * @param dev  Bound device handle (see crumbs_device_t).
      * @param out  Output struct (must not be NULL).
@@ -236,11 +236,10 @@ extern "C"
         if (rc != 0)
             return rc;
         dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);
-        rc = crumbs_controller_read(dev->ctx, dev->addr, &reply, dev->read_fn, dev->io);
+        rc = crumbs_controller_read_expect(dev->ctx, dev->addr, LED_TYPE_ID, LED_OP_GET_STATE,
+                                          &reply, dev->read_fn, dev->io);
         if (rc != 0)
             return rc;
-        if (reply.type_id != LED_TYPE_ID || reply.opcode != LED_OP_GET_STATE)
-            return -1;
         return crumbs_msg_read_u8(reply.data, reply.data_len, 0, &out->states);
     }
 
@@ -261,11 +260,10 @@ extern "C"
         if (rc != 0)
             return rc;
         dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);
-        rc = crumbs_controller_read(dev->ctx, dev->addr, &reply, dev->read_fn, dev->io);
+        rc = crumbs_controller_read_expect(dev->ctx, dev->addr, LED_TYPE_ID, LED_OP_GET_BLINK,
+                                          &reply, dev->read_fn, dev->io);
         if (rc != 0)
             return rc;
-        if (reply.type_id != LED_TYPE_ID || reply.opcode != LED_OP_GET_BLINK)
-            return -1;
         /* Reply: [led0_enable:u8][led0_period:u16]...[led3_enable:u8][led3_period:u16] */
         for (uint8_t i = 0; i < 4; i++)
         {

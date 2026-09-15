@@ -246,11 +246,10 @@ extern "C"
         if (rc != 0)
             return rc;
         dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);
-        rc = crumbs_controller_read(dev->ctx, dev->addr, &reply, dev->read_fn, dev->io);
+        rc = crumbs_controller_read_expect(dev->ctx, dev->addr, MOCK_TYPE_ID, MOCK_OP_GET_ECHO,
+                                          &reply, dev->read_fn, dev->io);
         if (rc != 0)
             return rc;
-        if (reply.type_id != MOCK_TYPE_ID || reply.opcode != MOCK_OP_GET_ECHO)
-            return -1;
         out->len = reply.data_len;
         if (reply.data_len > 0)
             memcpy(out->data, reply.data, reply.data_len);
@@ -274,11 +273,10 @@ extern "C"
         if (rc != 0)
             return rc;
         dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);
-        rc = crumbs_controller_read(dev->ctx, dev->addr, &reply, dev->read_fn, dev->io);
+        rc = crumbs_controller_read_expect(dev->ctx, dev->addr, MOCK_TYPE_ID, MOCK_OP_GET_STATUS,
+                                          &reply, dev->read_fn, dev->io);
         if (rc != 0)
             return rc;
-        if (reply.type_id != MOCK_TYPE_ID || reply.opcode != MOCK_OP_GET_STATUS)
-            return -1;
         rc = crumbs_msg_read_u8(reply.data, reply.data_len, 0, &out->state);
         if (rc != 0)
             return rc;
@@ -302,11 +300,10 @@ extern "C"
         if (rc != 0)
             return rc;
         dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);
-        rc = crumbs_controller_read(dev->ctx, dev->addr, &reply, dev->read_fn, dev->io);
+        rc = crumbs_controller_read_expect(dev->ctx, dev->addr, MOCK_TYPE_ID, MOCK_OP_GET_INFO,
+                                          &reply, dev->read_fn, dev->io);
         if (rc != 0)
             return rc;
-        if (reply.type_id != MOCK_TYPE_ID || reply.opcode != MOCK_OP_GET_INFO)
-            return -1;
         out->len = reply.data_len;
         if (reply.data_len > 0)
             memcpy(out->info, reply.data, reply.data_len);

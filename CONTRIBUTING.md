@@ -116,7 +116,8 @@ while the tag must point at that same commit.
    `release.yml` builds the GitHub release from it.
 3. `pio pkg publish` from the tagged tree; wait until
    `pio pkg show cameronbrooks11/CRUMBS@X.Y.Z` resolves.
-4. Re-run the PR's `platformio` lane, then merge with a **merge commit** so
+4. Re-run the PR's `platformio` lane, then merge with a **merge commit** (the
+   repo allows both; releases are the one case that uses it) so
    the tagged SHA stays an ancestor of `main`.
 5. Check the release assets and `git merge-base --is-ancestor vX.Y.Z main`.
 

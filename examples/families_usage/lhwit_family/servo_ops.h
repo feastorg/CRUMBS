@@ -244,11 +244,10 @@ extern "C"
         if (rc != 0)
             return rc;
         dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);
-        rc = crumbs_controller_read(dev->ctx, dev->addr, &reply, dev->read_fn, dev->io);
+        rc = crumbs_controller_read_expect(dev->ctx, dev->addr, SERVO_TYPE_ID, SERVO_OP_GET_POS,
+                                          &reply, dev->read_fn, dev->io);
         if (rc != 0)
             return rc;
-        if (reply.type_id != SERVO_TYPE_ID || reply.opcode != SERVO_OP_GET_POS)
-            return -1;
         rc = crumbs_msg_read_u8(reply.data, reply.data_len, 0, &out->pos[0]);
         if (rc != 0)
             return rc;
@@ -272,11 +271,10 @@ extern "C"
         if (rc != 0)
             return rc;
         dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);
-        rc = crumbs_controller_read(dev->ctx, dev->addr, &reply, dev->read_fn, dev->io);
+        rc = crumbs_controller_read_expect(dev->ctx, dev->addr, SERVO_TYPE_ID, SERVO_OP_GET_SPEED,
+                                          &reply, dev->read_fn, dev->io);
         if (rc != 0)
             return rc;
-        if (reply.type_id != SERVO_TYPE_ID || reply.opcode != SERVO_OP_GET_SPEED)
-            return -1;
         rc = crumbs_msg_read_u8(reply.data, reply.data_len, 0, &out->speed[0]);
         if (rc != 0)
             return rc;

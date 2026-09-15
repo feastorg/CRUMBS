@@ -128,8 +128,10 @@ and `Result:` / `History:` are the same as above.)
 
 Copy the four headers, keep their type IDs, and bind a `crumbs_device_t` per
 device the way `controller_manual/main.c` does. The headers predate
-`crumbs_ops.h` and hand-write every wrapper; getters read with
-`crumbs_controller_read()` and compare type and opcode themselves. They will
-move to `crumbs_controller_read_expect()` and the peripherals to
-`crumbs_set_type_id()` once the library release that ships those is on the
-PlatformIO registry, since the projects pin the published version.
+`crumbs_ops.h` and hand-write every wrapper in the shape the macros would
+produce; every getter reads with `crumbs_controller_read_expect()`, so a
+reply of the wrong type or opcode returns `CRUMBS_RX_REPLY_MISMATCH`. Each
+peripheral declares its type with `crumbs_set_type_id()`, so a frame
+addressed to another family's type is dropped before any handler runs — the
+controllers' `@addr` selector still does not check types, but the device
+itself now does.
