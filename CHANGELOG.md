@@ -6,6 +6,8 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-14
+
 ### Added
 
 - `CRUMBS_DEFINE_PAYLOAD(name, wire_bytes, FIELDS)` in `crumbs_ops.h`: one X-macro field list per payload layout generates the struct, the wire size, and `pack`/`unpack` functions for both sides, so a layout is stated once instead of as an append sequence on the controller and hand-written offsets on the peripheral. The build fails if the list does not sum to the declared length or exceeds 27 bytes. `unpack` checks the length once and reads at constant offsets, so it compiles to the size of a careful hand-written unpack. (#36)
@@ -16,13 +18,14 @@ All notable changes to CRUMBS are documented in this file.
 
 ### Fixed
 
-- `crumbs_arduino.h` said callbacks could be installed before or after `crumbs_arduino_init_peripheral()`; `crumbs_init()`, which it calls, clears them, so they must be installed after (as every example does). The header now says so, and `test_arduino_hal` pins it.
+- `crumbs_arduino.h` said callbacks could be installed before or after `crumbs_arduino_init_peripheral()`; `crumbs_init()`, which it calls, clears them and the declared type, so `crumbs_set_callbacks()`, the handler registrations and `crumbs_set_type_id()` must come after (as every example does). The header now says so, and `test_arduino_hal` pins it.
 - Configuring `examples/core_usage/linux/simple_controller` or `mixed_bus_probe` from its own directory (the default in-tree mode) failed with a duplicate-target error, because the root subbuild also defined the example; the other three Linux examples configured but built every test and root example alongside. The in-tree branch now turns the root's tests and examples off, so the subbuild contributes the library only, and the standalone binaries carry the same names as the root build's (`crumbs_mock_controller`, `crumbs_controller_discovery`, `crumbs_controller_manual`). CI builds all five in-tree. (#70)
 
 ### Changed
 
 - The LHWIT family headers declare their type and opcodes with `CRUMBS_DEFINE_FAMILY` and every payload layout with `CRUMBS_DEFINE_PAYLOAD`; the peripherals unpack and pack through the generated codec, and the controller wrappers take a pointer to the payload struct (`led_send_blink(dev, &v)` instead of `led_send_blink(dev, idx, enable, period_ms)`). `servo_pos_result_t` and `servo_speed_result_t` hold `pos0`/`pos1` and `speed0`/`speed1` instead of two-element arrays. The LED blink table and the calculator history entry, which the codec cannot express, have hand-written `pack`/`unpack` pairs in the same shape; the calculator peripheral packs its history through it instead of copying the struct onto the bus. `tests/test_lhwit_roundtrip.c` sends every operation through the family's own codec in both directions. The unused `display_build_*`, `display_parse_get_value()` and `calc_query_hist_entry()` helpers are removed. The bytes on the wire are unchanged for every opcode. `docs/create-a-family.md` is rewritten to this shape. (#36)
-- `CRUMBS_DEFINE_SEND_OP` returns `-1` when its `pack_stmt` returns non-zero instead of sending whatever was packed; a `NULL` payload pointer no longer goes out as an empty frame.
+- `CRUMBS_DEFINE_SEND_OP` returns `-1` when its `pack_stmt` returns non-zero instead of sending whatever was packed, so `pack_stmt` must be an `int`-valued expression (every `crumbs_msg_add_*` and generated `_pack` is); a `NULL` payload pointer no longer goes out as an empty frame.
+- `crumbs_ops.h` requires C11 or C++11 (`#error` otherwise) for its static assertions; the other headers are unchanged. The documented floor was already C11, but a `.c` file that included `crumbs_ops.h` under an older `-std=` compiled before.
 - The `platformio` CI job rewrites each project's `lib_deps` to the checkout before building, so it tests the tree rather than the last published release. The projects themselves still pin the registry.
 - The LHWIT peripherals and the handlers-usage mock peripheral declare their type with `crumbs_set_type_id()`, and every getter in the `*_ops.h` headers reads with `crumbs_controller_read_expect()` instead of comparing the reply's type and opcode by hand; a mismatch now returns `CRUMBS_RX_REPLY_MISMATCH` (`-7`) instead of `-1`. `library.json` lists the mixed-bus sketches and the four LHWIT projects as examples. (#35)
 

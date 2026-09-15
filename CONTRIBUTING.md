@@ -112,21 +112,24 @@ and gates nothing.
 
 ## Releasing
 
-The order matters (#18): the version bump pins the examples' `platformio.ini`
-to the new version, so their CI lane can only pass once the registry has it,
-while the tag must point at that same commit.
+The order matters (#18): the tag must point at the commit that carries the
+version, and the examples' `platformio.ini` pin that version for users, so the
+package must be published before the merge.
 
 1. On a branch, bump the version in `CMakeLists.txt`, `library.json`,
    `library.properties`, `src/crumbs_version.h`, the examples' `lib_deps` and
-   any doc that quotes it; date the `[Unreleased]` section. Open the PR; its
-   `platformio` lane fails with `UnknownPackageError` — expected.
+   any doc that quotes it (`git grep 'X.Y.Z'` for the old one, and its
+   `CRUMBS_VERSION` word in hex, e.g. `0x0578` for 1400); date the
+   `[Unreleased]` section. Open the PR. Its `platformio` lane builds the
+   checkout, not the pin, so it passes before the package exists.
 2. Tag that commit (`git tag -a vX.Y.Z -m "Release vX.Y.Z"`, push the tag).
    `release.yml` builds the GitHub release from it.
 3. `pio pkg publish` from the tagged tree; wait until
-   `pio pkg show cameronbrooks11/CRUMBS@X.Y.Z` resolves.
-4. Re-run the PR's `platformio` lane, then merge with a **merge commit** (the
-   repo allows both; releases are the one case that uses it) so
-   the tagged SHA stays an ancestor of `main`.
+   `pio pkg show cameronbrooks11/CRUMBS@X.Y.Z` resolves, then `pio run` one
+   example in a scratch copy with its pin untouched, which is what a user
+   gets.
+4. Merge with a **merge commit** (the repo allows both; releases are the one
+   case that uses it) so the tagged SHA stays an ancestor of `main`.
 5. Check the release assets and `git merge-base --is-ancestor vX.Y.Z main`.
 
 CRUMBS is not in the Arduino Library Manager; Arduino users install from the
