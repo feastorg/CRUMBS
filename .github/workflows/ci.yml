@@ -183,7 +183,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
             cmake --build "build-intree-$name" --parallel
             # The subbuild must contribute the library only: no tests, no root examples.
-            if ls "build-intree-$name"/crumbs_subbuild/test_* "build-intree-$name"/crumbs_subbuild/crumbs_* >/dev/null 2>&1; then
+            if find "build-intree-$name/crumbs_subbuild" -mindepth 1 -maxdepth 1 -type f \( -name 'test_*' -o -name 'crumbs_*' \) | grep -q .; then
               echo "::error::in-tree build of $ex pulled in tests or root examples"; exit 1
             fi
           done

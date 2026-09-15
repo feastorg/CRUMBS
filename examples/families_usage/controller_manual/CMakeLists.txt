@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(lhwit_manual_controller C)
+project(crumbs_controller_manual C)
 
 # Build in-tree (inside CRUMBS repo)
 option(CRUMBS_BUILD_IN_TREE "Add CRUMBS as a subdirectory" ON)
