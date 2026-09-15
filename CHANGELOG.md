@@ -21,6 +21,9 @@ All notable changes to CRUMBS are documented in this file.
 
 ### Changed
 
+- The LHWIT family headers declare their type and opcodes with `CRUMBS_DEFINE_FAMILY` and every payload layout with `CRUMBS_DEFINE_PAYLOAD`; the peripherals unpack and pack through the generated codec, and the controller wrappers take a pointer to the payload struct (`led_send_blink(dev, &v)` instead of `led_send_blink(dev, idx, enable, period_ms)`). `servo_pos_result_t` and `servo_speed_result_t` hold `pos0`/`pos1` and `speed0`/`speed1` instead of two-element arrays. The LED blink table and the calculator history entry, which the codec cannot express, have hand-written `pack`/`unpack` pairs in the same shape; the calculator peripheral packs its history through it instead of copying the struct onto the bus. `tests/test_lhwit_roundtrip.c` sends every operation through the family's own codec in both directions. `docs/create-a-family.md` is rewritten to this shape. (#36)
+- `CRUMBS_DEFINE_SEND_OP` returns `-1` when its `pack_stmt` returns non-zero instead of sending whatever was packed; a `NULL` payload pointer no longer goes out as an empty frame.
+- The `platformio` CI job rewrites each project's `lib_deps` to the checkout before building, so it tests the tree rather than the last published release. The projects themselves still pin the registry.
 - The LHWIT peripherals and the handlers-usage mock peripheral declare their type with `crumbs_set_type_id()`, and every getter in the `*_ops.h` headers reads with `crumbs_controller_read_expect()` instead of comparing the reply's type and opcode by hand; a mismatch now returns `CRUMBS_RX_REPLY_MISMATCH` (`-7`) instead of `-1`. `library.json` lists the mixed-bus sketches and the four LHWIT projects as examples. (#35)
 
 ## [0.13.0] - 2026-09-14

@@ -21,8 +21,9 @@ and Linux (controller, over `i2c-dev`).
   frame is a return code, never a callback.
 - SET commands and GET queries: a peripheral registers a handler per opcode
   and a reply builder per query; a controller sends, or asks and reads.
-- Device *families*: one shared header fixes a device class's type, opcodes
-  and payload layouts, and generates the controller-side functions.
+- Device *families*: one shared header declares a device class's type,
+  opcodes and payload layouts once, checked at compile time, and generates
+  the codec both sides use and the controller-side functions.
 - Discovery: find CRUMBS devices on a bus, with their types, and tell them
   from everything else that ACKs.
 - No heap, one static context; a minimal peripheral costs about 1.2 KB of
