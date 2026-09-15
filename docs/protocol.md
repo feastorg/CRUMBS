@@ -195,7 +195,7 @@ mismatch is incompatible, and a peripheral's minor must be at least the
 controller's. `crumbs_controller_scan_for_crumbs_with_types()` reports the
 `type_id` of whatever frame each device returns.
 
-`CRUMBS_VERSION` is `major × 10000 + minor × 100 + patch` (`0.13.0` → `1300`).
+`CRUMBS_VERSION` is `major × 10000 + minor × 100 + patch` (`0.14.0` → `1400`).
 For the module version, bump major for an incompatible opcode or payload
 change, minor for additions, patch for fixes.
 

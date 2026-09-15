@@ -6,6 +6,8 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-15
+
 ### Added
 
 - `CRUMBS_DEFINE_PAYLOAD(name, wire_bytes, FIELDS)` in `crumbs_ops.h`: one X-macro field list per payload layout generates the struct, the wire size, and `pack`/`unpack` functions for both sides, so a layout is stated once instead of as an append sequence on the controller and hand-written offsets on the peripheral. The build fails if the list does not sum to the declared length or exceeds 27 bytes. `unpack` checks the length once and reads at constant offsets, so it compiles to the size of a careful hand-written unpack. (#36)
@@ -16,7 +18,7 @@ All notable changes to CRUMBS are documented in this file.
 
 ### Fixed
 
-- `crumbs_arduino.h` said callbacks could be installed before or after `crumbs_arduino_init_peripheral()`; `crumbs_init()`, which it calls, clears them, so they must be installed after (as every example does). The header now says so, and `test_arduino_hal` pins it.
+- `crumbs_arduino.h` said callbacks could be installed before or after `crumbs_arduino_init_peripheral()`; `crumbs_init()`, which it calls, clears them and the declared type, so `crumbs_set_callbacks()`, the handler registrations and `crumbs_set_type_id()` must come after (as every example does). The header now says so, and `test_arduino_hal` pins it.
 - Configuring `examples/core_usage/linux/simple_controller` or `mixed_bus_probe` from its own directory (the default in-tree mode) failed with a duplicate-target error, because the root subbuild also defined the example; the other three Linux examples configured but built every test and root example alongside. The in-tree branch now turns the root's tests and examples off, so the subbuild contributes the library only, and the standalone binaries carry the same names as the root build's (`crumbs_mock_controller`, `crumbs_controller_discovery`, `crumbs_controller_manual`). CI builds all five in-tree. (#70)
 
 ### Changed

@@ -26,7 +26,7 @@ each found device a SET_REPLY `0x00` and read:
 CRUMBS addr=0x10 type=0x01 reply_op=0x00 len=5 data=<hex> crumbs_ver=0x0514 module=1.0.0
 ```
 
-(`0x0514` is 1300, library 0.13.0). Failures print `send_rc=` / `read_n=` /
+(`0x0578` is 1400, library 0.14.0). Failures print `send_rc=` / `read_n=` /
 `decode_rc=… raw=…`. Then each sensor address:
 `Sensor addr=0x76 chip_rc=0 chip_id=0x60 model=BME280 raw_rc=0 raw=<hex>`.
 An absent sensor shows a non-zero `chip_rc`.
