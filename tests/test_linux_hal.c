@@ -338,8 +338,10 @@ static int test_scan_strict(void)
     fake_lw_add_device(0x20)->driver_owned = 1;
     fake_lw_add_device(0x30)->pad_reads = 0; /* ACKs but clocks out nothing */
 
+    fake_lw.logged_calls = 0;
     n = crumbs_linux_scan(&i2c, 0x08, 0x77, 1, found, sizeof found);
     TEST_ASSERT_EQ(t, n, 2, "responder and driver-owned address found; silent ACK is not");
+    TEST_ASSERT_SIZE_EQ(t, fake_lw.logged_calls, 0, "nothing is logged during the sweep");
     TEST_ASSERT_EQ(t, found[0], 0x10, "0x10");
     TEST_ASSERT_EQ(t, found[1], 0x20, "0x20 (driver-owned)");
     TEST_ASSERT(t, strstr(fake_lw.trace, "T10 R1 ") != NULL, "strict probe is a one-byte read");
@@ -365,8 +367,10 @@ static int test_scan_quick(void)
     fake_lw_add_device(0x20)->driver_owned = 1;
     fake_lw_add_device(0x30)->pad_reads = 0;
 
+    fake_lw.logged_calls = 0;
     n = crumbs_linux_scan(&i2c, 0x08, 0x77, 0, found, sizeof found);
     TEST_ASSERT_EQ(t, n, 3, "every ACKing address found, including driver-owned");
+    TEST_ASSERT_SIZE_EQ(t, fake_lw.logged_calls, 0, "nothing is logged during the sweep");
     TEST_ASSERT_EQ(t, found[2], 0x30, "an address that ACKs without data is present");
     TEST_ASSERT(t, strstr(fake_lw.trace, "R") == NULL, "Quick Write puts no data on the bus");
     TEST_ASSERT_EQ(t, i2c.bus.log_errors, 1, "error logging restored after the sweep");
@@ -413,8 +417,10 @@ static int test_scan_for_crumbs(void)
     quiet->reply_after_write = 1; /* answers only once asked */
 
     memset(types, 0, sizeof types);
+    fake_lw.logged_calls = 0;
     n = crumbs_linux_scan_for_crumbs_with_types(&ctx, &i2c, 0x08, 0x77, 1, found, types, 8, 0);
     TEST_ASSERT_EQ(t, n, 2, "strict: the two devices that reply unprompted");
+    TEST_ASSERT_SIZE_EQ(t, fake_lw.logged_calls, 0, "nothing is logged during the scan");
     TEST_ASSERT_EQ(t, found[0], 0x10, "0x10 found");
     TEST_ASSERT_EQ(t, types[0], 0x11, "0x10 type");
     TEST_ASSERT_EQ(t, found[1], 0x12, "0x12 found");

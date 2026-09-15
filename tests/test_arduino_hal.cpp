@@ -374,6 +374,7 @@ static int test_write_then_read(void)
     uint8_t rx[8];
     uint8_t big[BUFFER_LENGTH + 1];
     fake_wire_device_t *d;
+    unsigned long before;
 
     reset();
     d = add_crumbs_device(0x10, 0x11, 0x01, payload, sizeof payload);
@@ -408,8 +409,10 @@ static int test_write_then_read(void)
 
     TEST_ASSERT_EQ(t, crumbs_arduino_write_then_read(NULL, 0x30, tx, sizeof tx, rx, 5, 0, 0), -2,
                    "-2 when the write phase NACKs");
+    before = micros();
     TEST_ASSERT_EQ(t, crumbs_arduino_write_then_read(NULL, 0x30, NULL, 0, rx, 5, 500, 0), 0,
                    "a NACKed read phase returns nothing");
+    TEST_ASSERT_EQ(t, micros() - before, 500, "the read phase polls until its deadline");
     TEST_ASSERT_EQ(t, crumbs_arduino_write_then_read(NULL, 0x10, big, sizeof big, rx, 5, 0, 0), -6,
                    "-6 when tx exceeds the Wire buffer");
     TEST_ASSERT_EQ(t, crumbs_arduino_write_then_read(NULL, 0x10, tx, sizeof tx, big, sizeof big, 0, 0), -6,

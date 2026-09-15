@@ -72,7 +72,6 @@ void TwoWire::beginTransmission(uint8_t address)
     trace_item(item);
     tx_addr = address;
     tx_len = 0;
-    in_transmission = 1;
 }
 
 void TwoWire::beginTransmission(int address) { beginTransmission((uint8_t)address); }
@@ -100,13 +99,9 @@ uint8_t TwoWire::endTransmission(uint8_t sendStop)
     fake_wire_device_t *d;
     snprintf(item, sizeof item, "P%d ", sendStop ? 1 : 0);
     trace_item(item);
-    in_transmission = 0;
-    if (end_returns)
-        return end_returns;
     d = find(tx_addr);
     if (!d)
         return 2;
-    d->addressed++;
     if (tx_len)
     {
         size_t n = tx_len;
@@ -132,7 +127,7 @@ uint8_t TwoWire::requestFrom(uint8_t address, uint8_t quantity)
     rx_len = 0;
     rx_pos = 0;
     d = find(address);
-    if (!d || (d->reply_after_write && d->writes == 0))
+    if (!d)
         return 0;
     if (quantity > BUFFER_LENGTH)
         quantity = BUFFER_LENGTH;

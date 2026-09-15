@@ -44,6 +44,7 @@ typedef struct
     fake_lw_device_t dev[FAKE_LW_MAX_DEVICES];
     size_t ndev;
     int target; /* last lw_set_target() address, -1 before any */
+    size_t logged_calls; /* bus calls made while bus->log_errors was on */
 
     char trace[4096]; /* "T10 W4 R31 P11 I10 " ... */
 } fake_lw_bus_t;

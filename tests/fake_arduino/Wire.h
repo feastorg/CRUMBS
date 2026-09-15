@@ -18,7 +18,6 @@
 struct fake_wire_device_t
 {
     uint8_t addr;
-    int reply_after_write; /* NACKs reads until something has been written */
     uint8_t reply[FAKE_WIRE_BUF];
     size_t reply_len;
     size_t reply_pos;
@@ -26,7 +25,6 @@ struct fake_wire_device_t
     uint8_t written[FAKE_WIRE_BUF];
     size_t written_len;
     size_t writes;     /* transmissions that carried bytes */
-    size_t addressed;  /* transmissions, with or without bytes */
 };
 
 class TwoWire
@@ -59,8 +57,9 @@ public:
     void (*request_fn)();
 
     /* Scripting. */
-    size_t write_returns; /* if non-zero, write(buf, n) reports this many */
-    uint8_t end_returns;  /* if non-zero, endTransmission() reports this */
+    size_t write_returns; /* if non-zero, write(buf, n) reports this many (the
+                             AVR core always reports n; other cores report what
+                             fit in the buffer) */
 
     char trace[4096];
 
@@ -71,7 +70,6 @@ public:
     size_t rx_len;
     size_t rx_pos;
     uint8_t tx_addr;
-    int in_transmission;
 
     fake_wire_device_t dev[FAKE_WIRE_MAX_DEVICES];
     size_t ndev;

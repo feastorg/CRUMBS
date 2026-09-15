@@ -47,6 +47,12 @@ static void trace_item(const char *item)
     strncat(fake_lw.trace, item, sizeof fake_lw.trace - strlen(fake_lw.trace) - 1);
 }
 
+static void note_logging(const lw_i2c_bus *bus)
+{
+    if (bus->log_errors)
+        fake_lw.logged_calls++;
+}
+
 static void trace_addr(char op, int addr)
 {
     char item[16];
@@ -93,6 +99,7 @@ int lw_set_target(lw_i2c_bus *bus, uint8_t addr)
 {
     fake_lw_device_t *d;
     trace_addr('T', addr);
+    note_logging(bus);
     if (bus->fd < 0)
     {
         errno = EBADF;
@@ -112,6 +119,7 @@ int lw_probe(lw_i2c_bus *bus, uint8_t addr)
 {
     fake_lw_device_t *d;
     trace_addr('P', addr);
+    note_logging(bus);
     if (bus->fd < 0)
     {
         errno = EBADF;
@@ -136,6 +144,7 @@ ssize_t lw_write(lw_i2c_bus *bus, const uint8_t *data, size_t len, int send_stop
     fake_lw_device_t *d;
     (void)send_stop; /* linux-wire always ends a write() with STOP */
     trace_len('W', len);
+    note_logging(bus);
     if (bus->fd < 0)
     {
         errno = EBADF;
@@ -191,6 +200,7 @@ ssize_t lw_read(lw_i2c_bus *bus, uint8_t *buf, size_t len)
 {
     fake_lw_device_t *d;
     trace_len('R', len);
+    note_logging(bus);
     if (bus->fd < 0)
     {
         errno = EBADF;
@@ -212,6 +222,7 @@ ssize_t lw_ioctl_read(lw_i2c_bus *bus, uint16_t addr, const uint8_t *iaddr, size
     ssize_t n;
     (void)flags;
     trace_addr('I', addr);
+    note_logging(bus);
     if (bus->fd < 0)
     {
         errno = EBADF;
@@ -223,9 +234,9 @@ ssize_t lw_ioctl_read(lw_i2c_bus *bus, uint16_t addr, const uint8_t *iaddr, size
         return -1;
     }
     d = find_dev(addr);
-    if (!d || d->driver_owned)
+    if (!d)
     {
-        errno = d ? EBUSY : EREMOTEIO;
+        errno = EREMOTEIO;
         return -1;
     }
     if (iaddr_len > 0)
