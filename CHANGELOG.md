@@ -6,7 +6,7 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
-## [0.14.0] - 2026-09-15
+## [0.14.0] - 2026-09-14
 
 ### Added
 
