@@ -305,6 +305,7 @@ void setup()
 
     /* Initialize CRUMBS context */
     crumbs_arduino_init_peripheral(&ctx, PERIPHERAL_ADDR);
+    crumbs_set_type_id(&ctx, CALC_TYPE_ID); /* drop frames addressed to other families */
 
     /* Register SET operation handlers */
     crumbs_register_handler(&ctx, CALC_OP_ADD, handler_add, nullptr);

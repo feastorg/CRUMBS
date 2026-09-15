@@ -191,6 +191,7 @@ void setup()
 
     /* Initialize CRUMBS context */
     crumbs_arduino_init_peripheral(&ctx, PERIPHERAL_ADDR);
+    crumbs_set_type_id(&ctx, MOCK_TYPE_ID); /* drop frames addressed to other families */
 
     /* Register SET operation handlers */
     crumbs_register_handler(&ctx, MOCK_OP_ECHO, handler_echo, nullptr);

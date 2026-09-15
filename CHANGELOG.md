@@ -4,6 +4,12 @@ All notable changes to CRUMBS are documented in this file.
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- The LHWIT peripherals and the handlers-usage mock peripheral declare their type with `crumbs_set_type_id()`, and every getter in the `*_ops.h` headers reads with `crumbs_controller_read_expect()` instead of comparing the reply's type and opcode by hand; a mismatch now returns `CRUMBS_RX_REPLY_MISMATCH` (`-7`) instead of `-1`. `library.json` lists the mixed-bus sketches and the four LHWIT projects as examples. (#35)
+
 ## [0.13.0] - 2026-09-14
 
 ### Added
