@@ -24,10 +24,11 @@ uses the Arduino `Servo` library.
 Speed `n` moves `n`° every 20 ms, so `1` is the slowest at 50 °/s and `20` is
 1000 °/s. Boot state: 90°, speed 0, sweep off. `idx ≥ 2` is rejected.
 
-Wrappers: `servo_send_set_pos(dev, idx, pos)`, `servo_send_set_speed(dev,
-idx, speed)`, `servo_send_sweep(dev, idx, enable, min, max, step)`,
-`servo_get_pos(dev, &servo_pos_result_t)`, `servo_get_speed(dev,
-&servo_speed_result_t)`.
+Wrappers, each taking a pointer to its payload struct:
+`servo_send_set_pos(dev, &servo_set_pos_t)`, `servo_send_set_speed(dev,
+&servo_set_speed_t)`, `servo_send_sweep(dev, &servo_sweep_t)`,
+`servo_get_pos(dev, &servo_pos_result_t)` (`pos0`, `pos1`),
+`servo_get_speed(dev, &servo_speed_result_t)` (`speed0`, `speed1`).
 
 ## Serial
 

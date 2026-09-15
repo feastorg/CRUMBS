@@ -1,28 +1,15 @@
 /**
  * @file led_ops.h
- * @brief LED control command definitions (Type ID 0x01)
+ * @brief LED array family (type 0x01): four LEDs on D4-D7, static or blinking.
  *
- * This file defines commands for controlling a 4-LED array peripheral.
- * The peripheral controls individual LEDs (D4-D7) with support for
- * static state and blinking patterns.
- *
- * Pattern: State-query interface
- * - SET operations (0x01-0x03): Set LED states and blink patterns
- * - GET operations (0x80-0x81): Query current state via SET_REPLY
- *
- * Commands:
- * - LED_OP_SET_ALL:     Set all 4 LEDs at once
- * - LED_OP_SET_ONE:     Set individual LED state
- * - LED_OP_BLINK:       Configure LED blinking
- * - LED_OP_GET_STATE:   Request LED states (via SET_REPLY)
- * - LED_OP_GET_BLINK:   Request blink configuration (via SET_REPLY)
+ * SET opcodes set states and blink patterns; GET opcodes read them back via
+ * SET_REPLY. Every payload layout is declared once below and packed and
+ * unpacked by both sides through the generated codec.
  */
 
 #ifndef LED_OPS_H
 #define LED_OPS_H
 
-#include "crumbs.h"
-#include "crumbs_message_helpers.h"
 #include "crumbs_ops.h"
 
 #ifdef __cplusplus
@@ -30,253 +17,92 @@ extern "C"
 {
 #endif
 
-/* ============================================================================
- * Device Identity
- * ============================================================================ */
+/* ---- Identity ------------------------------------------------------------ */
 
-/** @brief Type ID for LED array device. */
-#define LED_TYPE_ID 0x01
+#define LED_OPS(X)                                                             \
+    X(LED_OP_SET_ALL, 0x01)   /* [mask:u8] bits 0-3 = LEDs 0-3, 1 = on */       \
+    X(LED_OP_SET_ONE, 0x02)   /* [led_idx:u8][state:u8] */                      \
+    X(LED_OP_BLINK, 0x03)     /* [led_idx:u8][enable:u8][period_ms:u16] */      \
+    X(LED_OP_GET_STATE, 0x80) /* reply [states:u8] */                          \
+    X(LED_OP_GET_BLINK, 0x81) /* reply [enable:u8][period_ms:u16] x 4 LEDs */
+CRUMBS_DEFINE_FAMILY(LED, 0x01, LED_OPS)
 
-/* Module protocol version (opcode 0x00 convention, docs/protocol.md) */
+/* Module version reported by opcode 0x00 (docs/protocol.md). */
 #define LED_MODULE_VER_MAJOR 1
 #define LED_MODULE_VER_MINOR 0
 #define LED_MODULE_VER_PATCH 0
 
-/* ============================================================================
- * Command Definitions: SET Operations (Control LEDs)
- * ============================================================================ */
+/* ---- Payloads ------------------------------------------------------------ */
 
-/**
- * @brief Set all LEDs at once.
- * Payload: [mask:u8] (bits 0-3 control LEDs 0-3, bit=1 means ON)
- * Example: 0x05 = 0b0101 = LEDs 0 and 2 ON, LEDs 1 and 3 OFF
- */
-#define LED_OP_SET_ALL 0x01
+#define LED_SET_ALL_FIELDS(X) X(u8, mask) /* bits 0-3 = LEDs 0-3, 1 = on */
+CRUMBS_DEFINE_PAYLOAD(led_set_all, 1, LED_SET_ALL_FIELDS)
 
-/**
- * @brief Set individual LED state.
- * Payload: [led_idx:u8][state:u8]
- *   - led_idx: LED index (0-3 for D4-D7)
- *   - state: 0=OFF, 1=ON
- */
-#define LED_OP_SET_ONE 0x02
+#define LED_SET_ONE_FIELDS(X) \
+    X(u8, led_idx)            /* 0-3 */ \
+    X(u8, state)              /* 0 = off, 1 = on */
+CRUMBS_DEFINE_PAYLOAD(led_set_one, 2, LED_SET_ONE_FIELDS)
 
-/**
- * @brief Configure LED blinking.
- * Payload: [led_idx:u8][enable:u8][period_ms:u16]
- *   - led_idx: LED index (0-3)
- *   - enable: 0=disable blink, 1=enable blink
- *   - period_ms: Blink period in milliseconds (full on-off cycle)
- */
-#define LED_OP_BLINK 0x03
+#define LED_BLINK_FIELDS(X) \
+    X(u8, led_idx)          /* 0-3 */ \
+    X(u8, enable)           /* 0 = steady, 1 = blink */ \
+    X(u16, period_ms)       /* full on-off cycle */
+CRUMBS_DEFINE_PAYLOAD(led_blink, 4, LED_BLINK_FIELDS)
 
-/* ============================================================================
- * Command Definitions: GET Operations (Query State via SET_REPLY)
- * ============================================================================ */
-
-/**
- * @brief Request current LED states.
- * Payload: none
- * Reply: [states:u8] (bits 0-3 represent LEDs 0-3, bit=1 means ON)
- */
-#define LED_OP_GET_STATE 0x80
-
-/**
- * @brief Request blink configuration for all LEDs.
- * Payload: none
- * Reply: [led0_enable:u8][led0_period:u16]...[led3_enable:u8][led3_period:u16]
- *        Total: 12 bytes (3 bytes per LED x 4 LEDs)
- */
-#define LED_OP_GET_BLINK 0x81
-
-    /* ============================================================================
-     * Controller Side: Command Senders
-     * ============================================================================ */
+#define LED_STATE_RESULT_FIELDS(X) X(u8, states) /* bits 0-3 = LEDs 0-3 */
+CRUMBS_DEFINE_PAYLOAD(led_state_result, 1, LED_STATE_RESULT_FIELDS)
 
     /**
-     * @brief Set all LEDs at once.
+     * @brief Reply to LED_OP_GET_BLINK: per-LED blink configuration.
      *
-     * @param dev  Bound device handle (see crumbs_device_t).
-     * @param mask LED mask (bits 0-3 control LEDs 0-3).
-     * @return 0 on success, non-zero on error.
-     */
-    static inline int led_send_set_all(const crumbs_device_t *dev, uint8_t mask)
-    {
-        crumbs_message_t msg;
-        if (!crumbs_ops_can_send(dev))
-            return -1;
-        crumbs_msg_init(&msg, LED_TYPE_ID, LED_OP_SET_ALL);
-        crumbs_msg_add_u8(&msg, mask);
-        return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
-    }
-
-    /**
-     * @brief Set individual LED state.
-     *
-     * @param dev     Bound device handle (see crumbs_device_t).
-     * @param led_idx LED index (0-3).
-     * @param state   LED state (0=OFF, 1=ON).
-     * @return 0 on success, non-zero on error.
-     */
-    static inline int led_send_set_one(const crumbs_device_t *dev,
-                                       uint8_t led_idx,
-                                       uint8_t state)
-    {
-        crumbs_message_t msg;
-        if (!crumbs_ops_can_send(dev))
-            return -1;
-        crumbs_msg_init(&msg, LED_TYPE_ID, LED_OP_SET_ONE);
-        crumbs_msg_add_u8(&msg, led_idx);
-        crumbs_msg_add_u8(&msg, state);
-        return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
-    }
-
-    /**
-     * @brief Configure LED blinking.
-     *
-     * @param dev       Bound device handle (see crumbs_device_t).
-     * @param led_idx   LED index (0-3).
-     * @param enable    Enable blinking (0=OFF, 1=ON).
-     * @param period_ms Blink period in milliseconds.
-     * @return 0 on success, non-zero on error.
-     */
-    static inline int led_send_blink(const crumbs_device_t *dev,
-                                     uint8_t led_idx,
-                                     uint8_t enable,
-                                     uint16_t period_ms)
-    {
-        crumbs_message_t msg;
-        if (!crumbs_ops_can_send(dev))
-            return -1;
-        crumbs_msg_init(&msg, LED_TYPE_ID, LED_OP_BLINK);
-        crumbs_msg_add_u8(&msg, led_idx);
-        crumbs_msg_add_u8(&msg, enable);
-        crumbs_msg_add_u16(&msg, period_ms);
-        return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
-    }
-
-    /**
-     * @brief Query current LED states (peripheral will respond on next I2C read).
-     *
-     * @internal Used by led_get_state(); prefer that function for combined query+read.
-     *
-     * @param dev  Bound device handle (see crumbs_device_t).
-     * @return 0 on success, non-zero on error.
-     */
-    static inline int led_query_state(const crumbs_device_t *dev)
-    {
-        crumbs_message_t msg;
-        if (!crumbs_ops_can_send(dev))
-            return -1;
-        crumbs_msg_init(&msg, 0, CRUMBS_CMD_SET_REPLY);
-        crumbs_msg_add_u8(&msg, LED_OP_GET_STATE);
-        return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
-    }
-
-    /**
-     * @brief Query blink configuration (peripheral will respond on next I2C read).
-     *
-     * @internal Used by led_get_blink(); prefer that function for combined query+read.
-     *
-     * @param dev  Bound device handle (see crumbs_device_t).
-     * @return 0 on success, non-zero on error.
-     */
-    static inline int led_query_blink(const crumbs_device_t *dev)
-    {
-        crumbs_message_t msg;
-        if (!crumbs_ops_can_send(dev))
-            return -1;
-        crumbs_msg_init(&msg, 0, CRUMBS_CMD_SET_REPLY);
-        crumbs_msg_add_u8(&msg, LED_OP_GET_BLINK);
-        return crumbs_controller_send(dev->ctx, dev->addr, &msg, dev->write_fn, dev->io);
-    }
-
-    /* ============================================================================
-     * Controller Side: Combined Query + Read (Receiver API)
-     * ============================================================================ */
-
-    /**
-     * @brief Result struct for LED_OP_GET_STATE.
-     *
-     * Bits 0-3 represent LEDs 0-3 (bit=1 means ON).
+     * Wire: [enable:u8][period_ms:u16] repeated for LEDs 0-3, 12 bytes.
+     * Written by hand because the codec has no array fields.
      */
     typedef struct
     {
-        uint8_t states; /**< Bitmask of LED states (bits 0-3 = LEDs 0-3). */
-    } led_state_result_t;
-
-    /**
-     * @brief Result struct for LED_OP_GET_BLINK.
-     *
-     * Per-LED blink configuration (4 LEDs, indexed 0-3).
-     */
-    typedef struct
-    {
-        uint8_t  enable[4];    /**< Blink enable per LED (0=off, 1=on). */
-        uint16_t period_ms[4]; /**< Blink period in milliseconds per LED. */
+        uint8_t enable[4];     /**< 0 = steady, 1 = blink. */
+        uint16_t period_ms[4]; /**< Full on-off cycle. */
     } led_blink_result_t;
 
-    /**
-     * @brief Combined SET_REPLY query + read + parse for LED states.
-     *
-     * Sends the query, waits dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US),
-     * reads the reply via crumbs_controller_read_expect(), and parses the payload.
-     *
-     * @param dev  Bound device handle (see crumbs_device_t).
-     * @param out  Output struct (must not be NULL).
-     * @return 0 on success, non-zero on I2C or decode/parse error.
-     */
-    static inline int led_get_state(const crumbs_device_t *dev, led_state_result_t *out)
+    /** @brief Append a led_blink_result_t to @p msg. */
+    static inline int led_blink_result_pack(crumbs_message_t *msg, const led_blink_result_t *v)
     {
-        crumbs_message_t reply;
-        int rc;
-        if (!out || !crumbs_ops_can_get(dev))
+        int i;
+        if (!msg || !v)
             return -1;
-        rc = led_query_state(dev);
-        if (rc != 0)
-            return rc;
-        dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);
-        rc = crumbs_controller_read_expect(dev->ctx, dev->addr, LED_TYPE_ID, LED_OP_GET_STATE,
-                                          &reply, dev->read_fn, dev->io);
-        if (rc != 0)
-            return rc;
-        return crumbs_msg_read_u8(reply.data, reply.data_len, 0, &out->states);
-    }
-
-    /**
-     * @brief Combined SET_REPLY query + read + parse for LED blink config.
-     *
-     * @param dev  Bound device handle (see crumbs_device_t).
-     * @param out  Output struct (must not be NULL).
-     * @return 0 on success, non-zero on error.
-     */
-    static inline int led_get_blink(const crumbs_device_t *dev, led_blink_result_t *out)
-    {
-        crumbs_message_t reply;
-        int rc;
-        if (!out || !crumbs_ops_can_get(dev))
-            return -1;
-        rc = led_query_blink(dev);
-        if (rc != 0)
-            return rc;
-        dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);
-        rc = crumbs_controller_read_expect(dev->ctx, dev->addr, LED_TYPE_ID, LED_OP_GET_BLINK,
-                                          &reply, dev->read_fn, dev->io);
-        if (rc != 0)
-            return rc;
-        /* Reply: [led0_enable:u8][led0_period:u16]...[led3_enable:u8][led3_period:u16] */
-        for (uint8_t i = 0; i < 4; i++)
+        for (i = 0; i < 4; i++)
         {
-            uint8_t off = (uint8_t)(i * 3u);
-            rc = crumbs_msg_read_u8(reply.data, reply.data_len, off, &out->enable[i]);
-            if (rc != 0)
-                return rc;
-            rc = crumbs_msg_read_u16(reply.data, reply.data_len, (uint8_t)(off + 1u), &out->period_ms[i]);
-            if (rc != 0)
-                return rc;
+            if (crumbs_msg_add_u8(msg, v->enable[i]) != 0 || crumbs_msg_add_u16(msg, v->period_ms[i]) != 0)
+                return -1;
         }
         return 0;
     }
+
+    /** @brief Read a led_blink_result_t from the front of @p data. */
+    static inline int led_blink_result_unpack(const uint8_t *data, size_t len, led_blink_result_t *v)
+    {
+        int i;
+        if (!data || !v || len < 12u)
+            return -1;
+        for (i = 0; i < 4; i++)
+        {
+            v->enable[i] = data[i * 3];
+            v->period_ms[i] = (uint16_t)(data[i * 3 + 1] | ((uint16_t)data[i * 3 + 2] << 8));
+        }
+        return 0;
+    }
+
+    /* ---- Controller ---------------------------------------------------------- */
+
+    CRUMBS_DEFINE_SEND_OP(led, set_all, LED_TYPE_ID, LED_OP_SET_ALL,
+                          const led_set_all_t *v, led_set_all_pack(&_m, v))
+    CRUMBS_DEFINE_SEND_OP(led, set_one, LED_TYPE_ID, LED_OP_SET_ONE,
+                          const led_set_one_t *v, led_set_one_pack(&_m, v))
+    CRUMBS_DEFINE_SEND_OP(led, blink, LED_TYPE_ID, LED_OP_BLINK,
+                          const led_blink_t *v, led_blink_pack(&_m, v))
+    CRUMBS_DEFINE_GET_OP(led, state, LED_TYPE_ID, LED_OP_GET_STATE,
+                         led_state_result_t, led_state_result_unpack)
+    CRUMBS_DEFINE_GET_OP(led, blink, LED_TYPE_ID, LED_OP_GET_BLINK,
+                         led_blink_result_t, led_blink_result_unpack)
 
 #ifdef __cplusplus
 }

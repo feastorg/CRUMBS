@@ -313,17 +313,19 @@ static inline int crumbs_ops_can_get(const crumbs_device_t *dev)
 /**
  * @brief Define `family_send_name(dev, param)` for one single-parameter SET opcode.
  *
- * Returns -1 for an unbound device, otherwise the crumbs_controller_send() result.
- * Operations with two or more parameters are written as ordinary static inline
- * functions; the lhwit_family ops headers show the pattern.
+ * Returns -1 for an unbound device or when @p pack_stmt returns non-zero,
+ * otherwise the crumbs_controller_send() result. The parameter is usually a
+ * pointer to a payload struct from CRUMBS_DEFINE_PAYLOAD() and @p pack_stmt
+ * its `_pack` call; a single scalar with a `crumbs_msg_add_*` call works too.
  *
  * @param family        Token prefix.
  * @param name          Operation name token.
  * @param type_id_value Peripheral type ID constant.
  * @param opcode_value  Opcode constant.
- * @param param_decl    Single typed parameter, e.g. `uint8_t mask`.
+ * @param param_decl    Single typed parameter, e.g. `const led_blink_t *v`.
  * @param pack_stmt     Expression (no trailing semicolon) packing the parameter into
- *                      the local message `_m`, e.g. `crumbs_msg_add_u8(&_m, mask)`.
+ *                      the local message `_m` and returning 0 on success, e.g.
+ *                      `led_blink_pack(&_m, v)`.
  */
 #define CRUMBS_DEFINE_SEND_OP(family, name, type_id_value, opcode_value, param_decl, pack_stmt) \
     static inline int family##_send_##name(const crumbs_device_t *dev, param_decl)    \
@@ -331,7 +333,7 @@ static inline int crumbs_ops_can_get(const crumbs_device_t *dev)
         crumbs_message_t _m;                                                           \
         if (!crumbs_ops_can_send(dev)) return -1;                                     \
         crumbs_msg_init(&_m, (uint8_t)(type_id_value), (uint8_t)(opcode_value));      \
-        pack_stmt;                                                                     \
+        if ((pack_stmt) != 0) return -1;                                               \
         return crumbs_controller_send(dev->ctx, dev->addr, &_m,                       \
                                       dev->write_fn, dev->io);                        \
     }

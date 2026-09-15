@@ -109,9 +109,9 @@ static int test_macro_wrappers_reject_invalid_devices(void)
     return 0;
 }
 
-static int test_hand_written_wrappers_reject_invalid_devices(void)
+static int test_family_wrappers_reject_invalid_devices(void)
 {
-    const char *t = "hand_written_wrappers_reject_invalid_devices";
+    const char *t = "family_wrappers_reject_invalid_devices";
     crumbs_context_t ctx;
     test_init_controller(&ctx);
     ops_io_t io;
@@ -120,30 +120,33 @@ static int test_hand_written_wrappers_reject_invalid_devices(void)
     crumbs_device_t missing_write = {&ctx, 0x20, NULL, ops_read, ops_delay, &io};
     crumbs_device_t send_only = {&ctx, 0x20, ops_write, NULL, NULL, &io};
     uint8_t payload[1] = {0xAA};
-    uint8_t segments[4] = {1, 2, 3, 4};
+    led_set_all_t led_all = {0x0F};
+    servo_sweep_t sweep = {0, 1, 0, 180, 5};
+    display_set_segments_t segments = {1, 2, 3, 4};
+    calc_operands_t operands = {1, 2};
     led_state_result_t led_state;
     servo_pos_result_t servo_pos;
     display_value_result_t display_value;
     calc_result_t calc_result;
     mock_status_result_t mock_status;
 
-    TEST_ASSERT_EQ(t, led_send_set_all(NULL, 0x0F), -1, "LED send accepted NULL dev");
+    TEST_ASSERT_EQ(t, led_send_set_all(NULL, &led_all), -1, "LED send accepted NULL dev");
     TEST_ASSERT_EQ(t, led_query_state(&missing_write), -1, "LED query accepted missing write_fn");
     TEST_ASSERT_EQ(t, led_get_state(&send_only, &led_state), -1, "LED get accepted send-only dev");
 
-    TEST_ASSERT_EQ(t, servo_send_sweep(NULL, 0, 1, 0, 180, 5), -1,
+    TEST_ASSERT_EQ(t, servo_send_sweep(NULL, &sweep), -1,
                    "servo send accepted NULL dev");
     TEST_ASSERT_EQ(t, servo_get_pos(&send_only, &servo_pos), -1,
                    "servo get accepted send-only dev");
 
-    TEST_ASSERT_EQ(t, display_send_set_segments(NULL, segments), -1,
+    TEST_ASSERT_EQ(t, display_send_set_segments(NULL, &segments), -1,
                    "display send accepted NULL dev");
     TEST_ASSERT_EQ(t, display_send_set_segments(&send_only, NULL), -1,
-                   "display send accepted NULL segments");
+                   "display send accepted NULL payload");
     TEST_ASSERT_EQ(t, display_get_value(&send_only, &display_value), -1,
                    "display get accepted send-only dev");
 
-    TEST_ASSERT_EQ(t, calc_send_add(NULL, 1, 2), -1, "calculator send accepted NULL dev");
+    TEST_ASSERT_EQ(t, calc_send_add(NULL, &operands), -1, "calculator send accepted NULL dev");
     TEST_ASSERT_EQ(t, calc_get_result(&send_only, &calc_result), -1,
                    "calculator get accepted send-only dev");
 
@@ -154,8 +157,8 @@ static int test_hand_written_wrappers_reject_invalid_devices(void)
     TEST_ASSERT_EQ(t, mock_get_status(&send_only, &mock_status), -1,
                    "mock get accepted send-only dev");
 
-    TEST_ASSERT_EQ(t, io.write_calls, 0, "invalid hand-written wrappers should not write");
-    TEST_ASSERT_EQ(t, io.read_calls, 0, "invalid hand-written wrappers should not read");
+    TEST_ASSERT_EQ(t, io.write_calls, 0, "invalid family wrappers should not write");
+    TEST_ASSERT_EQ(t, io.read_calls, 0, "invalid family wrappers should not read");
     return 0;
 }
 
@@ -168,7 +171,8 @@ static int test_valid_send_still_uses_transport(void)
     memset(&io, 0, sizeof(io));
     crumbs_device_t dev = {&ctx, 0x20, ops_write, NULL, NULL, &io};
 
-    TEST_ASSERT_EQ(t, led_send_set_all(&dev, 0x0F), 0, "LED send failed");
+    led_set_all_t led_all = {0x0F};
+    TEST_ASSERT_EQ(t, led_send_set_all(&dev, &led_all), 0, "LED send failed");
     TEST_ASSERT_EQ(t, ops_test_send_set_value(&dev, 9), 0, "macro send failed");
     TEST_ASSERT_EQ(t, io.write_calls, 2, "valid sends did not call write");
     return 0;
@@ -182,7 +186,7 @@ int main(void)
         return 1;
     if (test_macro_wrappers_reject_invalid_devices() != 0)
         return 1;
-    if (test_hand_written_wrappers_reject_invalid_devices() != 0)
+    if (test_family_wrappers_reject_invalid_devices() != 0)
         return 1;
     if (test_valid_send_still_uses_transport() != 0)
         return 1;

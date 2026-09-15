@@ -23,10 +23,10 @@ Blink is serviced from `loop()` every 10 ms, so periods below that resolve
 to it; nothing enforces a minimum. Defaults: all off, blink disabled,
 period 1000 ms.
 
-Controller wrappers: `led_send_set_all(dev, mask)`, `led_send_set_one(dev,
-idx, state)`, `led_send_blink(dev, idx, enable, period_ms)`,
-`led_get_state(dev, &led_state_result_t)`, `led_get_blink(dev,
-&led_blink_result_t)`.
+Controller wrappers, each taking a pointer to its payload struct:
+`led_send_set_all(dev, &led_set_all_t)`, `led_send_set_one(dev,
+&led_set_one_t)`, `led_send_blink(dev, &led_blink_t)`, `led_get_state(dev,
+&led_state_result_t)`, `led_get_blink(dev, &led_blink_result_t)`.
 
 ## Serial
 
