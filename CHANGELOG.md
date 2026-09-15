@@ -6,6 +6,10 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Configuring `examples/core_usage/linux/simple_controller` or `mixed_bus_probe` from its own directory (the default in-tree mode) failed with a duplicate-target error, because the root subbuild also defined the example; the other three Linux examples configured but built every test and root example alongside. The in-tree branch now turns the root's tests and examples off, so the subbuild contributes the library only, and the standalone binaries carry the same names as the root build's (`crumbs_mock_controller`, `crumbs_controller_discovery`, `crumbs_controller_manual`). CI builds all five in-tree. (#70)
+
 ### Changed
 
 - The LHWIT peripherals and the handlers-usage mock peripheral declare their type with `crumbs_set_type_id()`, and every getter in the `*_ops.h` headers reads with `crumbs_controller_read_expect()` instead of comparing the reply's type and opcode by hand; a mismatch now returns `CRUMBS_RX_REPLY_MISMATCH` (`-7`) instead of `-1`. `library.json` lists the mixed-bus sketches and the four LHWIT projects as examples. (#35)

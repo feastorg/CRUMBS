@@ -171,6 +171,23 @@ jobs:
             -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
           cmake --build build-controller-manual --parallel
 
+      - name: Build every Linux example in-tree (library subbuild only)
+        env:
+          CMAKE_PREFIX_PATH: ${{ github.workspace }}/third_party/linux-wire/install
+        run: |
+          for ex in core_usage/linux/simple_controller core_usage/linux/mixed_bus_probe \
+                    handlers_usage/linux/mock_controller families_usage/controller_discovery \
+                    families_usage/controller_manual; do
+            name=$(basename "$ex")
+            cmake -S "examples/$ex" -B "build-intree-$name" -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
+            cmake --build "build-intree-$name" --parallel
+            # The subbuild must contribute the library only: no tests, no root examples.
+            if ls "build-intree-$name"/crumbs_subbuild/test_* "build-intree-$name"/crumbs_subbuild/crumbs_* >/dev/null 2>&1; then
+              echo "::error::in-tree build of $ex pulled in tests or root examples"; exit 1
+            fi
+          done
+
   # ---------------------------------------------------------------------------
   # PlatformIO Builds
   # ---------------------------------------------------------------------------
