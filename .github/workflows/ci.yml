@@ -334,14 +334,17 @@ jobs:
             -DCRUMBS_BUILD_EXAMPLES=OFF \
             -DCRUMBS_ENABLE_LINUX_HAL=OFF \
             -DCMAKE_C_FLAGS="${{ matrix.c_flags }}" \
+            -DCMAKE_CXX_FLAGS="${{ matrix.c_flags }}" \
             -DCMAKE_EXE_LINKER_FLAGS="${{ matrix.link_flags }}"
 
       - name: Build
         run: cmake --build build-${{ matrix.name }} --parallel
 
       # test_handlers and test_reply_handler exit with the CTest skip code when
-      # the table is compiled out (Skipped, not Passed); test_set_reply compiles
-      # out its two table-dependent subtests and runs the rest.
+      # the table is compiled out (Skipped, not Passed); test_set_reply and
+      # test_arduino_hal compile out their table-dependent subtests and run
+      # the rest. The flags go to both languages: test_arduino_hal is C++ and
+      # must see the same CRUMBS_MAX_HANDLERS as the core it links.
       - name: Test
         run: ctest --test-dir build-${{ matrix.name }} --output-on-failure
 

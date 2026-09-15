@@ -18,15 +18,17 @@ Each configures into its own `build*/` directory.
 
 Options: `CRUMBS_ENABLE_LINUX_HAL` (off), `CRUMBS_BUILD_EXAMPLES` (on, but only
 built when the HAL is on), `CRUMBS_ENABLE_TESTS` (on). Two configurations CI
-also runs: `-DCMAKE_C_FLAGS=-DCRUMBS_MAX_HANDLERS=0` (two tests then skip with
-exit 77) and ASan+UBSan.
+also runs, with the flags given to both `CMAKE_C_FLAGS` and `CMAKE_CXX_FLAGS`:
+`-DCRUMBS_MAX_HANDLERS=0` (two tests then skip with exit 77) and ASan+UBSan.
 
 Tests are one binary per `tests/test_*.c`, registered in the root
-`CMakeLists.txt`; `tests/test_common.h` has the assertion macros. A test that
-needs the Linux HAL is registered under `if(CRUMBS_ENABLE_LINUX_HAL)`;
-`test_linux_hal` compiles the HAL against `tests/fake_linux_wire.c`, a scripted
-stand-in for the linux-wire calls it makes, so no bus is needed. Arduino and
-PlatformIO builds have no host tests; CI compiles the sketches.
+`CMakeLists.txt`; `tests/test_common.h` has the assertion macros. Both HALs
+run on the host against a scripted bus: `test_linux_hal` compiles the Linux
+HAL against `tests/fake_linux_wire.c` (registered under
+`if(CRUMBS_ENABLE_LINUX_HAL)`, since it needs the linux-wire header), and
+`test_arduino_hal` compiles the Arduino HAL against the `Arduino.h` and
+`Wire.h` in `tests/fake_arduino/` (needs a C++ compiler; skipped without one).
+The real sketches are compiled by the `arduino-cli` and `platformio` CI jobs.
 
 Arduino sketches compile with the tree as the library:
 
