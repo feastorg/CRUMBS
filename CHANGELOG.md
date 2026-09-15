@@ -13,6 +13,7 @@ All notable changes to CRUMBS are documented in this file.
 
 ### Fixed
 
+- `crumbs_arduino.h` said callbacks could be installed before or after `crumbs_arduino_init_peripheral()`; `crumbs_init()`, which it calls, clears them, so they must be installed after (as every example does). The header now says so, and `test_arduino_hal` pins it.
 - Configuring `examples/core_usage/linux/simple_controller` or `mixed_bus_probe` from its own directory (the default in-tree mode) failed with a duplicate-target error, because the root subbuild also defined the example; the other three Linux examples configured but built every test and root example alongside. The in-tree branch now turns the root's tests and examples off, so the subbuild contributes the library only, and the standalone binaries carry the same names as the root build's (`crumbs_mock_controller`, `crumbs_controller_discovery`, `crumbs_controller_manual`). CI builds all five in-tree. (#70)
 
 ### Changed
