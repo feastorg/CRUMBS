@@ -137,7 +137,8 @@ jobs:
         with:
           files: |
             crumbs-*.tar.gz
-            dist/*
+            dist/*.whl
+            dist/*.tar.gz
             SHA256SUMS
             manifest.json
           generate_release_notes: true
