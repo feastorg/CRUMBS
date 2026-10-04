@@ -72,6 +72,8 @@ at 115200 and press `s` and `r`.
 - **Arduino IDE:** clone into `~/Arduino/libraries/CRUMBS` (not in the
   Library Manager)
 - **Linux:** CMake, with [linux-wire](https://github.com/feastorg/linux-wire) ≥ 0.1.3
+- **Python (controller on Linux):** `pip install crumbs-i2c`, pure Python with
+  no dependencies; see [bindings/python](bindings/python/README.md)
 
 Details, wiring and troubleshooting: [docs/platform-setup.md](docs/platform-setup.md).
 

@@ -1,0 +1,66 @@
+[project]
+name = "crumbs-i2c"
+# Always the C library's version (src/crumbs_version.h); a test checks it.
+version = "0.14.0"
+description = "CRUMBS for Python: the frame, its CRC, and a controller over Linux I2C"
+readme = "bindings/python/README.md"
+requires-python = ">=3.11"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "Cameron K. Brooks" }]
+maintainers = [{ name = "Cameron K. Brooks", email = "cambrooks3393@gmail.com" }]
+keywords = ["crumbs", "i2c", "smbus", "raspberry-pi"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: System :: Hardware",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/feastorg/CRUMBS"
+Protocol = "https://github.com/feastorg/CRUMBS/blob/main/docs/protocol.md"
+Changelog = "https://github.com/feastorg/CRUMBS/blob/main/CHANGELOG.md"
+
+[build-system]
+requires = ["uv_build>=0.11,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv]
+# Keep in step with build-system.requires.
+required-version = ">=0.11,<0.13"
+
+[tool.uv.build-backend]
+module-name = "crumbs_i2c"
+module-root = "bindings/python/src"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1",
+    "pytest>=8",
+    "ruff>=0.14",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+include = ["pyproject.toml", "bindings/python/**/*.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["crumbs_i2c"]
+
+[tool.pyright]
+include = ["bindings/python"]
+strict = ["bindings/python/src"]
+pythonVersion = "3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["bindings/python/tests"]
+addopts = "-q"
