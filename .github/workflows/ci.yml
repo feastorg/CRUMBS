@@ -439,8 +439,6 @@ jobs:
           done
           exit $rc
 
-  # ─── Unified gate ─────────────────────────────────────────────────────────
-  # Branch protection requires only: CI / ok
   # Python binding (bindings/python): the vectors must be what the C core
   # writes today, and the binding must match them.
   python:
@@ -483,6 +481,8 @@ jobs:
       - name: Build the sdist and wheel
         run: uv build
 
+  # ─── Unified gate ─────────────────────────────────────────────────────────
+  # Branch protection requires only: CI / ok
   ok:
     name: ok
     if: always()

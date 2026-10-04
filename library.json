@@ -36,5 +36,15 @@
     "examples/families_usage/lhwit_family/display",
     "examples/families_usage/lhwit_family/led",
     "examples/families_usage/lhwit_family/servo"
-  ]
+  ],
+  "export": {
+    "exclude": [
+      "bindings",
+      "pyproject.toml",
+      "uv.lock",
+      "tests/golden_vectors",
+      ".ruff_cache",
+      ".venv"
+    ]
+  }
 }

@@ -7,15 +7,17 @@
         crumbs.send(0x10, Message(type_id=0x01, opcode=0x02, data=b"\\x01"))
         reply = crumbs.query(0x10, type_id=0x01, opcode=0x80)
 
-The wire format is docs/protocol.md; the frame functions are checked against
+Protocol errors are CrumbsError (FrameError, ReplyMismatch); bus errors are
+OSError. The wire format is docs/protocol.md; the frame functions are checked against
 vectors written by the C library.
 """
 
 from crumbs_i2c._controller import (
     FIRST_ADDRESS,
     LAST_ADDRESS,
+    NO_ANSWER,
+    QUERY_ATTEMPTS,
     QUERY_DELAY_S,
-    READ_ATTEMPTS,
     Bus,
     Controller,
     ReplyMismatch,
@@ -26,6 +28,7 @@ from crumbs_i2c._frame import (
     MIN_FRAME,
     SET_REPLY,
     TYPE_ID_ANY,
+    CrumbsError,
     FrameError,
     Message,
     crc8,
@@ -41,12 +44,14 @@ __all__ = [
     "MAX_FRAME",
     "MAX_PAYLOAD",
     "MIN_FRAME",
+    "NO_ANSWER",
+    "QUERY_ATTEMPTS",
     "QUERY_DELAY_S",
-    "READ_ATTEMPTS",
     "SET_REPLY",
     "TYPE_ID_ANY",
     "Bus",
     "Controller",
+    "CrumbsError",
     "FrameError",
     "LinuxBus",
     "Message",

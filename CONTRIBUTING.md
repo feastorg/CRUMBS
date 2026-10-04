@@ -105,9 +105,13 @@ changed, why, and how it was verified. Add a `[Unreleased]` entry to
 | `doxygen` | `doccheck.sh` and `check_api_index.py` (pinned to `ubuntu-24.04` for a fixed Doxygen) |
 | `docs-links` | `check_docs_links.py` |
 | `crc-regen` | Committed CRC source matches the pycrc output |
+| `python` | `tests/golden_vectors/vectors.json` is what `crumbs_gen_vectors` writes from the core today; the Python binding is formatted, lint-clean, strictly typed and passes its tests against those vectors on 3.11 and 3.13, and its sdist and wheel build |
 
-`release.yml` builds the Linux x86_64 tarball, source archive, checksums and
-manifest for a `v*` tag. `metrics.yml` publishes size metrics as an artifact
+`release.yml`, for a `v*` tag, first checks that the tag names the version in
+every package file, then builds the Linux x86_64 tarball, source archive,
+Python sdist and wheel, checksums and manifest, publishes `crumbs-i2c` to PyPI
+from the `pypi` environment once a reviewer approves, and installs it back
+from PyPI to check it. `metrics.yml` publishes size metrics as an artifact
 and gates nothing.
 
 ## Releasing
@@ -117,13 +121,17 @@ version, and the examples' `platformio.ini` pin that version for users, so the
 package must be published before the merge.
 
 1. On a branch, bump the version in `CMakeLists.txt`, `library.json`,
-   `library.properties`, `src/crumbs_version.h`, the examples' `lib_deps` and
+   `library.properties`, `src/crumbs_version.h`, `pyproject.toml` (then run
+   `uv lock`, which records it, and regenerate
+   `tests/golden_vectors/vectors.json`, which records it too), the examples'
+   `lib_deps` and
    any doc that quotes it (`git grep 'X.Y.Z'` for the old one, and its
    `CRUMBS_VERSION` word in hex, e.g. `0x0578` for 1400); date the
    `[Unreleased]` section. Open the PR. Its `platformio` lane builds the
    checkout, not the pin, so it passes before the package exists.
 2. Tag that commit (`git tag -a vX.Y.Z -m "Release vX.Y.Z"`, push the tag).
-   `release.yml` builds the GitHub release from it.
+   `release.yml` builds the GitHub release from it, then waits for a reviewer
+   to approve the PyPI upload of `crumbs-i2c`.
 3. `pio pkg publish` from the tagged tree; wait until
    `pio pkg show cameronbrooks11/CRUMBS@X.Y.Z` resolves, then `pio run` one
    example in a scratch copy with its pin untouched, which is what a user

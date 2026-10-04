@@ -35,12 +35,28 @@ build and read `data`.
   tests check them against vectors the C code writes
   (`tests/golden_vectors/`).
 - `Controller.query` sends SET_REPLY with the wildcard type, waits 10 ms as
-  the C getters do, reads a full 31-byte frame and trims it to the length its
-  header declares. A reply that does not decode is read again, up to three
-  reads: a Raspberry Pi's I2C controller ignores clock stretching, so a reply
-  the peripheral is still building can read as `0xFF` bytes. A valid reply for
-  another opcode or device type raises `ReplyMismatch` and is not retried.
-- `Controller.scan` reads each address once and writes nothing.
+  the C getters do, reads a full 31-byte frame, trims it to the length its
+  header declares, and checks the reply's opcode and type. A GET is safe to
+  repeat, so the whole exchange is tried again, up to three times in all,
+  when:
+  - the reply is corrupt (a Raspberry Pi's I2C controller ignores clock
+    stretching, so a reply the peripheral is still building can read as
+    `0xFF` bytes);
+  - it is the same device's reply to another opcode (a lost SET_REPLY, or a
+    device that restarted);
+  - the device did not answer (`ENXIO`, `EREMOTEIO`, `EIO`, `ETIMEDOUT`,
+    `EAGAIN`).
+
+  Another device type at the address raises `ReplyMismatch` at once, and any
+  other bus error is raised as the `OSError` it is. `send` is never retried,
+  since a SET need not be safe to repeat.
+- `Controller.scan` reads each address once and writes nothing. An address
+  with no device, or one that answers with something that is not a frame, is
+  skipped; any other bus error is raised.
+- A `Controller` may be shared between threads: each exchange holds its lock,
+  so one thread's GET is never interleaved with another's.
+- Protocol errors share the base `CrumbsError` (`FrameError`,
+  `ReplyMismatch`); bus errors are `OSError`.
 - `LinuxBus` uses `/dev/i2c-N` like the C library's Linux HAL: the
   `I2C_SLAVE` ioctl, then a plain write or read. Anything with the same
   `write(address, data)` and `read(address, count)` methods works as a bus.

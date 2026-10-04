@@ -49,3 +49,11 @@ def test_close_closes_the_device(device):
 def test_a_missing_bus_is_an_oserror(tmp_path: Path):
     with pytest.raises(FileNotFoundError):
         LinuxBus(str(tmp_path / "i2c-9"))
+
+
+def test_a_closed_bus_says_so(device):
+    path, _ = device
+    bus = LinuxBus(str(path))
+    bus.close()
+    with pytest.raises(ValueError, match="is closed"):
+        bus.read(0x10, 1)

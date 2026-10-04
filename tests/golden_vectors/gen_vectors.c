@@ -35,7 +35,8 @@ static void item(void)
     first = 0;
 }
 
-/* A fixed pseudo-random sequence, the same on every platform. */
+/* A fixed pseudo-random sequence, the same on every platform as long as
+   each call to it is its own statement. */
 static uint32_t lcg_state = 0x2545F491u;
 
 static uint8_t next_byte(void)
@@ -200,6 +201,17 @@ int main(int argc, char **argv)
     decode_case(buf, 4); /* the empty frame 00 00 00 00 */
     memset(buf, 0xFF, sizeof(buf));
     decode_case(buf, CRUMBS_MESSAGE_MAX_SIZE); /* a silent device */
+    /* One payload byte over the maximum, with a CRC that matches: refused
+       for its length alone. */
+    buf[0] = 0x01;
+    buf[1] = 0x02;
+    buf[2] = (uint8_t)(CRUMBS_MAX_PAYLOAD + 1u);
+    for (size_t i = 0; i < CRUMBS_MAX_PAYLOAD + 1u; i++)
+    {
+        buf[3 + i] = (uint8_t)i;
+    }
+    buf[3 + CRUMBS_MAX_PAYLOAD + 1u] = crumbs_crc8(buf, 3 + CRUMBS_MAX_PAYLOAD + 1u);
+    decode_case(buf, 3 + CRUMBS_MAX_PAYLOAD + 2u);
     for (int n = 0; n < 80; n++)
     {
         uint8_t data[CRUMBS_MAX_PAYLOAD];
@@ -208,7 +220,11 @@ int main(int argc, char **argv)
         {
             data[i] = next_byte();
         }
-        size_t fl = encode_into(frame, next_byte(), next_byte(), data, len);
+        /* One draw per statement: C leaves the order of a call's argument
+           evaluations unspecified, and compilers differ. */
+        uint8_t type_id = next_byte();
+        uint8_t opcode = next_byte();
+        size_t fl = encode_into(frame, type_id, opcode, data, len);
         memcpy(buf, frame, fl);
         switch (n % 8)
         {
@@ -217,7 +233,11 @@ int main(int argc, char **argv)
             decode_case(buf, fl);
             break;
         case 2: /* corrupt one byte */
-            buf[next_byte() % fl] ^= (uint8_t)(1u << (next_byte() % 8u));
+        {
+            size_t at = next_byte() % fl;
+            unsigned bit = next_byte() % 8u;
+            buf[at] ^= (uint8_t)(1u << bit);
+        }
             decode_case(buf, fl);
             break;
         case 3: /* one byte short */
@@ -260,7 +280,11 @@ int main(int argc, char **argv)
         {
             data[i] = next_byte();
         }
-        size_t fl = encode_into(frame, next_byte(), next_byte(), data, len);
+        /* One draw per statement: C leaves the order of a call's argument
+           evaluations unspecified, and compilers differ. */
+        uint8_t type_id = next_byte();
+        uint8_t opcode = next_byte();
+        size_t fl = encode_into(frame, type_id, opcode, data, len);
         memset(buf, 0xFF, sizeof(buf));
         memcpy(buf, frame, fl);
         /* a padded fixed-size read, the exact frame, and one byte short */

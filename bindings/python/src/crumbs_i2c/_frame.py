@@ -48,7 +48,12 @@ class Message(NamedTuple):
     data: bytes = b""
 
 
-class FrameError(ValueError):
+class CrumbsError(Exception):
+    """Base of every CRUMBS protocol error this package raises. Bus errors
+    are OSError, as the operating system reports them."""
+
+
+class FrameError(CrumbsError):
     """Bytes that are not a CRUMBS frame. ``crc`` is true only for a CRC
     mismatch in an otherwise well-formed frame, which the C library alone
     counts as a CRC error."""

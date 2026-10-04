@@ -14,7 +14,8 @@ _I2C_SLAVE = 0x0703
 
 class LinuxBus:
     """``/dev/i2c-N``. A CRUMBS exchange never needs a repeated start: a GET
-    is a write, a pause, then a read."""
+    is a write, a pause, then a read. Use it as a context manager, or call
+    close(), to release the device."""
 
     def __init__(self, path: str = "/dev/i2c-1"):
         self.path = path
@@ -22,6 +23,8 @@ class LinuxBus:
         self._target: int | None = None
 
     def _select(self, address: int) -> None:
+        if self._fd < 0:
+            raise ValueError(f"{self.path} is closed")
         if not 0x00 <= address <= 0x7F:
             raise ValueError(f"a 7-bit I2C address is 0x00-0x7F, not 0x{address:X}")
         if address != self._target:
