@@ -1,7 +1,7 @@
 [project]
 name = "crumbs-i2c"
 # Always the C library's version (src/crumbs_version.h); a test checks it.
-version = "0.14.0"
+version = "0.15.0"
 description = "CRUMBS for Python: the frame, its CRC, and a controller over Linux I2C"
 readme = "bindings/python/README.md"
 requires-python = ">=3.11"

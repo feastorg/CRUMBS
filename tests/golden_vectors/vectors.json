@@ -1,5 +1,5 @@
 {
-  "crumbs_version": "0.14.0",
+  "crumbs_version": "0.15.0",
   "crc8": [
     {"input": "", "crc": 0},
     {"input": "313233343536373839", "crc": 244},

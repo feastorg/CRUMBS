@@ -6,6 +6,8 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-04
+
 ### Added
 
 - A pure-Python controller binding, `crumbs-i2c` on PyPI (import `crumbs_i2c`, Python 3.11+, no dependencies), in `bindings/python`:
