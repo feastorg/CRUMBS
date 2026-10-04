@@ -12,6 +12,8 @@ jobs:
   release-linux-x86_64:
     name: Release (linux-x86_64)
     runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     env:
       LINUX_WIRE_VERSION: "0.1.3"
       LINUX_WIRE_SHA256: "a7c3d1d8fcaf4f5aab50891bfc6ab13f3e3c204f0b62d22004d76afefef43e25"
@@ -24,9 +26,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build build-essential jq
 
-      - name: Extract version
+      - name: Check the tag names the version every package file carries
         id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          status=0
+          check() {
+            if [ "$2" != "${VERSION}" ]; then
+              echo "::error file=$1::$1 carries version '$2'; tag ${GITHUB_REF_NAME} names ${VERSION}"
+              status=1
+            fi
+          }
+          check library.json "$(jq -r .version library.json)"
+          check library.properties "$(sed -n 's/^version=//p' library.properties)"
+          check pyproject.toml "$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml)"
+          check CMakeLists.txt "$(awk '/^project\(CRUMBS/{p=1} p && $1=="VERSION"{print $2; exit}' CMakeLists.txt)"
+          check src/crumbs_version.h "$(sed -n 's/^#define CRUMBS_VERSION_STRING "\(.*\)".*/\1/p' src/crumbs_version.h)"
+          exit "${status}"
 
       - name: Install linux-wire from release
         run: |
@@ -65,6 +82,27 @@ jobs:
           tar -czf "${ARTIFACT}" -C "${{ github.workspace }}/staging" .
           echo "artifact=${ARTIFACT}" >> "$GITHUB_OUTPUT"
 
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.11"
+
+      - name: Test the Python binding in the locked environment
+        run: |
+          uv sync --locked
+          uv run pytest
+
+      - name: Build the Python sdist and universal wheel
+        run: |
+          uv build
+          ls -l "dist/crumbs_i2c-${{ steps.version.outputs.version }}-py3-none-any.whl" \
+            "dist/crumbs_i2c-${{ steps.version.outputs.version }}.tar.gz"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: python-dist
+          path: dist/
+          if-no-files-found: error
+
       - name: Package source tarball
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -74,7 +112,9 @@ jobs:
             HEAD
 
       - name: Generate checksums
-        run: sha256sum crumbs-*.tar.gz > SHA256SUMS
+        run: |
+          sha256sum crumbs-*.tar.gz > SHA256SUMS
+          (cd dist && sha256sum -- *) >> SHA256SUMS
 
       - name: Generate manifest
         run: |
@@ -97,6 +137,72 @@ jobs:
         with:
           files: |
             crumbs-*.tar.gz
+            dist/*
             SHA256SUMS
             manifest.json
           generate_release_notes: true
+
+  # PyPI through Trusted Publishing, so no token is stored. The publisher on
+  # pypi.org is registered for this repository, workflow `release.yml` and
+  # environment `pypi`; the environment's reviewers gate the upload.
+  publish-pypi:
+    name: Publish crumbs-i2c to PyPI
+    needs: release-linux-x86_64
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/crumbs-i2c/${{ needs.release-linux-x86_64.outputs.version }}/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: python-dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@v1.14.2
+
+  # The published package, installed the way a consumer installs it: no
+  # checkout, a fresh venv, the release pinned by version.
+  verify-pypi:
+    name: Install crumbs-i2c from PyPI
+    needs: [release-linux-x86_64, publish-pypi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions: {}
+    env:
+      VERSION: ${{ needs.release-linux-x86_64.outputs.version }}
+    steps:
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.11"
+
+      - name: Install the released version into a clean venv
+        run: |
+          uv venv "$RUNNER_TEMP/venv"
+          # The index can lag the upload by a few minutes; keep asking.
+          for attempt in $(seq 1 20); do
+            if uv pip install --python "$RUNNER_TEMP/venv/bin/python" --no-cache \
+                "crumbs-i2c==${VERSION}"; then
+              exit 0
+            fi
+            echo "attempt ${attempt}: ${VERSION} is not installable yet; retrying in 30 s"
+            sleep 30
+          done
+          exit 1
+
+      - name: Import it, check its version and round-trip a frame
+        run: |
+          "$RUNNER_TEMP/venv/bin/python" - <<'EOF'
+          import os
+          from importlib.metadata import version
+
+          from crumbs_i2c import Message, crc8, decode, encode
+
+          assert version("crumbs-i2c") == os.environ["VERSION"], version("crumbs-i2c")
+          assert crc8(b"123456789") == 0xF4
+          message = Message(0x01, 0x80, b"\x2a")
+          assert decode(encode(message)) == message
+          print("crumbs-i2c", version("crumbs-i2c"), "OK")
+          EOF

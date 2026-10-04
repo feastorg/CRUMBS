@@ -6,6 +6,19 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- A pure-Python controller binding, `crumbs-i2c` on PyPI (import `crumbs_i2c`, Python 3.11+, no dependencies), in `bindings/python`:
+  - The frame: `encode`, `decode`, `frame_length` and `crc8`, following `crumbs_core.c` exactly.
+  - `Controller` over any bus with `write` and `read`, and `LinuxBus` for `/dev/i2c-N` through the `I2C_SLAVE` ioctl, as the Linux HAL does:
+    - `send` writes a SET.
+    - `query` sends SET_REPLY with the wildcard type, waits `CRUMBS_DEFAULT_QUERY_DELAY_US`, reads 31 bytes, trims them to the declared frame and checks the reply's opcode and type, as `crumbs_controller_read_expect()` does.
+    - `scan` read-probes without writing.
+  - Retried reads: a reply that does not decode is read again, up to three reads, for the Raspberry Pi controller's clock-stretching failures (feastorg/Slice_DCMT#3). A wrong reply raises `ReplyMismatch` and is not retried.
+  - Golden vectors: `tests/golden_vectors/gen_vectors.c` writes `vectors.json` from the C core (CRC, encode, decode and frame-length cases, including corrupt, short, long and padded frames). CI regenerates the file and fails on any difference, then tests the binding against it on Python 3.11 and 3.13.
+  - Versioning: the package's version is the library's, and a test checks it.
+- The release workflow checks that the tag names the version in `library.json`, `library.properties`, `pyproject.toml`, `CMakeLists.txt` and `crumbs_version.h`, then publishes `crumbs-i2c` to PyPI through Trusted Publishing from the `pypi` environment, and installs it back from PyPI to check it.
+
 ## [0.14.0] - 2026-09-14
 
 ### Added

@@ -129,6 +129,11 @@ endif()
 if(CRUMBS_ENABLE_TESTS)
     enable_testing()
 
+    # Writes tests/golden_vectors/vectors.json for the Python binding's
+    # tests; CI regenerates it and fails on any difference.
+    add_executable(crumbs_gen_vectors tests/golden_vectors/gen_vectors.c)
+    target_link_libraries(crumbs_gen_vectors PRIVATE crumbs)
+
     add_executable(test_encode_decode tests/test_encode_decode.c)
     target_link_libraries(test_encode_decode PRIVATE crumbs)
     add_test(NAME encode_decode_test COMMAND test_encode_decode)

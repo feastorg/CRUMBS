@@ -441,10 +441,52 @@ jobs:
 
   # ─── Unified gate ─────────────────────────────────────────────────────────
   # Branch protection requires only: CI / ok
+  # Python binding (bindings/python): the vectors must be what the C core
+  # writes today, and the binding must match them.
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Regenerate tests/golden_vectors/vectors.json and fail on any difference
+        run: |
+          cmake -S . -B build/vectors -DCMAKE_BUILD_TYPE=Release -DCRUMBS_BUILD_EXAMPLES=OFF
+          cmake --build build/vectors --parallel --target crumbs_gen_vectors
+          ./build/vectors/crumbs_gen_vectors tests/golden_vectors/vectors.json
+          git diff --exit-code -- tests/golden_vectors/vectors.json
+
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install the locked dev environment
+        run: uv sync --locked
+
+      - name: Format check
+        run: uv run ruff format --check
+
+      - name: Lint
+        run: uv run ruff check
+
+      - name: Type check
+        run: uv run pyright
+
+      - name: Test
+        run: uv run pytest
+
+      - name: Build the sdist and wheel
+        run: uv build
+
   ok:
     name: ok
     if: always()
-    needs: [core-only-install, build-and-test, platformio, doxygen, docs-links, crc-regen, build-configs, arduino-cli]
+    needs: [core-only-install, build-and-test, platformio, doxygen, docs-links, crc-regen, build-configs, arduino-cli, python]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
