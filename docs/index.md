@@ -21,6 +21,7 @@ format lives in `protocol.md`; everything else links to them.
 | [Create a Family](create-a-family.md) | The `therm` walkthrough: header, generated wrappers, peripheral, controller |
 | [Examples](../examples/README.md) | Every example in learning order; each directory has its own README |
 | [LHWIT Family](../examples/families_usage/lhwit_family/README.md) | The reference family: four Nano peripherals and two Linux controllers |
+| [Python binding](../bindings/python/README.md) | `crumbs-i2c` on PyPI: the frame, its CRC and a Linux I²C controller in pure Python |
 
 ## Project
 
