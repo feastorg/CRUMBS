@@ -63,6 +63,12 @@ library, not the checkout they sit in.
 
 ## Linux
 
+A controller written in Python builds nothing: `pip install crumbs-i2c`
+installs the binding, pure Python 3.11 or newer with no dependencies, which
+opens `/dev/i2c-N` itself. Its API is in
+[bindings/python/README.md](../bindings/python/README.md). Set up the bus as
+in [The I²C bus](#the-ic-bus); the subsections before it are the C path.
+
 The Linux HAL is controller-only and needs
 [linux-wire](https://github.com/feastorg/linux-wire) **0.1.3 or newer**.
 
