@@ -71,9 +71,10 @@ class ReplyMismatch(CrumbsError):
 def _transient(exc: BaseException) -> bool:
     """A failed GET that asking again can fix."""
     if isinstance(exc, FrameError):
-        # A reply read before the peripheral finished building it: a
-        # Raspberry Pi's I2C controller ignores clock stretching, so it reads
-        # 0xFF bytes (feastorg/Slice_DCMT#3).
+        # A reply that slipped a bit: with a Raspberry Pi as controller, the
+        # bus can lose a clock edge around the peripheral's clock stretch
+        # unless it runs slowly, so the reply is correct up to some byte,
+        # then 0xFF (docs/protocol.md, "When the reply is built").
         return True
     if isinstance(exc, ReplyMismatch):
         # The right device, staged on another opcode: the SET_REPLY was lost

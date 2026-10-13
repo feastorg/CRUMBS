@@ -39,9 +39,11 @@ build and read `data`.
   header declares, and checks the reply's opcode and type. A GET is safe to
   repeat, so the whole exchange is tried again, up to three times in all,
   when:
-  - the reply is corrupt (a Raspberry Pi's I2C controller ignores clock
-    stretching, so a reply the peripheral is still building can read as
-    `0xFF` bytes);
+  - the reply is corrupt (with a Raspberry Pi as controller, the bus can
+    lose a clock edge around the peripheral's clock stretch unless it runs
+    slowly, so a reply reads correctly up to some byte, then as `0xFF`
+    bytes; see
+    [When the reply is built](https://github.com/feastorg/CRUMBS/blob/main/docs/protocol.md#when-the-reply-is-built));
   - it is the same device's reply to another opcode (a lost SET_REPLY, or a
     device that restarted);
   - the device did not answer (`ENXIO`, `EREMOTEIO`, `EIO`, `ETIMEDOUT`,
