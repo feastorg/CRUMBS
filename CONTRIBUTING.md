@@ -60,9 +60,11 @@ convention it does not enforce: `@brief`, `@param` for every parameter,
 Internal `static` functions in `.c` files get ordinary comments that say why,
 not what.
 
-The docs follow one rule: **one home per fact**. Signatures and return codes
+The docs follow two rules. **One home per fact**: signatures and return codes
 live in the headers; the wire format lives in `docs/protocol.md`; everything
-else links to them. A number in a doc carries the command that produced it.
+else links to them. **They describe HEAD**: not the last release, and not
+plans; deferred work goes in `docs/roadmap.md` and nowhere else. A number in a
+doc carries the command that produced it.
 
 ## Code style
 
@@ -127,7 +129,9 @@ package must be published before the merge.
    `lib_deps` and
    any doc that quotes it (`git grep 'X.Y.Z'` for the old one, and its
    `CRUMBS_VERSION` word in hex, e.g. `0x05DC` for 1500); date the
-   `[Unreleased]` section. Open the PR. Its `platformio` lane builds the
+   `[Unreleased]` section with the day the tag will be made, in local time
+   (a UTC date would have put v0.14.0 and v0.12.5 a day late: both were
+   tagged after 23:00 Eastern). Open the PR. Its `platformio` lane builds the
    checkout, not the pin, so it passes before the package exists.
 2. Tag that commit (`git tag -a vX.Y.Z -m "Release vX.Y.Z"`, push the tag).
    `release.yml` builds the GitHub release from it, then waits for a reviewer
@@ -139,6 +143,11 @@ package must be published before the merge.
 4. Merge with a **merge commit** (the repo allows both; releases are the one
    case that uses it) so the tagged SHA stays an ancestor of `main`.
 5. Check the release assets and `git merge-base --is-ancestor vX.Y.Z main`.
+6. File or link the pin bumps in the consumers' trackers. A PlatformIO caret
+   on a 0.x version stops below the next minor (`^0.15.0` matches
+   `>=0.15.0 <0.16.0`), so a minor release reaches no consumer on its own:
+   the examples here bump theirs in step 1, and every other consumer
+   (bread-crumbs-contracts, the Slice firmware) bumps its pin explicitly.
 
 CRUMBS is not in the Arduino Library Manager; Arduino users install from the
 release archive.
