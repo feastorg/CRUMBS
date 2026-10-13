@@ -59,27 +59,15 @@ Work that is planned is tracked in [GitHub issues](https://github.com/feastorg/C
 
 ## Python Controller Tools
 
-**Goal:** Rapid prototyping and automation with Python (controller-only)
+**Goal:** Scan and talk to a bus from the shell, without writing Python
 
-**Value:** Medium-High — Lowers barrier to entry, enables rapid prototyping and integration  
-**Feasibility:** High — Controller-only scope, well-defined protocol  
-**Effort:** Medium-High — Package development, CLI tools, testing infrastructure
+**Effort:** Low — thin commands over the binding's `Controller.scan`, `send` and `query`
 
-**Deliverables:**
+**Done:** The controller package, `crumbs-i2c` on PyPI ([bindings/python](../bindings/python/README.md)): `Controller`, `LinuxBus` and `Message` from `crumbs_i2c`, pure Python with no dependencies (it opens `/dev/i2c-N` itself rather than going through smbus2), tested against vectors written by the C core.
 
-- PyPI package: `pip install crumbs-i2c` (encode/decode, CRC-8, I²C via smbus2)
-- CLI tools: `crumbs-scan`, `crumbs-send`, `crumbs-query`
-- `docs/python-quickstart.md` with integration examples (pandas, Flask)
-- pytest suite with LHWIT validation
+**Remaining:**
 
-**Example:**
-
-```python
-from crumbs_controller import CrumbsController
-bus = CrumbsController("/dev/i2c-1")
-devices = bus.scan()  # {0x10: 0x03, 0x20: 0x01}
-bus.send(0x20, type_id=0x01, opcode=0x01, data=[0xFF])
-```
+- CLI tools (`crumbs-scan`, `crumbs-send`, `crumbs-query`), if they are still wanted; the package installs no commands today.
 
 ---
 
