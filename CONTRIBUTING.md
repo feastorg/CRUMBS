@@ -136,7 +136,18 @@ package must be published before the merge.
 2. Tag that commit (`git tag -a vX.Y.Z -m "Release vX.Y.Z"`, push the tag).
    `release.yml` builds the GitHub release from it, then waits for a reviewer
    to approve the PyPI upload of `crumbs-i2c`.
-3. `pio pkg publish` from the tagged tree; wait until
+3. Pack from the tag and publish that tarball, never the working tree,
+   which `pio pkg pack` packs as it finds it, untracked files included:
+
+   ```sh
+   d=$(mktemp -d)
+   scripts/check_pio_package.sh "$d" vX.Y.Z
+   pio pkg publish "$d/CRUMBS.tar.gz"
+   ```
+
+   The script packs a `git archive` export of the tag and stops before the
+   upload if the file list is not the expected one; a published version
+   cannot be replaced. Then wait until
    `pio pkg show cameronbrooks11/CRUMBS@X.Y.Z` resolves, then `pio run` one
    example in a scratch copy with its pin untouched, which is what a user
    gets.
