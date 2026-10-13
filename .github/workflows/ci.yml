@@ -218,6 +218,9 @@ jobs:
           python -m pip install -U pip
           python -m pip install -U platformio
 
+      - name: Check the packed library's file list
+        run: bash ./scripts/check_pio_package.sh "$RUNNER_TEMP/pio-package"
+
       # The projects pin the registry package so that a user's `pio run`
       # builds a release; CI builds the tree, so point every lib_deps at it.
       - name: Build against this checkout, not the registry
