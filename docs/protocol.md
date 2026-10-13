@@ -114,15 +114,36 @@ the pause the generated getters insert between the SET_REPLY write and the
 read, is margin on top of that, chosen conservatively; the header says to
 reduce it only with an oscilloscope on the bus.
 
-Two limits apply. The Raspberry Pi's Broadcom I²C controller does not honour
-clock stretching: when a peripheral's interrupt is late it reads `0xFF` bytes
-instead of waiting, which fails the CRC — measured as a few percent of first
-reads in [feastorg/Slice_DCMT#3](https://github.com/feastorg/Slice_DCMT/issues/3),
-unchanged by halving the bus clock or lengthening the pre-read delay. And
-SMBus, whose CRC this protocol shares, caps a target's cumulative stretching at
-25 ms per message (T_LOW:SEXT) and a controller's at 10 ms per byte
-(T_LOW:MEXT); a reply handler that finishes well inside 25 ms keeps CRUMBS
-usable on SMBus-timed controllers.
+Two limits apply. SMBus, whose CRC this protocol shares, caps a target's
+cumulative stretching at 25 ms per message (T_LOW:SEXT) and a controller's at
+10 ms per byte (T_LOW:MEXT); a reply handler that finishes well inside 25 ms
+keeps CRUMBS usable on SMBus-timed controllers.
+
+And a Raspberry Pi 4 controller (`i2c-bcm2835`) loses bytes around a
+peripheral's clock stretch unless the bus is slow. Measured on one rig on
+2026-10-07 (Pi 4, kernel 6.18, core clock pinned with `core_freq_min=500`, two
+ATmega328P peripherals on CRUMBS 0.12.5), with 300 `GET_STATE` queries and 100
+SET frames per board at each rate:
+
+| Measured SCL | SETs applied | Bad `GET_STATE` replies |
+| --- | --- | --- |
+| 98 kHz | 96/100, 96/100; every loss a write that NACKed and was retried | not measured |
+| 79 kHz | 200/200 | 33/300, 29/300 |
+| 66 kHz | 200/200 | 92/300, 10/300 |
+| 49.7 kHz | 200/200 | 0/300, 0/300 |
+
+Both failures fit the peripheral missing the first SCL edge after its stretch
+and ending up one bit behind. A bad reply is correct up to some byte, then
+`0xFF`, and fails the CRC. A SET whose write NACKs is not delivered by a
+controller retry, though the controller sees the retry succeed: the
+peripheral's ACK masks the controller's STOP, the retry arrives in the same
+receive buffer as the failed frame, and the decoder rejects the result. It is
+stretch timing, not signal margin: at 49.7 kHz, masking interrupts on the
+peripheral for 10–30 µs per loop brought both failures back (8–28 of 300
+replies bad, up to 5 write NACKs). Whether the edge is lost in the Pi's
+controller or in the AVR's TWI is not established, and other peripheral
+firmware was not swept. The Pi 4 setting is in
+[platform-setup.md](platform-setup.md#the-ic-bus).
 
 ### Type check
 

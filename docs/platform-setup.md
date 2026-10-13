@@ -124,6 +124,24 @@ I2C) and use `/dev/i2c-1`. Elsewhere load `i2c-dev` (`sudo modprobe i2c-dev`)
 and find the bus with `i2cdetect -l`. Add your user to the `i2c` group rather
 than running as root.
 
+On a Raspberry Pi 4 controller, set the bus rate and pin the core clock in
+`config.txt`, then reboot:
+
+```ini
+dtparam=i2c_arm_baudrate=50000
+core_freq_min=500
+```
+
+The Pi 4 divides the I²C clock from the VPU core clock, which firmware scales
+between 200 and 500 MHz; without `core_freq_min=500` the configured rate is a
+ceiling, not the rate. On one rig (2026-10-07: Pi 4, kernel 6.18,
+`i2c-bcm2835`, two ATmega328P peripherals on CRUMBS 0.12.5), 50 kHz with no pin
+measured about 20 kHz on 255-byte reads at idle and 49.7 kHz under load. With
+the pin, 50 kHz was the only rate that rig ran clean; 66 kHz and up corrupted
+replies or lost SETs ([protocol.md](protocol.md#when-the-reply-is-built)).
+`CRUMBS_DEFAULT_TWI_FREQ` sets the AVR's own TWI clock and has no effect when
+the Pi is the controller, which drives SCL.
+
 `i2cdetect -y 1` shows what ACKs; a CRUMBS peripheral shows up like any other
 device. Then:
 
@@ -158,7 +176,7 @@ GPIO 21 / 22; Raspberry Pi GPIO 2 / 3 (header pins 3 / 5).
 | --- | --- |
 | Controller sends, peripheral silent | Same address in both sketches; SDA/SCL not swapped; common ground; pull-ups present. `i2cdetect` (Linux) or `crumbs_arduino_scan` sees the peripheral? |
 | `crumbs_controller_read` returns `-1` | Nothing decodable came back: the address did not answer, or the peripheral had nothing staged for the requested opcode — see [protocol.md](protocol.md#the-read). |
-| `-2` (CRC) on most reads from a Pi | The Pi's I²C controller does not honour clock stretching; a peripheral whose interrupt is late returns `0xFF`s. Keep handlers short; see [protocol.md](protocol.md#when-the-reply-is-built). |
+| `-2` (CRC) on reads from a Pi, or SETs that do not take | Bytes lost around the peripheral's clock stretch: a bad reply is correct up to some byte, then `0xFF`s. On a Pi 4 run the bus at 50 kHz with the core clock pinned ([The I²C bus](#the-ic-bus)); keep handlers short and interrupts unmasked on the peripheral; see [protocol.md](protocol.md#when-the-reply-is-built). |
 | `CRUMBS_MAX_HANDLERS mismatch` at boot | The value was set in the sketch, not as a build flag for the library too. |
 | `Could not find a package configuration file provided by "linux_wire"` at configure | Install linux-wire ≥ 0.1.3 (a build tree is not enough) or pass its install prefix in `CMAKE_PREFIX_PATH`. |
 | `crumbs_linux_scan` returns `-2` | The adapter cannot do an SMBus Quick Write; use strict mode. |
