@@ -82,7 +82,7 @@ jobs:
           tar -czf "${ARTIFACT}" -C "${{ github.workspace }}/staging" .
           echo "artifact=${ARTIFACT}" >> "$GITHUB_OUTPUT"
 
-      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
           python-version: "3.11"
 
@@ -175,7 +175,7 @@ jobs:
     env:
       VERSION: ${{ needs.release-linux-x86_64.outputs.version }}
     steps:
-      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
           python-version: "3.11"
 
