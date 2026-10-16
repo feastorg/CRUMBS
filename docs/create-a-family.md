@@ -249,8 +249,10 @@ the payload's `_pack`, and send it with
 `crumbs_controller_send_confirmed(&dev, &msg, 3, &ack)`: it reads the
 peripheral's acknowledgement before and after, re-sends a frame that did not
 arrive, and returns `CRUMBS_SET_APPLIED`, `_REFUSED`, `_REJECTED` or
-`_NOT_ADVANCED`. It needs a peripheral built with a library that answers
-GET_ACK; check its version reply against `CRUMBS_ACK_MIN_VERSION` first.
+`_NOT_ADVANCED`, or a negative code when it cannot tell (the peripheral
+restarted, say) and has not re-sent. It needs a peripheral built with a
+library that answers GET_ACK, and does not check: compare its version reply
+with `CRUMBS_ACK_MIN_VERSION` first.
 
 ## 5. When the macros do not fit
 

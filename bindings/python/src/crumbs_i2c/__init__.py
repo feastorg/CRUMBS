@@ -8,9 +8,9 @@
         reply = crumbs.query(0x10, type_id=0x01, opcode=0x80)
         outcome, ack = crumbs.send_confirmed(0x10, Message(0x01, 0x02, b"\\x01"))
 
-Protocol errors are CrumbsError (FrameError, ReplyMismatch, AckMismatch); bus
-errors are OSError. The wire format is docs/protocol.md; the frame functions are checked against
-vectors written by the C library.
+Protocol errors are CrumbsError (FrameError, ReplyMismatch, AckMismatch,
+AckUnknown); bus errors are OSError. The wire format is docs/protocol.md;
+the frame functions are checked against vectors written by the C library.
 """
 
 from crumbs_i2c._controller import (
@@ -29,6 +29,7 @@ from crumbs_i2c._controller import (
     REJECT_TYPE,
     Ack,
     AckMismatch,
+    AckUnknown,
     Bus,
     Controller,
     ReplyMismatch,
@@ -75,6 +76,7 @@ __all__ = [
     "TYPE_ID_ANY",
     "Ack",
     "AckMismatch",
+    "AckUnknown",
     "Bus",
     "Controller",
     "CrumbsError",

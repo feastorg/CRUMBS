@@ -30,6 +30,7 @@
 /* ---- Peripheral fixtures ----------------------------------------------- */
 
 static int g_refuse_rc;
+static int g_applied; /* OP_APPLY frames the peripheral acted on */
 
 #if CRUMBS_MAX_HANDLERS > 0
 static void apply_handler(crumbs_context_t *ctx, uint8_t opcode,
@@ -40,6 +41,7 @@ static void apply_handler(crumbs_context_t *ctx, uint8_t opcode,
     (void)data;
     (void)data_len;
     (void)user_data;
+    g_applied++;
 }
 
 static void refuse_handler(crumbs_context_t *ctx, uint8_t opcode,
@@ -70,6 +72,20 @@ static void refusing_on_message(crumbs_context_t *ctx, const crumbs_message_t *m
     {
         g_refuse_rc = crumbs_refuse(ctx, REFUSE_REASON);
     }
+    else if (msg->opcode == OP_APPLY)
+    {
+        g_applied++;
+    }
+}
+
+/* A peripheral built before GET_ACK that answers every query by echoing the
+   requested opcode with a status block, as basic_peripheral's on_request
+   echoes it: it passes the opcode check, and its bytes never change. */
+static void echo_on_request(crumbs_context_t *ctx, crumbs_message_t *reply)
+{
+    crumbs_msg_init(reply, DEV_TYPE, ctx->requested_opcode);
+    for (uint8_t i = 0; i < 6; i++)
+        crumbs_msg_add_u8(reply, (uint8_t)(0x10 + i));
 }
 
 /* An old peripheral's fallback: answer every read with the version reply. */
@@ -336,7 +352,8 @@ static int test_ack_decode(void)
     crumbs_msg_add_u8(&m, 9);
     crumbs_msg_add_u8(&m, OP_REFUSE);
     crumbs_msg_add_u8(&m, CRUMBS_ACK_REFUSED);
-    TEST_ASSERT_EQ(t, crumbs_ack_decode(&m, &a), -1, "three bytes are too short");
+    TEST_ASSERT_EQ(t, crumbs_ack_decode(&m, &a), CRUMBS_RX_REPLY_MISMATCH,
+                   "three bytes are not an acknowledgement");
     crumbs_msg_add_u8(&m, REFUSE_REASON);
     TEST_ASSERT_EQ(t, crumbs_ack_decode(&m, &a), 0, "four bytes decode");
     TEST_ASSERT_EQ(t, a.counter, 9, "counter");
@@ -345,6 +362,23 @@ static int test_ack_decode(void)
     TEST_ASSERT_EQ(t, a.reason, REFUSE_REASON, "reason");
     crumbs_msg_add_u8(&m, 0xEE);
     TEST_ASSERT_EQ(t, crumbs_ack_decode(&m, &a), 0, "trailing bytes are an extension");
+
+    /* What an echoing old peripheral sends: the right opcode, a payload
+       whose status byte is none of the four. */
+    crumbs_msg_init(&m, DEV_TYPE, CRUMBS_CMD_GET_ACK);
+    crumbs_msg_add_u8(&m, 0x10);
+    crumbs_msg_add_u8(&m, 0x11);
+    crumbs_msg_add_u8(&m, 0x12);
+    crumbs_msg_add_u8(&m, 0x13);
+    TEST_ASSERT_EQ(t, crumbs_ack_decode(&m, &a), CRUMBS_RX_REPLY_MISMATCH, "unknown status");
+    /* Status none is only ever all four bytes zero. */
+    m.data[2] = CRUMBS_ACK_NONE;
+    TEST_ASSERT_EQ(t, crumbs_ack_decode(&m, &a), CRUMBS_RX_REPLY_MISMATCH, "none with a record");
+    m.data[0] = 0;
+    m.data[1] = 0;
+    m.data[3] = 0;
+    TEST_ASSERT_EQ(t, crumbs_ack_decode(&m, &a), 0, "none, all zero");
+
     m.opcode = 0x00;
     TEST_ASSERT_EQ(t, crumbs_ack_decode(&m, &a), CRUMBS_RX_REPLY_MISMATCH, "another opcode");
     TEST_ASSERT_EQ(t, crumbs_ack_decode(NULL, &a), -1, "NULL reply");
@@ -390,6 +424,25 @@ static int test_ack_classify(void)
     after = ack(0, OP_APPLY, CRUMBS_ACK_APPLIED, 0);
     TEST_ASSERT_EQ(t, crumbs_ack_classify(&before, &after, OP_APPLY), CRUMBS_SET_APPLIED,
                    "advanced across the wrap");
+
+    /* A peripheral that restarted reads all zero with status none. That is
+       the fresh baseline too, and what a wrapped counter can come back to:
+       never "not advanced". */
+    crumbs_ack_t fresh = ack(0, 0x00, CRUMBS_ACK_NONE, 0);
+    TEST_ASSERT_EQ(t, crumbs_ack_classify(&fresh, &fresh, OP_APPLY), CRUMBS_RX_ACK_UNKNOWN,
+                   "fresh baseline, reset or lost");
+    before = ack(0, OP_REFUSE, CRUMBS_ACK_APPLIED, 0);
+    TEST_ASSERT_EQ(t, crumbs_ack_classify(&before, &fresh, OP_APPLY), CRUMBS_RX_ACK_UNKNOWN,
+                   "wrapped baseline, then reset");
+    before = ack(5, OP_REFUSE, CRUMBS_ACK_APPLIED, 0);
+    TEST_ASSERT_EQ(t, crumbs_ack_classify(&before, &fresh, OP_APPLY), CRUMBS_RX_ACK_UNKNOWN,
+                   "reset from counter 5");
+    after = ack(5, OP_APPLY, CRUMBS_ACK_APPLIED, 0);
+    TEST_ASSERT_EQ(t, crumbs_ack_classify(&before, &after, OP_APPLY), CRUMBS_RX_ACK_UNKNOWN,
+                   "same counter, another record");
+    after = ack(0, 0x00, CRUMBS_ACK_NONE, 4);
+    TEST_ASSERT_EQ(t, crumbs_ack_classify(&before, &after, OP_APPLY), -1, "none with a reason");
+
     TEST_ASSERT_EQ(t, crumbs_ack_classify(NULL, &after, OP_APPLY), -1, "NULL before");
     TEST_ASSERT_EQ(t, crumbs_ack_classify(&before, NULL, OP_APPLY), -1, "NULL after");
     printf("  %s: PASS\n", t);
@@ -407,6 +460,10 @@ typedef struct
     uint32_t fail_bits;  /* fail read i (0-based) when bit i is set */
     int read_index;
     int command_rc;      /* what a delivered command write returns */
+    int reset_after;     /* restart the peripheral after this many command writes */
+    int commands;        /* command writes delivered */
+    int old_echo;        /* answer 0xFD as a pre-GET_ACK echoing peripheral */
+    int inject_opcode;   /* if non-zero, deliver this frame after each command */
     int delays;
     char log[128];       /* S: SET_REPLY write, C: command write, R: read */
     size_t log_len;
@@ -438,6 +495,14 @@ static int bus_write(void *user, uint8_t addr, const uint8_t *data, size_t len)
         return 0;
     }
     (void)crumbs_peripheral_handle_receive(b->periph, data, len);
+    if (!is_stage)
+    {
+        b->commands++;
+        if (b->inject_opcode)
+            (void)receive(b->periph, DEV_TYPE, (uint8_t)b->inject_opcode);
+        if (b->reset_after && b->commands == b->reset_after)
+            init_peripheral(b->periph); /* brown-out: firmware starts over */
+    }
     return is_stage ? 0 : b->command_rc;
 }
 
@@ -459,6 +524,14 @@ static int bus_read(void *user, uint8_t addr, uint8_t *buf, size_t len, uint32_t
     }
     size_t out_len = 0;
     memset(buf, 0xFF, len);
+    if (b->old_echo && b->periph->requested_opcode == CRUMBS_CMD_GET_ACK)
+    {
+        /* An old library does not intercept 0xFD; on_request answers. */
+        crumbs_message_t r;
+        echo_on_request(b->periph, &r);
+        (void)crumbs_encode_message(&r, buf, len);
+        return (int)len;
+    }
     if (crumbs_peripheral_build_reply(b->periph, buf, len, &out_len) != 0)
         return -1;
     if (out_len == 0)
@@ -588,20 +661,34 @@ static int test_send_confirmed_resends_a_lost_frame(void)
     bus_t bus;
     crumbs_device_t dev;
     crumbs_ack_t a;
-    setup(&periph, &ctrl, &bus, &dev);
-    bus.drop_commands = 1;
+    int rc;
     crumbs_message_t m = command(OP_APPLY);
-    TEST_ASSERT_EQ(t, crumbs_controller_send_confirmed(&dev, &m, 3, &a), CRUMBS_SET_APPLIED,
-                   "applied on the second send");
+
+    /* A peripheral that has counted a command already: "not advanced" is
+       then distinguishable from a restart. */
+    setup(&periph, &ctrl, &bus, &dev);
+    (void)receive(&periph, DEV_TYPE, OP_REFUSE);
+    bus.drop_commands = 1;
+    rc = crumbs_controller_send_confirmed(&dev, &m, 3, &a);
+    TEST_ASSERT_EQ(t, rc, CRUMBS_SET_APPLIED, "applied on the second send");
     TEST_ASSERT(t, strcmp(bus.log, "SRCSRCSR") == 0, "re-sent once");
-    TEST_ASSERT_EQ(t, a.counter, 1, "applied once");
+    TEST_ASSERT_EQ(t, a.counter, 2, "applied once");
 
     setup(&periph, &ctrl, &bus, &dev);
+    (void)receive(&periph, DEV_TYPE, OP_REFUSE);
     bus.drop_commands = 100;
-    TEST_ASSERT_EQ(t, crumbs_controller_send_confirmed(&dev, &m, 2, &a), CRUMBS_SET_NOT_ADVANCED,
-                   "not advanced after the bound");
+    rc = crumbs_controller_send_confirmed(&dev, &m, 2, &a);
+    TEST_ASSERT_EQ(t, rc, CRUMBS_SET_NOT_ADVANCED, "not advanced after the bound");
     TEST_ASSERT(t, strcmp(bus.log, "SRCSRCSR") == 0, "two sends in all");
-    TEST_ASSERT_EQ(t, a.counter, 0, "out_ack is the last read");
+    TEST_ASSERT_EQ(t, a.counter, 1, "out_ack is the last read");
+
+    /* A peripheral that has counted nothing: a lost first frame reads the
+       same as one applied before a restart, so it is not re-sent. */
+    setup(&periph, &ctrl, &bus, &dev);
+    bus.drop_commands = 1;
+    rc = crumbs_controller_send_confirmed(&dev, &m, 3, &a);
+    TEST_ASSERT_EQ(t, rc, CRUMBS_RX_ACK_UNKNOWN, "fresh peripheral: unknown");
+    TEST_ASSERT(t, strcmp(bus.log, "SRCSR") == 0, "not re-sent");
     printf("  %s: PASS\n", t);
     return 0;
 }
@@ -735,6 +822,88 @@ static int test_send_confirmed_arguments(void)
     return 0;
 }
 
+/* The peripheral applies the SET, then restarts before the acknowledgement
+   is read (a brown-out from the load it switched on). Re-sending would
+   apply it twice. */
+static int test_send_confirmed_reset_after_apply(void)
+{
+    const char *t = "send_confirmed_reset_after_apply";
+    crumbs_context_t periph, ctrl;
+    bus_t bus;
+    crumbs_device_t dev;
+    crumbs_ack_t a;
+    setup(&periph, &ctrl, &bus, &dev);
+    bus.reset_after = 1;
+    g_applied = 0;
+    crumbs_message_t m = command(OP_APPLY);
+    TEST_ASSERT_EQ(t, crumbs_controller_send_confirmed(&dev, &m, 3, &a), CRUMBS_RX_ACK_UNKNOWN,
+                   "unknown, from a zero baseline");
+    TEST_ASSERT_EQ(t, g_applied, 1, "applied once");
+    TEST_ASSERT(t, strcmp(bus.log, "SRCSR") == 0, "not re-sent");
+    printf("  %s: PASS\n", t);
+    return 0;
+}
+
+static int test_send_confirmed_reset_at_the_wrapped_counter(void)
+{
+    const char *t = "send_confirmed_reset_at_the_wrapped_counter";
+    crumbs_context_t periph, ctrl;
+    bus_t bus;
+    crumbs_device_t dev;
+    crumbs_ack_t a;
+    setup(&periph, &ctrl, &bus, &dev);
+    for (int i = 0; i < 256; i++)
+        (void)receive(&periph, DEV_TYPE, OP_REFUSE); /* counter back at 0 */
+    bus.reset_after = 1;
+    g_applied = 0;
+    crumbs_message_t m = command(OP_APPLY);
+    TEST_ASSERT_EQ(t, crumbs_controller_send_confirmed(&dev, &m, 3, &a), CRUMBS_RX_ACK_UNKNOWN,
+                   "unknown, from a wrapped baseline");
+    TEST_ASSERT_EQ(t, g_applied, 1, "applied once");
+    TEST_ASSERT(t, strcmp(bus.log, "SRCSR") == 0, "not re-sent");
+    printf("  %s: PASS\n", t);
+    return 0;
+}
+
+static int test_send_confirmed_echoing_old_peripheral(void)
+{
+    const char *t = "send_confirmed_echoing_old_peripheral";
+    crumbs_context_t periph, ctrl;
+    bus_t bus;
+    crumbs_device_t dev;
+    crumbs_ack_t a;
+    setup(&periph, &ctrl, &bus, &dev);
+    bus.old_echo = 1;
+    g_applied = 0;
+    crumbs_message_t m = command(OP_APPLY);
+    TEST_ASSERT_EQ(t, crumbs_controller_send_confirmed(&dev, &m, 3, &a), CRUMBS_RX_REPLY_MISMATCH,
+                   "no acknowledgement");
+    TEST_ASSERT_EQ(t, g_applied, 0, "nothing applied");
+    TEST_ASSERT(t, strchr(bus.log, 'C') == NULL, "nothing sent");
+    printf("  %s: PASS\n", t);
+    return 0;
+}
+
+static int test_send_confirmed_another_command_counted(void)
+{
+    const char *t = "send_confirmed_another_command_counted";
+    crumbs_context_t periph, ctrl;
+    bus_t bus;
+    crumbs_device_t dev;
+    crumbs_ack_t a;
+    setup(&periph, &ctrl, &bus, &dev);
+    bus.inject_opcode = OP_REFUSE; /* another frame lands after ours */
+    g_applied = 0;
+    crumbs_message_t m = command(OP_APPLY);
+    TEST_ASSERT_EQ(t, crumbs_controller_send_confirmed(&dev, &m, 3, &a), CRUMBS_RX_ACK_MISMATCH,
+                   "advanced on another opcode");
+    TEST_ASSERT_EQ(t, g_applied, 1, "applied once");
+    TEST_ASSERT(t, strcmp(bus.log, "SRCSR") == 0, "not re-sent");
+    TEST_ASSERT_EQ(t, a.opcode, OP_REFUSE, "out_ack names the other command");
+    printf("  %s: PASS\n", t);
+    return 0;
+}
+
 int main(void)
 {
     int failures = 0;
@@ -762,6 +931,10 @@ int main(void)
     failures += test_send_confirmed_write_error_still_reads_the_ack();
     failures += test_send_confirmed_old_peripheral_is_unsupported();
     failures += test_send_confirmed_arguments();
+    failures += test_send_confirmed_reset_after_apply();
+    failures += test_send_confirmed_reset_at_the_wrapped_counter();
+    failures += test_send_confirmed_echoing_old_peripheral();
+    failures += test_send_confirmed_another_command_counted();
     if (failures)
     {
         fprintf(stderr, "test_ack: %d failed\n", failures);

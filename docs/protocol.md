@@ -167,6 +167,17 @@ A controller stages `0xFD` with SET_REPLY like any GET and reads:
 | `status` | `0x00` none yet, `0x01` applied, `0x02` refused, `0x03` rejected. |
 | `reason` | `0x00` when applied. Refused: a byte the firmware chose (its meaning is the family's). Rejected: `0x01` nothing took the opcode, `0x02` the type check failed. |
 
+Status `0x00` occurs only before the first command frame, and then all four
+bytes are `0x00`. A reply with any other status, or with status `0x00` and a
+non-zero byte, is not an acknowledgement, and a controller treats it as one
+from a peripheral without GET_ACK.
+
+"Applied" is the library's view: the frame reached `on_message` or a handler
+and neither called `crumbs_refuse()`. A peripheral that dispatches only
+through `on_message` therefore reports every frame it receives as applied,
+including opcodes it ignores, unless it calls `crumbs_refuse()` for them; and
+a handler that only queues work reports the command applied when it returns.
+
 The reply's `type_id` is the peripheral's declared type, or `0x00` if it has
 declared none.
 
@@ -186,13 +197,20 @@ to the acknowledgement it never arrived. SET_REPLY is not counted, so reading
 the acknowledgement does not move it.
 
 A controller reads the acknowledgement before a SET (the baseline) and after
-it. The counter is compared for change only, so it may wrap:
+it. The counter is compared for change only, so it may wrap; a peripheral that
+restarts starts again from all zeros:
 
 | After the SET | Means |
 | --- | --- |
-| counter unchanged | not advanced: the frame did not arrive intact; send it again |
+| all four bytes equal to the baseline, status not `0x00` | not advanced: the frame did not arrive intact; send it again |
+| status `0x00` | unknown: the peripheral has counted nothing since it started, which is both a lost first frame and a frame applied before a restart; do not re-send |
+| counter equal to the baseline, record different | unknown: the counter came round, or the peripheral restarted and counted back to it; do not re-send |
 | counter changed, same opcode | the status says applied, refused or rejected |
 | counter changed, another opcode | another frame was dispatched in between; unknown, do not re-send |
+
+So the first SET to a peripheral that has counted nothing since it started is
+never re-sent. A restart that brings the record back to exactly the baseline
+still reads as not advanced; the counter cannot rule that out.
 
 A failed read of the acknowledgement is read again, never answered by sending
 the SET again, so a frame is not applied twice because a read failed.
@@ -201,13 +219,22 @@ the SET again, so a frame is not applied twice because a read failed.
 
 **Compatibility.** A peripheral built with a library older than 0.16.0 does not
 answer `0xFD`: it returns whatever its reply handlers or `on_request` build
-for an unknown opcode, or nothing. Its [version reply](#opcode-0x00-version-information)
-tells a controller which it is: a `CRUMBS_VERSION` below `1600`
+for an unknown opcode, or nothing. What a controller then reads depends on
+that fallback:
+
+| The older peripheral's fallback | `crumbs_controller_read_ack()` returns |
+| --- | --- |
+| another opcode's reply (a version reply from `on_request`) | `CRUMBS_RX_REPLY_MISMATCH` (`-7`) |
+| an echo of `0xFD` with a short payload or one that is not a valid record (the `basic_peripheral` example's `on_request`) | `-7` |
+| no reply | `-1`: the read does not decode |
+| an echo whose first four bytes happen to form a valid record | success, with a counter that never moves; `send_confirmed` would send up to its bound |
+
+So only its [version reply](#opcode-0x00-version-information) tells a
+controller reliably which it is: a `CRUMBS_VERSION` below `1600`
 (`CRUMBS_ACK_MIN_VERSION`) has no acknowledgement, and its SETs can only be
-sent unconfirmed. Nothing else on the wire changed, so old controllers and
-new peripherals work together unchanged. A peripheral that dispatches only
-through `on_message` reports every frame as applied unless it calls
-`crumbs_refuse()`, including opcodes it ignores.
+sent unconfirmed. `crumbs_controller_send_confirmed()` does not check it; the
+caller does. Nothing else on the wire changed, so old controllers and new
+peripherals work together unchanged.
 
 ### Type check
 

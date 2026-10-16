@@ -123,34 +123,71 @@ class AckMismatch(CrumbsError):
         self.opcode = opcode
 
 
+class AckUnknown(CrumbsError):
+    """The acknowledgement cannot say what became of the SET: the device
+    holds no record (it has just started, or restarted after acting on the
+    SET), or its counter is back at the baseline with another record. The
+    SET may have been applied, so it is not sent again."""
+
+    def __init__(self, before: Ack, after: Ack, opcode: int):
+        super().__init__(
+            f"cannot tell whether opcode 0x{opcode:02X} was applied: "
+            f"acknowledgement went from {tuple(before)} to {tuple(after)}"
+        )
+        self.before = before
+        self.after = after
+        self.opcode = opcode
+
+
+_OUTCOMES = {
+    ACK_APPLIED: SetOutcome.APPLIED,
+    ACK_REFUSED: SetOutcome.REFUSED,
+    ACK_REJECTED: SetOutcome.REJECTED,
+}
+
+
+def _valid(ack: Ack) -> bool:
+    """A record a device can hold: one of the three outcomes, or status none
+    with every other byte zero, as before its first command."""
+    if ack.status == ACK_NONE:
+        return ack.counter == 0 and ack.opcode == 0 and ack.reason == 0
+    return ack.status in _OUTCOMES
+
+
 def decode_ack(reply: Message) -> Ack:
     """The acknowledgement in a GET_ACK reply. Raises ReplyMismatch for
-    another opcode's reply and FrameError for a payload under four bytes;
-    longer payloads are accepted, as an extension."""
-    if reply.opcode != GET_ACK:
+    another opcode's reply, a payload under four bytes, or four bytes that
+    are not a record a device can hold (an older device echoing the opcode
+    with a payload of its own); longer payloads are accepted, as an
+    extension."""
+    if reply.opcode != GET_ACK or len(reply.data) < 4:
         raise ReplyMismatch(reply, TYPE_ID_ANY, GET_ACK)
-    if len(reply.data) < 4:
-        raise FrameError(f"an acknowledgement is 4 bytes, not {len(reply.data)}")
-    return Ack(*reply.data[:4])
+    ack = Ack(*reply.data[:4])
+    if not _valid(ack):
+        raise ReplyMismatch(reply, TYPE_ID_ANY, GET_ACK)
+    return ack
 
 
 def classify(before: Ack, after: Ack, opcode: int) -> SetOutcome:
     """What became of a SET with ``opcode``, from the acknowledgements read
-    before and after it. Raises AckMismatch if the counter advanced on
-    another opcode, and CrumbsError for a status this package does not
-    know."""
+    before and after it. NOT_ADVANCED, the one outcome on which a SET may be
+    sent again, needs ``after`` equal to ``before`` and a status other than
+    none. Raises AckUnknown when the device holds no record or its counter is
+    unchanged with another record, AckMismatch if the counter advanced on
+    another opcode, and CrumbsError for a record no device can hold."""
+    if not _valid(before) or not _valid(after):
+        raise CrumbsError(
+            f"not an acknowledgement a device can hold: {tuple(before)}, {tuple(after)}"
+        )
+    if after.status == ACK_NONE:
+        raise AckUnknown(before, after, opcode)
     if after.counter == before.counter:
-        return SetOutcome.NOT_ADVANCED
+        if after == before:
+            return SetOutcome.NOT_ADVANCED
+        raise AckUnknown(before, after, opcode)
     if after.opcode != opcode:
         raise AckMismatch(before, after, opcode)
-    outcomes = {
-        ACK_APPLIED: SetOutcome.APPLIED,
-        ACK_REFUSED: SetOutcome.REFUSED,
-        ACK_REJECTED: SetOutcome.REJECTED,
-    }
-    if after.status not in outcomes:
-        raise CrumbsError(f"acknowledgement status 0x{after.status:02X} is not a known one")
-    return outcomes[after.status]
+    return _OUTCOMES[after.status]
 
 
 def _transient(exc: BaseException) -> bool:
@@ -232,9 +269,11 @@ class Controller:
     def read_ack(self, address: int) -> Ack:
         """The device's acknowledgement: a query for GET_ACK, retried as any
         query is, then parsed. A device built before GET_ACK answers with
-        another opcode's reply, if at all, so ReplyMismatch here means it has
-        no acknowledgement; its version reply (ACK_MIN_VERSION) is the
-        reliable test."""
+        another opcode's reply, an echo of 0xFD that is not a valid record,
+        or nothing, so ReplyMismatch here, or a read that keeps failing, means
+        it has no acknowledgement; an echo that happens to form a valid record
+        is not caught. Its version reply (ACK_MIN_VERSION) is the reliable
+        test."""
         reply = self.query(address, type_id=TYPE_ID_ANY, opcode=GET_ACK)
         return decode_ack(reply)
 
@@ -252,7 +291,10 @@ class Controller:
 
         Returns the outcome and the last acknowledgement read, with
         NOT_ADVANCED once the sends are spent. Raises AckMismatch if another
-        command was counted, and what read_ack() raises."""
+        command was counted, AckUnknown if the acknowledgement cannot say
+        (the device restarted, or its counter came round), and what
+        read_ack() raises. It does not check the device's version: use it
+        only with one whose version reply is at least ACK_MIN_VERSION."""
         if sends < 1:
             raise ValueError("sends must be at least 1")
         if message.opcode == SET_REPLY:

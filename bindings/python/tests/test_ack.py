@@ -21,9 +21,9 @@ from crumbs_i2c import (
     SET_REPLY,
     Ack,
     AckMismatch,
+    AckUnknown,
     Controller,
     CrumbsError,
-    FrameError,
     Message,
     ReplyMismatch,
     SetOutcome,
@@ -49,31 +49,51 @@ def test_decode_ack_reads_what_the_c_peripheral_sends(case):
 
 @pytest.mark.parametrize("case", VECTORS["ack_classify"])
 def test_classify_matches_the_c_core(case):
-    before = Ack(case["before"], 0, ACK_APPLIED, 0)
-    counter, opcode, status = case["after"]
-    after = Ack(counter, opcode, status, 0)
+    before = Ack(*case["before"])
+    after = Ack(*case["after"])
     if case["result"] >= 0:
         assert classify(before, after, case["opcode"]) == SetOutcome(case["result"])
     elif case["result"] == -9:
         with pytest.raises(AckMismatch):
             classify(before, after, case["opcode"])
+    elif case["result"] == -10:
+        with pytest.raises(AckUnknown):
+            classify(before, after, case["opcode"])
     else:
         assert case["result"] == -1
         with pytest.raises(CrumbsError) as e:
             classify(before, after, case["opcode"])
-        assert not isinstance(e.value, AckMismatch)
+        assert not isinstance(e.value, (AckMismatch, AckUnknown))
+
+
+@pytest.mark.parametrize("case", VECTORS["ack_decode"], ids=lambda c: c["data"] or "empty")
+def test_decode_ack_accepts_what_the_c_core_accepts(case):
+    reply = Message(TYPE, GET_ACK, bytes.fromhex(case["data"]))
+    if case["result"] == 0:
+        assert decode_ack(reply) == Ack(*reply.data[:4])
+    else:
+        assert case["result"] == -7
+        with pytest.raises(ReplyMismatch):
+            decode_ack(reply)
 
 
 def test_the_vectors_cover_every_outcome():
     assert {c["status"] for c in VECTORS["ack"]} == {0, 1, 2, 3}
-    assert {c["result"] for c in VECTORS["ack_classify"]} == {0, 1, 2, 3, -1, -9}
+    assert {c["result"] for c in VECTORS["ack_classify"]} == {0, 1, 2, 3, -1, -9, -10}
+    assert {c["result"] for c in VECTORS["ack_decode"]} == {0, -7}
 
 
 def test_decode_ack_refuses_what_is_not_an_acknowledgement():
-    with pytest.raises(FrameError):
+    with pytest.raises(ReplyMismatch):
         decode_ack(Message(TYPE, GET_ACK, b"\x01\x02\x03"))
     with pytest.raises(ReplyMismatch):
         decode_ack(Message(TYPE, 0x00, b"\x01\x02\x03\x04"))
+    # An echoing old peripheral: right opcode, a status that is none of the four.
+    with pytest.raises(ReplyMismatch):
+        decode_ack(Message(TYPE, GET_ACK, b"\x10\x11\x12\x13\x14\x15"))
+    # Status none only with every other byte zero.
+    with pytest.raises(ReplyMismatch):
+        decode_ack(Message(TYPE, GET_ACK, b"\x01\x00\x00\x00"))
     # Trailing bytes are how the layout is extended.
     assert decode_ack(Message(TYPE, GET_ACK, b"\x01\x02\x03\x04\x05")) == Ack(1, 2, 3, 4)
 
@@ -103,10 +123,17 @@ class AckPeripheral:
     SET_REPLY is counted, with the opcode and what became of it. Opcode
     APPLY is applied, REFUSE refused with reason 0x2A, anything else
     rejected. ``ack=False`` models one built before GET_ACK, which answers
-    every read with its version reply."""
+    every read with its version reply; ``echo=True`` one that answers by
+    echoing the requested opcode with a status block of its own, as
+    basic_peripheral's on_request does. ``reset_after`` restarts the device
+    (a brown-out) after that many command writes."""
 
-    def __init__(self, *, ack: bool = True):
+    def __init__(self, *, ack: bool = True, echo: bool = False, reset_after: int = 0):
         self.ack = ack
+        self.echo = echo
+        self.reset_after = reset_after
+        self.commands = 0
+        self.applied = 0
         self.staged = 0x00
         self.state = Ack(0, 0, 0, 0)
         # Scripted faults, in order: "drop" loses the next command write
@@ -129,6 +156,11 @@ class AckPeripheral:
             message.opcode, (ACK_REJECTED, REJECT_NO_HANDLER)
         )
         self.state = Ack((self.state.counter + 1) % 256, message.opcode, status, reason)
+        self.applied += message.opcode == APPLY
+        self.commands += 1
+        if self.reset_after and self.commands == self.reset_after:
+            self.state = Ack(0, 0, 0, 0)
+            self.staged = 0x00
         if self.faults and self.faults[0] == "fail-write":
             self.faults.popleft()
             raise OSError(errno.EREMOTEIO, "Remote I/O error")
@@ -137,7 +169,9 @@ class AckPeripheral:
         self.reads += 1
         if self.reads - 1 in self.failed_reads:
             raise OSError(errno.EREMOTEIO, "Remote I/O error")
-        if self.ack and self.staged == GET_ACK:
+        if self.echo:
+            reply = Message(TYPE, self.staged, bytes(range(0x10, 0x16)))
+        elif self.ack and self.staged == GET_ACK:
             reply = Message(TYPE, GET_ACK, bytes(self.state))
         else:
             reply = Message(TYPE, 0x00, b"\x40\x06\x01\x00\x00")
@@ -190,22 +224,63 @@ def test_send_confirmed_applied():
 
 def test_send_confirmed_resends_a_lost_frame():
     device = AckPeripheral()
+    device.state = Ack(1, REFUSE, ACK_REFUSED, 0x2A)  # it has counted a command
     device.faults.append("drop")
     c, bus = controller(device)
     outcome, ack = c.send_confirmed(0x10, Message(TYPE, APPLY))
     assert outcome is SetOutcome.APPLIED
-    assert ack.counter == 1
+    assert ack.counter == 2
     assert bus.log == ["stage", "read"] + ["set", "stage", "read"] * 2
 
 
 def test_send_confirmed_stops_at_its_bound():
     device = AckPeripheral()
+    device.state = Ack(1, REFUSE, ACK_REFUSED, 0x2A)
     device.faults.extend(["drop"] * 5)
     c, bus = controller(device)
     outcome, ack = c.send_confirmed(0x10, Message(TYPE, APPLY), sends=2)
     assert outcome is SetOutcome.NOT_ADVANCED
-    assert ack.counter == 0
+    assert ack.counter == 1
     assert bus.log.count("set") == 2
+
+
+def test_a_lost_first_frame_to_a_fresh_device_is_not_resent():
+    """Lost, and applied-then-restarted, read the same from a device that
+    has counted nothing."""
+    device = AckPeripheral()
+    device.faults.append("drop")
+    c, bus = controller(device)
+    with pytest.raises(AckUnknown):
+        c.send_confirmed(0x10, Message(TYPE, APPLY))
+    assert bus.log.count("set") == 1
+
+
+def test_a_reset_after_apply_from_a_zero_baseline_is_not_resent():
+    device = AckPeripheral(reset_after=1)
+    c, bus = controller(device)
+    with pytest.raises(AckUnknown):
+        c.send_confirmed(0x10, Message(TYPE, APPLY))
+    assert device.applied == 1
+    assert bus.log.count("set") == 1
+
+
+def test_a_reset_after_apply_at_the_wrapped_counter_is_not_resent():
+    device = AckPeripheral(reset_after=1)
+    device.state = Ack(0, REFUSE, ACK_REFUSED, 0x2A)  # 256 commands in
+    c, bus = controller(device)
+    with pytest.raises(AckUnknown):
+        c.send_confirmed(0x10, Message(TYPE, APPLY))
+    assert device.applied == 1
+    assert bus.log.count("set") == 1
+
+
+def test_an_echoing_old_peripheral_is_sent_nothing():
+    device = AckPeripheral(echo=True)
+    c, bus = controller(device)
+    with pytest.raises(ReplyMismatch):
+        c.send_confirmed(0x10, Message(TYPE, APPLY))
+    assert device.applied == 0
+    assert "set" not in bus.log
 
 
 def test_a_refused_or_rejected_set_is_not_resent():

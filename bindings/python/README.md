@@ -61,10 +61,15 @@ build and read `data`.
   again, up to three times in all; an acknowledgement that cannot be read
   after a send is raised rather than answered with a re-send, so a frame is
   never applied twice because a read failed. `AckMismatch` means another
-  command was counted in between. A device built with CRUMBS before 0.16.0
-  has no acknowledgement: `read_ack` raises `ReplyMismatch`, and its version
-  reply reports a `CRUMBS_VERSION` below `ACK_MIN_VERSION`; send to it with
-  `send`, unconfirmed. `decode_ack` and `classify` are the same steps for a
+  command was counted in between; `AckUnknown` that the acknowledgement
+  cannot say, because the device restarted or its counter came round, so the
+  SET is not sent again. The first SET to a device that has counted nothing
+  since it started is never re-sent. A device built with CRUMBS before
+  0.16.0 has no acknowledgement and `send_confirmed` does not check for one:
+  its version reply reports a `CRUMBS_VERSION` below `ACK_MIN_VERSION`, so
+  check that and send to it with `send`, unconfirmed. `read_ack` usually
+  raises `ReplyMismatch` for such a device, but one that echoes the opcode
+  with bytes that happen to form a valid record is not caught. `decode_ack` and `classify` are the same steps for a
   caller with its own transport.
 - `Controller.scan` reads each address once and writes nothing. An address
   with no device, or one that answers with something that is not a frame, is
@@ -72,7 +77,7 @@ build and read `data`.
 - A `Controller` may be shared between threads: each exchange holds its lock,
   so one thread's GET is never interleaved with another's.
 - Protocol errors share the base `CrumbsError` (`FrameError`,
-  `ReplyMismatch`, `AckMismatch`); bus errors are `OSError`.
+  `ReplyMismatch`, `AckMismatch`, `AckUnknown`); bus errors are `OSError`.
 - `LinuxBus` uses `/dev/i2c-N` like the C library's Linux HAL: the
   `I2C_SLAVE` ioctl, then a plain write or read. Anything with the same
   `write(address, data)` and `read(address, count)` methods works as a bus.

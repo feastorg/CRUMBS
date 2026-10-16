@@ -189,6 +189,18 @@ extern "C"
  */
 #define CRUMBS_RX_ACK_MISMATCH (-9)
 
+/**
+ * @brief crumbs_ack_classify() result: the acknowledgement cannot say.
+ *
+ * The peripheral holds no record (status CRUMBS_ACK_NONE: it has just
+ * started, or restarted after acting on the SET), or its counter equals the
+ * baseline while the record differs (it came round, or counted back to the
+ * same value after a restart). The SET may have been applied, so it is not
+ * re-sent. A restart that lands exactly on the baseline record is still
+ * read as "not advanced"; the counter cannot rule that out.
+ */
+#define CRUMBS_RX_ACK_UNKNOWN (-10)
+
     /**
      * @brief Role of a CRUMBS endpoint on the I2C bus.
      */
@@ -622,27 +634,43 @@ extern "C"
      * For callers with their own transport, which stage CRUMBS_CMD_GET_ACK
      * with SET_REPLY and decode the reply themselves.
      *
+     * Only a record a peripheral can hold is accepted: a status of
+     * CRUMBS_ACK_APPLIED, _REFUSED or _REJECTED, or CRUMBS_ACK_NONE with
+     * the other three bytes zero. That keeps an older peripheral which
+     * echoes the requested opcode with a payload of its own from being read
+     * as an acknowledgement, unless its bytes happen to form a valid record;
+     * the version reply (CRUMBS_ACK_MIN_VERSION) is the test that cannot be
+     * fooled.
+     *
      * @param reply A decoded reply frame.
-     * @param out   Filled with the first four payload bytes.
-     * @return 0 on success; -1 for NULL arguments or a payload shorter than
-     *         CRUMBS_ACK_PAYLOAD_LEN (longer is accepted);
-     *         CRUMBS_RX_REPLY_MISMATCH if the opcode is not CRUMBS_CMD_GET_ACK.
+     * @param out   Filled with the first four payload bytes; untouched on failure.
+     * @return 0 on success; -1 for NULL arguments; CRUMBS_RX_REPLY_MISMATCH
+     *         if the opcode is not CRUMBS_CMD_GET_ACK, the payload is shorter
+     *         than CRUMBS_ACK_PAYLOAD_LEN (longer is accepted), or the four
+     *         bytes are not a valid record.
      */
     int crumbs_ack_decode(const crumbs_message_t *reply, crumbs_ack_t *out);
 
     /**
      * @brief Classify a SET by the acknowledgements read before and after it.
      *
-     * The counter is compared for change only, so it may wrap.
+     * "Not advanced", the one result on which a SET may be re-sent,
+     * needs all four bytes equal to the baseline and a status other than
+     * CRUMBS_ACK_NONE. Anything else the counter cannot account for is
+     * CRUMBS_RX_ACK_UNKNOWN. So the first SET to a peripheral that has
+     * counted nothing since it started is never re-sent: lost and
+     * applied-then-restarted read the same.
      *
      * @param before Acknowledgement read before the SET was sent.
      * @param after  Acknowledgement read after it.
      * @param opcode Opcode of the SET.
-     * @return CRUMBS_SET_NOT_ADVANCED if the counter is unchanged; otherwise
+     * @return CRUMBS_SET_NOT_ADVANCED if @p after equals @p before;
+     *         CRUMBS_RX_ACK_UNKNOWN if @p after has status CRUMBS_ACK_NONE,
+     *         or the same counter with another record; otherwise
      *         CRUMBS_SET_APPLIED, CRUMBS_SET_REFUSED or CRUMBS_SET_REJECTED
-     *         from the status; CRUMBS_RX_ACK_MISMATCH if the last command is
-     *         another opcode; -1 for NULL arguments or a status that is none
-     *         of the three.
+     *         from the status, or CRUMBS_RX_ACK_MISMATCH if the last command
+     *         is another opcode; -1 for NULL arguments or a record that is
+     *         not valid (see crumbs_ack_decode()).
      */
     int crumbs_ack_classify(const crumbs_ack_t *before,
                             const crumbs_ack_t *after,
@@ -658,10 +686,17 @@ extern "C"
      * staging each time, up to CRUMBS_ACK_READ_ATTEMPTS in all. A GET is
      * safe to repeat; nothing here re-sends a SET.
      *
-     * A peripheral built before CRUMBS_ACK_MIN_VERSION answers with another
-     * opcode's reply, if it answers at all, so CRUMBS_RX_REPLY_MISMATCH on
-     * every attempt means "no acknowledgement". Its version reply is the
-     * reliable test.
+     * A peripheral built before CRUMBS_ACK_MIN_VERSION has no
+     * acknowledgement, and what this returns for one depends on its
+     * fallback for an unknown opcode:
+     * - another opcode's reply (a version reply from on_request), or an
+     *   echo of 0xFD whose payload is short or not a valid record
+     *   (basic_peripheral's on_request): CRUMBS_RX_REPLY_MISMATCH;
+     * - no reply at all: -1, a read that did not decode;
+     * - an echo whose payload happens to be a valid record: success, with a
+     *   counter that never moves.
+     * Only its version reply is a reliable test: check it before relying
+     * on this.
      *
      * @param dev Device with ctx, write_fn, read_fn and delay_fn bound.
      * @param out Filled on success.
@@ -683,9 +718,10 @@ extern "C"
      * error, never answered with a re-send, so a frame is not applied twice
      * because a read failed.
      *
-     * Use it only with a peripheral that answers GET_ACK (see
-     * CRUMBS_ACK_MIN_VERSION); if the baseline cannot be read, nothing is
-     * sent.
+     * Use it only with a peripheral whose version reply is at least
+     * CRUMBS_ACK_MIN_VERSION; this function does not check, and an older
+     * peripheral can be re-sent the SET (see crumbs_controller_read_ack()).
+     * If the baseline cannot be read, nothing is sent.
      *
      * @param dev       Device with ctx, write_fn, read_fn and delay_fn bound.
      * @param msg       The SET. SET_REPLY is refused: it is never counted.
@@ -695,7 +731,9 @@ extern "C"
      *         or CRUMBS_SET_NOT_ADVANCED after @p max_sends sends;
      *         -1 for NULL arguments, an unbound device, @p max_sends 0 or a
      *         SET_REPLY message; CRUMBS_RX_ACK_MISMATCH if another command
-     *         was counted; otherwise crumbs_controller_read_ack()'s code, with
+     *         was counted; CRUMBS_RX_ACK_UNKNOWN if the acknowledgement
+     *         cannot say (the peripheral restarted, or its counter came
+     *         round), with no re-send; otherwise crumbs_controller_read_ack()'s code, with
      *         nothing sent if it was the baseline that failed.
      */
     int crumbs_controller_send_confirmed(const crumbs_device_t *dev,

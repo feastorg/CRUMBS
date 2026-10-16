@@ -561,24 +561,45 @@ int crumbs_controller_read_expect(crumbs_context_t *ctx,
     return 0;
 }
 
+/* A record a peripheral can actually hold: one of the four statuses, and
+   status none only before the first command, when every byte is zero. An
+   older peripheral that echoes the requested opcode with a payload of its
+   own fails this, so its bytes are not read as a counter. */
+static int ack_valid(const crumbs_ack_t *a)
+{
+    switch (a->status)
+    {
+    case CRUMBS_ACK_NONE:
+        return a->counter == 0u && a->opcode == 0u && a->reason == 0u;
+    case CRUMBS_ACK_APPLIED:
+    case CRUMBS_ACK_REFUSED:
+    case CRUMBS_ACK_REJECTED:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 int crumbs_ack_decode(const crumbs_message_t *reply, crumbs_ack_t *out)
 {
     if (!reply || !out)
     {
         return -1;
     }
-    if (reply->opcode != CRUMBS_CMD_GET_ACK)
+    if (reply->opcode != CRUMBS_CMD_GET_ACK || reply->data_len < CRUMBS_ACK_PAYLOAD_LEN)
     {
         return CRUMBS_RX_REPLY_MISMATCH;
     }
-    if (reply->data_len < CRUMBS_ACK_PAYLOAD_LEN)
+    crumbs_ack_t a;
+    a.counter = reply->data[0];
+    a.opcode = reply->data[1];
+    a.status = reply->data[2];
+    a.reason = reply->data[3];
+    if (!ack_valid(&a))
     {
-        return -1;
+        return CRUMBS_RX_REPLY_MISMATCH;
     }
-    out->counter = reply->data[0];
-    out->opcode = reply->data[1];
-    out->status = reply->data[2];
-    out->reason = reply->data[3];
+    *out = a;
     return 0;
 }
 
@@ -586,13 +607,26 @@ int crumbs_ack_classify(const crumbs_ack_t *before,
                         const crumbs_ack_t *after,
                         uint8_t opcode)
 {
-    if (!before || !after)
+    if (!before || !after || !ack_valid(before) || !ack_valid(after))
     {
         return -1;
     }
+    if (after->status == CRUMBS_ACK_NONE)
+    {
+        /* The peripheral holds no record: it has just started, or started
+           again after acting on this SET. Re-sending could apply it twice. */
+        return CRUMBS_RX_ACK_UNKNOWN;
+    }
     if (after->counter == before->counter)
     {
-        return CRUMBS_SET_NOT_ADVANCED;
+        if (after->opcode == before->opcode && after->status == before->status &&
+            after->reason == before->reason)
+        {
+            return CRUMBS_SET_NOT_ADVANCED;
+        }
+        /* Same counter, another record: it came round, or restarted and
+           counted back to here. Not proof the frame was lost. */
+        return CRUMBS_RX_ACK_UNKNOWN;
     }
     if (after->opcode != opcode)
     {
@@ -604,10 +638,8 @@ int crumbs_ack_classify(const crumbs_ack_t *before,
         return CRUMBS_SET_APPLIED;
     case CRUMBS_ACK_REFUSED:
         return CRUMBS_SET_REFUSED;
-    case CRUMBS_ACK_REJECTED:
-        return CRUMBS_SET_REJECTED;
     default:
-        return -1;
+        return CRUMBS_SET_REJECTED;
     }
 }
 
