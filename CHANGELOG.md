@@ -23,6 +23,10 @@ All notable changes to CRUMBS are documented in this file.
 - **A family header that declares opcode `0xFD` no longer compiles.** `CRUMBS_DEFINE_FAMILY` refuses it, now that it is reserved for GET_ACK, with "every opcode must be 0x00-0xFF and not 0xFD or 0xFE"; renumber that opcode. A family that declared it would otherwise lose its `0xFD` reply handler silently, since the library answers that query itself. (#98)
 - `crumbs_context_t` grows by the five-byte acknowledgement record: 183 B on ATmega328P and 324 B on Cortex-M0 at the default table size (was 178 and 320), unchanged on x86-64 (alignment padding). The minimal Uno peripheral in `tests/footprint/` is 148 B of flash and 5 B of RAM larger. (#98)
 
+### Fixed
+
+- The PlatformIO package ships `src/`, `examples/`, the two manifests, `README.md`, `LICENSE` and `CHANGELOG.md`, and nothing else. 0.15.0's `export.exclude` list had switched off PlatformIO's own exclusions and the `.gitignore` filters, so its package carried `docs/` and `tests/` (161 files against 0.14.0's 112); `library.json` now names what ships with `export.include`. `scripts/check_pio_package.sh` packs a `git archive` export and fails unless the tarball holds exactly those files; the `platformio` CI job runs it. 0.15.0 stays on the registry as published. (#93)
+
 ## [0.15.0] - 2026-10-04
 
 ### Added

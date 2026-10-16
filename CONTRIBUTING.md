@@ -101,7 +101,7 @@ changed, why, and how it was verified. Add a `[Unreleased]` entry to
 | --- | --- |
 | `core-only-install` | Core build, tests, install, and a `find_package(crumbs)` consumer without the HAL; `crumbs_linux.h` must not leak into that install |
 | `build-and-test` | Linux HAL build and tests against the pinned, checksum-verified linux-wire release; install; the four out-of-tree example builds and the five in-tree ones (which must pull in the library only); a smoke run of `crumbs_simple_linux_controller` |
-| `platformio` | The eight PlatformIO projects for `nanoatmega328new` and `esp32dev`, their `lib_deps` rewritten to this checkout |
+| `platformio` | The packed library holds exactly `src/`, `examples/` and the top-level files `scripts/check_pio_package.sh` lists; the eight PlatformIO projects for `nanoatmega328new` and `esp32dev`, their `lib_deps` rewritten to this checkout |
 | `arduino-cli` | The two mixed-bus Arduino sketches with ezo-driver and SparkFun BME280 pinned by tag and SHA |
 | `build-configs` | Core and Arduino-HAL host tests under ASan+UBSan and with `CRUMBS_MAX_HANDLERS=0`, the flags given to both languages |
 | `doxygen` | `doccheck.sh` and `check_api_index.py` (pinned to `ubuntu-24.04` for a fixed Doxygen) |
@@ -136,7 +136,18 @@ package must be published before the merge.
 2. Tag that commit (`git tag -a vX.Y.Z -m "Release vX.Y.Z"`, push the tag).
    `release.yml` builds the GitHub release from it, then waits for a reviewer
    to approve the PyPI upload of `crumbs-i2c`.
-3. `pio pkg publish` from the tagged tree; wait until
+3. Pack from the tag and publish that tarball, never the working tree,
+   which `pio pkg pack` packs as it finds it, untracked files included:
+
+   ```sh
+   d=$(mktemp -d)
+   scripts/check_pio_package.sh "$d" vX.Y.Z
+   pio pkg publish "$d/CRUMBS.tar.gz"
+   ```
+
+   The script packs a `git archive` export of the tag and stops before the
+   upload if the file list is not the expected one; a published version
+   cannot be replaced. Then wait until
    `pio pkg show cameronbrooks11/CRUMBS@X.Y.Z` resolves, then `pio run` one
    example in a scratch copy with its pin untouched, which is what a user
    gets.
