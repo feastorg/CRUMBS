@@ -191,6 +191,10 @@ if(CRUMBS_ENABLE_TESTS)
     target_link_libraries(test_set_reply PRIVATE crumbs)
     add_test(NAME set_reply_test COMMAND test_set_reply)
 
+    add_executable(test_ack tests/test_ack.c)
+    target_link_libraries(test_ack PRIVATE crumbs)
+    add_test(NAME ack_test COMMAND test_ack)
+
     add_executable(test_reply_flow tests/test_reply_flow.c)
     target_link_libraries(test_reply_flow PRIVATE crumbs)
     add_test(NAME reply_flow_test COMMAND test_reply_flow)
@@ -226,7 +230,7 @@ if(CRUMBS_ENABLE_TESTS)
     # The compile-time checks in crumbs_ops.h: each source must fail to
     # compile with its own message. The targets are built only by their
     # tests, and a build that fails for any other reason fails the test.
-    foreach(case size_mismatch too_large type_zero opcode_set_reply opcode_too_large opcode_duplicate)
+    foreach(case size_mismatch too_large type_zero opcode_set_reply opcode_get_ack opcode_too_large opcode_duplicate)
         add_library(compile_fail_${case} OBJECT EXCLUDE_FROM_ALL tests/compile_fail/${case}.c)
         target_include_directories(compile_fail_${case} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS tests/compile_fail/${case}.c)

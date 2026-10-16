@@ -19,6 +19,8 @@ MIN_FRAME = 4
 TYPE_ID_ANY = 0x00
 #: The opcode a controller sends to choose which reply the next read returns.
 SET_REPLY = 0xFE
+#: The reserved query a peripheral's library answers with its acknowledgement.
+GET_ACK = 0xFD
 
 
 def _table() -> tuple[int, ...]:

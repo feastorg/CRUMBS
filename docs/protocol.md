@@ -1,10 +1,13 @@
 # Protocol
 
-**CRUMBS protocol 1.0.** The frame below has been the wire format since library
-0.7; SET_REPLY (opcode `0xFE`) was added in 0.10.0, and receivers have rejected
-over-long buffers since 0.12.4. Nothing on the wire changes without a new
-protocol major version. This document is normative; the library
-version (`CRUMBS_VERSION`) is a separate number and moves independently.
+**CRUMBS protocol 1.1.** The frame below has been the wire format since library
+0.7; SET_REPLY (opcode `0xFE`) was added in 0.10.0, receivers have rejected
+over-long buffers since 0.12.4, and protocol 1.1 adds the SET acknowledgement
+(GET_ACK, opcode `0xFD`). Nothing on the wire changes incompatibly without a
+new protocol major version; an addition that older peripherals and
+controllers can ignore is a minor version. This document is normative; the
+library version (`CRUMBS_VERSION`) is a separate number and moves
+independently.
 
 CRUMBS is a message layer over plain I²C. The I²C address selects the device;
 everything inside the transaction is one CRUMBS frame.
@@ -21,7 +24,7 @@ everything inside the transaction is one CRUMBS frame.
 | Field      | Meaning                                                          |
 | ---------- | ---------------------------------------------------------------- |
 | `type_id`  | Device class the frame is addressed to or comes from. `0x00` = any. |
-| `opcode`   | Command or query identifier, scoped to the `type_id`. `0xFE` is reserved. |
+| `opcode`   | Command or query identifier, scoped to the `type_id`. `0xFD` and `0xFE` are reserved. |
 | `data_len` | Payload length, `0`–`27`.                                        |
 | `data`     | Opaque bytes; the application defines the layout.                |
 | `crc8`     | CRC-8 over the preceding `3 + data_len` bytes.                   |
@@ -62,7 +65,9 @@ as their 4 native bytes; a family that uses them inherits that convention.
 Two I²C transaction shapes carry every CRUMBS exchange.
 
 **SET** — one write. The controller writes a frame; the peripheral validates it
-and dispatches on `opcode`. Nothing comes back on the bus.
+and dispatches on `opcode`. Nothing comes back on the bus; a controller that
+needs to know the SET arrived reads the acknowledgement afterwards
+([GET_ACK](#get_ack-0xfd-the-set-acknowledgement)).
 
 **GET** — a write, then a read.
 
@@ -78,7 +83,7 @@ controller can read the same value repeatedly with one SET_REPLY.
 
 ### SET_REPLY (`0xFE`)
 
-The only opcode the protocol reserves. The library intercepts it before any
+Reserved. The library intercepts it before any
 user code runs: it is never delivered to `on_message` or to a handler, and a
 handler registered for `0xFE` is never called.
 
@@ -145,6 +150,65 @@ controller or in the AVR's TWI is not established, and other peripheral
 firmware was not swept. The Pi 4 setting is in
 [platform-setup.md](platform-setup.md#the-ic-bus).
 
+### GET_ACK (`0xFD`): the SET acknowledgement
+
+Since protocol 1.1 (library 0.16.0) a peripheral keeps a record of the command
+frames it receives, and the library answers the reserved query `0xFD` with it.
+A controller stages `0xFD` with SET_REPLY like any GET and reads:
+
+```text
+[type][0xFD][0x04][counter][opcode][status][reason][crc]
+```
+
+| Byte | Content |
+| --- | --- |
+| `counter` | Command frames counted since the peripheral started, modulo 256. |
+| `opcode` | The last counted frame's opcode. |
+| `status` | `0x00` none yet, `0x01` applied, `0x02` refused, `0x03` rejected. |
+| `reason` | `0x00` when applied. Refused: a byte the firmware chose (its meaning is the family's). Rejected: `0x01` nothing took the opcode, `0x02` the type check failed. |
+
+The reply's `type_id` is the peripheral's declared type, or `0x00` if it has
+declared none.
+
+A **command frame** is every frame that decodes, CRC included, other than
+SET_REPLY. Each one advances the counter and becomes the last command:
+
+- **applied** when `on_message` or a handler for its opcode received it and
+  did not refuse it;
+- **refused** when one of them called `crumbs_refuse(ctx, reason)`: the
+  command arrived and was deliberately not acted on;
+- **rejected** when neither exists for its opcode (`0x01`), or when it failed
+  the [type check](#type-check) (`0x02`).
+
+A frame that does not decode — a CRC error, a wrong length, or a retried write
+merged into a failed one ([above](#when-the-reply-is-built)) — is not counted:
+to the acknowledgement it never arrived. SET_REPLY is not counted, so reading
+the acknowledgement does not move it.
+
+A controller reads the acknowledgement before a SET (the baseline) and after
+it. The counter is compared for change only, so it may wrap:
+
+| After the SET | Means |
+| --- | --- |
+| counter unchanged | not advanced: the frame did not arrive intact; send it again |
+| counter changed, same opcode | the status says applied, refused or rejected |
+| counter changed, another opcode | another frame was dispatched in between; unknown, do not re-send |
+
+A failed read of the acknowledgement is read again, never answered by sending
+the SET again, so a frame is not applied twice because a read failed.
+`crumbs_controller_send_confirmed()` and the Python binding's
+`Controller.send_confirmed()` do exactly this, with a bounded number of sends.
+
+**Compatibility.** A peripheral built with a library older than 0.16.0 does not
+answer `0xFD`: it returns whatever its reply handlers or `on_request` build
+for an unknown opcode, or nothing. Its [version reply](#opcode-0x00-version-information)
+tells a controller which it is: a `CRUMBS_VERSION` below `1600`
+(`CRUMBS_ACK_MIN_VERSION`) has no acknowledgement, and its SETs can only be
+sent unconfirmed. Nothing else on the wire changed, so old controllers and
+new peripherals work together unchanged. A peripheral that dispatches only
+through `on_message` reports every frame as applied unless it calls
+`crumbs_refuse()`, including opcodes it ignores.
+
 ### Type check
 
 A peripheral may declare its own `type_id` (`crumbs_set_type_id()`). Once
@@ -190,6 +254,7 @@ told apart by address. Each type owns an independent opcode space.
 | Value         | Status                                                     |
 | ------------- | ---------------------------------------------------------- |
 | `0xFE`        | Reserved: SET_REPLY.                                       |
+| `0xFD`        | Reserved: GET_ACK, the SET acknowledgement (protocol 1.1). |
 | `0x00`        | Convention: version information (below).                   |
 | all others    | Free per type. Convention: SET commands low, GET queries from `0x80` up, so a reply's opcode says what it is. |
 

@@ -1,8 +1,11 @@
 """The controller side of CRUMBS: send a SET, query a GET, scan a bus.
 
 Mirrors ``crumbs_controller_send()``, ``crumbs_controller_read()``,
-``crumbs_controller_read_expect()`` and the strict read-probe scanner in
-``src/core/crumbs_core.c``, over any object with the Bus methods.
+``crumbs_controller_read_expect()``, the SET acknowledgement
+(``crumbs_ack_decode()``, ``crumbs_ack_classify()``,
+``crumbs_controller_read_ack()``, ``crumbs_controller_send_confirmed()``)
+and the strict read-probe scanner in ``src/core/crumbs_core.c``, over any
+object with the Bus methods.
 """
 
 from __future__ import annotations
@@ -11,9 +14,11 @@ import errno
 import threading
 import time
 from collections.abc import Callable, Iterable
-from typing import Protocol
+from enum import IntEnum
+from typing import NamedTuple, Protocol
 
 from crumbs_i2c._frame import (
+    GET_ACK,
     MAX_FRAME,
     SET_REPLY,
     TYPE_ID_ANY,
@@ -41,6 +46,23 @@ LAST_ADDRESS = 0x77
 #: on the wire, or no device at the address.
 NO_ANSWER = frozenset({errno.ENXIO, errno.EREMOTEIO, errno.EIO, errno.ETIMEDOUT, errno.EAGAIN})
 
+#: The last command's status in a GET_ACK reply (``CRUMBS_ACK_*``).
+ACK_NONE = 0x00
+ACK_APPLIED = 0x01
+ACK_REFUSED = 0x02
+ACK_REJECTED = 0x03
+
+#: Why a command was rejected (``CRUMBS_ACK_REJECT_*``).
+REJECT_NO_HANDLER = 0x01
+REJECT_TYPE = 0x02
+
+#: The first ``CRUMBS_VERSION`` whose peripherals answer GET_ACK, as the
+#: opcode 0x00 version reply carries it in its first two bytes.
+ACK_MIN_VERSION = 1600
+
+#: How many SETs send_confirmed() sends at most, by default.
+CONFIRMED_SENDS = 3
+
 
 class Bus(Protocol):
     def write(self, address: int, data: bytes) -> None: ...
@@ -66,6 +88,69 @@ class ReplyMismatch(CrumbsError):
     def wrong_device(self) -> bool:
         """Another device type answered: retrying cannot help."""
         return self.type_id != TYPE_ID_ANY and self.reply.type_id != self.type_id
+
+
+class Ack(NamedTuple):
+    """A peripheral's acknowledgement: how many command frames it has
+    counted (modulo 256), and the last one's opcode, status and reason."""
+
+    counter: int
+    opcode: int
+    status: int
+    reason: int
+
+
+class SetOutcome(IntEnum):
+    """What the acknowledgement says became of a SET (``CRUMBS_SET_*``).
+    Only APPLIED means the command took effect."""
+
+    APPLIED = 0
+    REFUSED = 1
+    REJECTED = 2
+    NOT_ADVANCED = 3
+
+
+class AckMismatch(CrumbsError):
+    """The counter advanced, but on another opcode: some other frame was
+    dispatched, and whether this SET was applied cannot be told."""
+
+    def __init__(self, before: Ack, after: Ack, opcode: int):
+        super().__init__(
+            f"sent opcode 0x{opcode:02X}, but the last command counted is 0x{after.opcode:02X}"
+        )
+        self.before = before
+        self.after = after
+        self.opcode = opcode
+
+
+def decode_ack(reply: Message) -> Ack:
+    """The acknowledgement in a GET_ACK reply. Raises ReplyMismatch for
+    another opcode's reply and FrameError for a payload under four bytes;
+    longer payloads are accepted, as an extension."""
+    if reply.opcode != GET_ACK:
+        raise ReplyMismatch(reply, TYPE_ID_ANY, GET_ACK)
+    if len(reply.data) < 4:
+        raise FrameError(f"an acknowledgement is 4 bytes, not {len(reply.data)}")
+    return Ack(*reply.data[:4])
+
+
+def classify(before: Ack, after: Ack, opcode: int) -> SetOutcome:
+    """What became of a SET with ``opcode``, from the acknowledgements read
+    before and after it. Raises AckMismatch if the counter advanced on
+    another opcode, and CrumbsError for a status this package does not
+    know."""
+    if after.counter == before.counter:
+        return SetOutcome.NOT_ADVANCED
+    if after.opcode != opcode:
+        raise AckMismatch(before, after, opcode)
+    outcomes = {
+        ACK_APPLIED: SetOutcome.APPLIED,
+        ACK_REFUSED: SetOutcome.REFUSED,
+        ACK_REJECTED: SetOutcome.REJECTED,
+    }
+    if after.status not in outcomes:
+        raise CrumbsError(f"acknowledgement status 0x{after.status:02X} is not a known one")
+    return outcomes[after.status]
 
 
 def _transient(exc: BaseException) -> bool:
@@ -143,6 +228,48 @@ class Controller:
                     if attempt + 1 == self.query_attempts or not _transient(exc):
                         raise
         raise AssertionError("unreachable")
+
+    def read_ack(self, address: int) -> Ack:
+        """The device's acknowledgement: a query for GET_ACK, retried as any
+        query is, then parsed. A device built before GET_ACK answers with
+        another opcode's reply, if at all, so ReplyMismatch here means it has
+        no acknowledgement; its version reply (ACK_MIN_VERSION) is the
+        reliable test."""
+        reply = self.query(address, type_id=TYPE_ID_ANY, opcode=GET_ACK)
+        return decode_ack(reply)
+
+    def send_confirmed(
+        self, address: int, message: Message, *, sends: int = CONFIRMED_SENDS
+    ) -> tuple[SetOutcome, Ack]:
+        """A SET confirmed by the device's acknowledgement: read it, send,
+        read it again and classify. If the counter did not advance the frame
+        never arrived, and it is sent again, up to ``sends`` times in all. A
+        write that raises is still followed by a read, since the frame may
+        have landed. An acknowledgement that cannot be read after a send is
+        raised, never answered with a re-send, so a frame is not applied
+        twice because a read failed; if the first read fails, nothing is
+        sent.
+
+        Returns the outcome and the last acknowledgement read, with
+        NOT_ADVANCED once the sends are spent. Raises AckMismatch if another
+        command was counted, and what read_ack() raises."""
+        if sends < 1:
+            raise ValueError("sends must be at least 1")
+        if message.opcode == SET_REPLY:
+            raise ValueError("SET_REPLY is never counted, so it cannot be confirmed")
+        with self._lock:
+            before = self.read_ack(address)
+            after = before
+            for _ in range(sends):
+                try:
+                    self.send(address, message)
+                except OSError:
+                    pass  # the acknowledgement decides whether it landed
+                after = self.read_ack(address)
+                outcome = classify(before, after, message.opcode)
+                if outcome is not SetOutcome.NOT_ADVANCED:
+                    return outcome, after
+            return SetOutcome.NOT_ADVANCED, after
 
     def scan(self, addresses: Iterable[int] | None = None) -> dict[int, int]:
         """Find CRUMBS devices: read each address once and keep those whose

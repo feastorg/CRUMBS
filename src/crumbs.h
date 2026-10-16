@@ -61,8 +61,8 @@ extern "C"
      * Default is 16 which balances memory use and typical needs.
      *
      * Two tables (SET handlers and reply handlers) of this many entries each
-     * live in the context, so it sizes crumbs_context_t: 178 bytes on
-     * ATmega328P and 320 on Cortex-M0 at 16, against 16 and 28 at 0. Set it
+     * live in the context, so it sizes crumbs_context_t: 183 bytes on
+     * ATmega328P and 324 on Cortex-M0 at 16, against 21 and 32 at 0. Set it
      * with a build flag, identically for the library and the sketch, and
      * compare crumbs_context_size() with sizeof(crumbs_context_t) at startup.
      * 0 compiles both tables out. Dispatch is a linear search.
@@ -90,6 +90,62 @@ extern "C"
      * requested_opcode unchanged.
      */
 #define CRUMBS_CMD_SET_REPLY 0xFE
+
+/**
+ * @brief Reserved opcode for the acknowledgement query (GET_ACK).
+ *
+ * A controller stages it with SET_REPLY like any GET opcode. The library
+ * answers it itself, before any reply handler or on_request runs, with a
+ * frame of the peripheral's declared type_id, opcode 0xFD and the four
+ * bytes [counter][opcode][status][reason] that describe the last command
+ * frame (see crumbs_ack_t). A reply handler registered for 0xFD is never
+ * called. A SET frame carrying 0xFD is an ordinary command; family headers
+ * may not declare it (CRUMBS_DEFINE_FAMILY).
+ */
+#define CRUMBS_CMD_GET_ACK 0xFD
+
+/** @brief Payload length of the GET_ACK reply; longer replies are an extension. */
+#define CRUMBS_ACK_PAYLOAD_LEN 4u
+
+/** @name Last-command status (GET_ACK byte 2)
+ *  @{ */
+#define CRUMBS_ACK_NONE 0x00     /**< No command frame since crumbs_init(). */
+#define CRUMBS_ACK_APPLIED 0x01  /**< Dispatched to on_message or a handler, and not refused. */
+#define CRUMBS_ACK_REFUSED 0x02  /**< A handler called crumbs_refuse(); the reason byte is its own. */
+#define CRUMBS_ACK_REJECTED 0x03 /**< Decoded, but nothing took it; the reason byte says why. */
+/** @} */
+
+/** @name Rejection reasons (GET_ACK byte 3 when the status is CRUMBS_ACK_REJECTED)
+ *  @{ */
+#define CRUMBS_ACK_REJECT_NO_HANDLER 0x01 /**< No on_message and no handler for the opcode. */
+#define CRUMBS_ACK_REJECT_TYPE 0x02       /**< The frame failed the type check (CRUMBS_RX_TYPE_MISMATCH). */
+/** @} */
+
+/**
+ * @brief The first CRUMBS_VERSION whose peripherals answer GET_ACK.
+ *
+ * A controller that reads a peripheral's opcode 0x00 version reply
+ * (crumbs_build_version_reply()) compares its CRUMBS_VERSION bytes with
+ * this. A peripheral built with an older library cannot confirm a SET:
+ * send to it with crumbs_controller_send() and treat the result as
+ * unconfirmed.
+ */
+#define CRUMBS_ACK_MIN_VERSION 1600
+
+/**
+ * @brief How many times crumbs_controller_read_ack() stages and reads before giving up.
+ */
+#define CRUMBS_ACK_READ_ATTEMPTS 3
+
+/** @name crumbs_ack_classify() and crumbs_controller_send_confirmed() outcomes
+ *  Non-negative: what the peripheral reported. Only CRUMBS_SET_APPLIED (0)
+ *  means the command took effect.
+ *  @{ */
+#define CRUMBS_SET_APPLIED 0      /**< The counter advanced and the command was applied. */
+#define CRUMBS_SET_REFUSED 1      /**< The counter advanced and a handler refused the command. */
+#define CRUMBS_SET_REJECTED 2     /**< The counter advanced and nothing took the command. */
+#define CRUMBS_SET_NOT_ADVANCED 3 /**< The counter did not move: the frame never arrived intact. */
+/** @} */
 
 /**
  * @brief Wildcard type_id.
@@ -123,6 +179,15 @@ extern "C"
  * declared type_id nor CRUMBS_TYPE_ID_ANY. Nothing was dispatched.
  */
 #define CRUMBS_RX_TYPE_MISMATCH (-8)
+
+/**
+ * @brief crumbs_ack_classify() result: the counter advanced on another command.
+ *
+ * The acknowledgement names an opcode other than the one sent, so some other
+ * frame was dispatched after the baseline was read. Whether the command sent
+ * was applied cannot be told, so it is not re-sent.
+ */
+#define CRUMBS_RX_ACK_MISMATCH (-9)
 
     /**
      * @brief Role of a CRUMBS endpoint on the I2C bus.
@@ -237,6 +302,17 @@ extern "C"
          */
         uint8_t requested_opcode;
 
+        /** @name Last-command acknowledgement (GET_ACK)
+         *  Kept by crumbs_peripheral_handle_receive() and answered by
+         *  crumbs_peripheral_build_reply(); see CRUMBS_CMD_GET_ACK.
+         *  @{ */
+        uint8_t ack_counter;     /**< Command frames counted since init, modulo 256. */
+        uint8_t ack_opcode;      /**< Opcode of the last counted frame. */
+        uint8_t ack_status;      /**< CRUMBS_ACK_* status of the last counted frame. */
+        uint8_t ack_reason;      /**< Refusal or rejection reason; 0 when applied. */
+        uint8_t ack_dispatching; /**< Non-zero while on_message or a handler runs. */
+        /** @} */
+
 #if CRUMBS_MAX_HANDLERS > 0
         /** @name Command Handler Dispatch Table
          *  Per-opcode handler functions and associated user data.
@@ -284,6 +360,17 @@ extern "C"
         crumbs_delay_fn     delay_fn; /**< Microsecond delay callback (NULL if no GET ops). */
         void               *io;       /**< Platform I/O context (Wire*, linux handle, etc.). */
     } crumbs_device_t;
+
+    /**
+     * @brief A peripheral's acknowledgement, as the GET_ACK reply carries it.
+     */
+    typedef struct
+    {
+        uint8_t counter; /**< Command frames the peripheral has counted, modulo 256. */
+        uint8_t opcode;  /**< Opcode of the last counted frame. */
+        uint8_t status;  /**< CRUMBS_ACK_NONE, _APPLIED, _REFUSED or _REJECTED. */
+        uint8_t reason;  /**< Refusal reason (the firmware's) or CRUMBS_ACK_REJECT_*; 0 when applied. */
+    } crumbs_ack_t;
 
     /**
      * @brief Initialize a CRUMBS context.
@@ -524,6 +611,100 @@ extern "C"
                                       crumbs_i2c_read_fn read_fn,
                                       void *read_ctx);
 
+    /** @name SET acknowledgement (controller)
+     *  Read a peripheral's GET_ACK reply, classify a SET by it, and send a
+     *  SET that is confirmed and re-sent when it did not arrive.
+     *  @{ */
+
+    /**
+     * @brief Parse a GET_ACK reply.
+     *
+     * For callers with their own transport, which stage CRUMBS_CMD_GET_ACK
+     * with SET_REPLY and decode the reply themselves.
+     *
+     * @param reply A decoded reply frame.
+     * @param out   Filled with the first four payload bytes.
+     * @return 0 on success; -1 for NULL arguments or a payload shorter than
+     *         CRUMBS_ACK_PAYLOAD_LEN (longer is accepted);
+     *         CRUMBS_RX_REPLY_MISMATCH if the opcode is not CRUMBS_CMD_GET_ACK.
+     */
+    int crumbs_ack_decode(const crumbs_message_t *reply, crumbs_ack_t *out);
+
+    /**
+     * @brief Classify a SET by the acknowledgements read before and after it.
+     *
+     * The counter is compared for change only, so it may wrap.
+     *
+     * @param before Acknowledgement read before the SET was sent.
+     * @param after  Acknowledgement read after it.
+     * @param opcode Opcode of the SET.
+     * @return CRUMBS_SET_NOT_ADVANCED if the counter is unchanged; otherwise
+     *         CRUMBS_SET_APPLIED, CRUMBS_SET_REFUSED or CRUMBS_SET_REJECTED
+     *         from the status; CRUMBS_RX_ACK_MISMATCH if the last command is
+     *         another opcode; -1 for NULL arguments or a status that is none
+     *         of the three.
+     */
+    int crumbs_ack_classify(const crumbs_ack_t *before,
+                            const crumbs_ack_t *after,
+                            uint8_t opcode);
+
+    /**
+     * @brief Read a peripheral's acknowledgement.
+     *
+     * Stages CRUMBS_CMD_GET_ACK with SET_REPLY (wildcard type), waits
+     * CRUMBS_DEFAULT_QUERY_DELAY_US, reads with
+     * crumbs_controller_read_expect() and parses the reply. A failed stage
+     * or read, a corrupt reply, or another opcode's reply is tried again,
+     * staging each time, up to CRUMBS_ACK_READ_ATTEMPTS in all. A GET is
+     * safe to repeat; nothing here re-sends a SET.
+     *
+     * A peripheral built before CRUMBS_ACK_MIN_VERSION answers with another
+     * opcode's reply, if it answers at all, so CRUMBS_RX_REPLY_MISMATCH on
+     * every attempt means "no acknowledgement". Its version reply is the
+     * reliable test.
+     *
+     * @param dev Device with ctx, write_fn, read_fn and delay_fn bound.
+     * @param out Filled on success.
+     * @return 0 on success; -1 for NULL arguments or an unbound device;
+     *         otherwise the last attempt's send, read or decode code
+     *         (CRUMBS_RX_REPLY_MISMATCH when it was another opcode's reply).
+     */
+    int crumbs_controller_read_ack(const crumbs_device_t *dev, crumbs_ack_t *out);
+
+    /**
+     * @brief Send a SET and confirm it from the peripheral's acknowledgement.
+     *
+     * Reads the acknowledgement (the baseline), sends @p msg, reads it
+     * again and classifies the SET with crumbs_ack_classify(). If the
+     * counter did not advance the frame did not arrive, and it is sent
+     * again, up to @p max_sends sends in all. A write that reports an error
+     * is still followed by a read, since the frame may have landed. An
+     * acknowledgement that cannot be read after a send is returned as an
+     * error, never answered with a re-send, so a frame is not applied twice
+     * because a read failed.
+     *
+     * Use it only with a peripheral that answers GET_ACK (see
+     * CRUMBS_ACK_MIN_VERSION); if the baseline cannot be read, nothing is
+     * sent.
+     *
+     * @param dev       Device with ctx, write_fn, read_fn and delay_fn bound.
+     * @param msg       The SET. SET_REPLY is refused: it is never counted.
+     * @param max_sends Sends allowed in all, at least 1.
+     * @param out_ack   If not NULL, the last acknowledgement read.
+     * @return CRUMBS_SET_APPLIED (0), CRUMBS_SET_REFUSED, CRUMBS_SET_REJECTED,
+     *         or CRUMBS_SET_NOT_ADVANCED after @p max_sends sends;
+     *         -1 for NULL arguments, an unbound device, @p max_sends 0 or a
+     *         SET_REPLY message; CRUMBS_RX_ACK_MISMATCH if another command
+     *         was counted; otherwise crumbs_controller_read_ack()'s code, with
+     *         nothing sent if it was the baseline that failed.
+     */
+    int crumbs_controller_send_confirmed(const crumbs_device_t *dev,
+                                         const crumbs_message_t *msg,
+                                         uint8_t max_sends,
+                                         crumbs_ack_t *out_ack);
+
+    /** @} */
+
     /**
      * @brief Probe an I2C address range for CRUMBS-capable devices.
      *
@@ -756,6 +937,12 @@ extern "C"
      * @param ctx Active CRUMBS context (peripheral role).
      * @param buffer Raw bytes received.
      * @param len Number of bytes in @p buffer.
+     * Every frame that decodes, other than SET_REPLY, is a command frame:
+     * it advances ctx->ack_counter and becomes the last command GET_ACK
+     * reports, as applied, refused (crumbs_refuse()) or rejected (no
+     * on_message and no handler for its opcode, or a failed type check). A
+     * frame that does not decode is not counted.
+     *
      * @return 0 on success; -1 on invalid arguments or a malformed frame;
      *         -2 on CRC mismatch; CRUMBS_RX_TYPE_MISMATCH (-8) when the frame
      *         is valid but its type_id is neither the declared type nor
@@ -766,9 +953,28 @@ extern "C"
                                          size_t len);
 
     /**
+     * @brief Mark the command being dispatched as refused.
+     *
+     * Call it from on_message or a SET handler to report that the command
+     * was received and deliberately not acted on (a tripped latch, an
+     * argument out of range). GET_ACK then reports CRUMBS_ACK_REFUSED with
+     * @p reason, which the firmware defines. A command whose handler only
+     * queues work for later is reported as applied when the handler
+     * returns; a refusal must be decided in the handler.
+     *
+     * @param ctx    Active CRUMBS context (peripheral role).
+     * @param reason One byte for the controller; its meaning is the family's.
+     * @return 0 on success; -1 if @p ctx is NULL or no command is being
+     *         dispatched (the call then changes nothing).
+     */
+    int crumbs_refuse(crumbs_context_t *ctx, uint8_t reason);
+
+    /**
      * @brief Build an encoded reply frame for use inside an I2C request handler.
      *
      * Dispatches in order:
+     * 0. CRUMBS_CMD_GET_ACK - answered by the library with the last-command
+     *    acknowledgement; nothing below runs.
      * 1. Per-opcode reply handler table (crumbs_register_reply_handler) for
      *    ctx->requested_opcode - preferred for family peripherals.
      * 2. on_request callback - called when no matching reply handler is found

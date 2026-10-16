@@ -52,13 +52,27 @@ build and read `data`.
   Another device type at the address raises `ReplyMismatch` at once, and any
   other bus error is raised as the `OSError` it is. `send` is never retried,
   since a SET need not be safe to repeat.
+- `Controller.send_confirmed` sends a SET and confirms it from the device's
+  acknowledgement
+  ([GET_ACK](https://github.com/feastorg/CRUMBS/blob/main/docs/protocol.md#get_ack-0xfd-the-set-acknowledgement)):
+  it reads the acknowledgement (`Controller.read_ack`), sends, reads it
+  again, and returns a `SetOutcome` (`APPLIED`, `REFUSED`, `REJECTED` or
+  `NOT_ADVANCED`) with the last `Ack`. A frame that did not arrive is sent
+  again, up to three times in all; an acknowledgement that cannot be read
+  after a send is raised rather than answered with a re-send, so a frame is
+  never applied twice because a read failed. `AckMismatch` means another
+  command was counted in between. A device built with CRUMBS before 0.16.0
+  has no acknowledgement: `read_ack` raises `ReplyMismatch`, and its version
+  reply reports a `CRUMBS_VERSION` below `ACK_MIN_VERSION`; send to it with
+  `send`, unconfirmed. `decode_ack` and `classify` are the same steps for a
+  caller with its own transport.
 - `Controller.scan` reads each address once and writes nothing. An address
   with no device, or one that answers with something that is not a frame, is
   skipped; any other bus error is raised.
 - A `Controller` may be shared between threads: each exchange holds its lock,
   so one thread's GET is never interleaved with another's.
 - Protocol errors share the base `CrumbsError` (`FrameError`,
-  `ReplyMismatch`); bus errors are `OSError`.
+  `ReplyMismatch`, `AckMismatch`); bus errors are `OSError`.
 - `LinuxBus` uses `/dev/i2c-N` like the C library's Linux HAL: the
   `I2C_SLAVE` ioctl, then a plain write or read. Anything with the same
   `write(address, data)` and `read(address, count)` methods works as a bus.

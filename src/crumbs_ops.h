@@ -136,7 +136,7 @@ static inline void crumbs_field_write_float_(uint8_t *p, float v) { memcpy(p, &v
     _p += CRUMBS_FIELD_WIRE_##t;
 
 #define CRUMBS_OP_ENUM_(n, v) n = (v),
-#define CRUMBS_OP_BAD_(n, v) +((v) < 0 || (v) > 0xFF || (v) == CRUMBS_CMD_SET_REPLY)
+#define CRUMBS_OP_BAD_(n, v) +((v) < 0 || (v) > 0xFF || (v) == CRUMBS_CMD_SET_REPLY || (v) == CRUMBS_CMD_GET_ACK)
 #define CRUMBS_OP_CASE_(n, v) \
     case n:                   \
         break;
@@ -211,7 +211,8 @@ static inline void crumbs_field_write_float_(uint8_t *p, float v) { memcpy(p, &v
  * `enum { PREFIX_TYPE_ID = type_id };` and one enum constant per opcode,
  * plus three checks that fail the build: the type must be `0x01`-`0xFF`
  * (`0x00` is the wildcard); every opcode must be `0x00`-`0xFF` and not
- * `0xFE` (SET_REPLY); and no two opcodes may share a value, which would make
+ * `0xFD` (GET_ACK) or `0xFE` (SET_REPLY), the two the library answers
+ * itself; and no two opcodes may share a value, which would make
  * one handler registration silently replace another. `0x00` is allowed: by
  * convention it is the version query (docs/protocol.md).
  *
@@ -239,7 +240,7 @@ static inline void crumbs_field_write_float_(uint8_t *p, float v) { memcpy(p, &v
         PREFIX##_bad_opcodes_ = 0 OPS(CRUMBS_OP_BAD_)                                      \
     };                                                                                     \
     CRUMBS_STATIC_ASSERT(PREFIX##_bad_opcodes_ == 0,                                       \
-                         #PREFIX ": every opcode must be 0x00-0xFF and not 0xFE");         \
+                         #PREFIX ": every opcode must be 0x00-0xFF and not 0xFD or 0xFE"); \
     CRUMBS_UNUSED_FN_ static inline void PREFIX##_opcodes_are_distinct_(uint8_t op)        \
     {                                                                                      \
         switch (op)                                                                        \

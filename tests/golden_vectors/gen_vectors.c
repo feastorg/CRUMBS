@@ -115,6 +115,76 @@ static void frame_length_case(const uint8_t *buf, size_t len)
     }
 }
 
+/* The acknowledgement cases: a peripheral with one handler that applies,
+   one that refuses, and none for any other opcode. */
+#define ACK_TYPE 0x07
+#define ACK_OP_APPLY 0x01
+#define ACK_OP_REFUSE 0x02
+#define ACK_REASON 0x2A
+
+static void ack_apply(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data,
+                      uint8_t data_len, void *user_data)
+{
+    (void)ctx;
+    (void)opcode;
+    (void)data;
+    (void)data_len;
+    (void)user_data;
+}
+
+static void ack_refuse(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data,
+                       uint8_t data_len, void *user_data)
+{
+    (void)opcode;
+    (void)data;
+    (void)data_len;
+    (void)user_data;
+    (void)crumbs_refuse(ctx, ACK_REASON);
+}
+
+/* Feed buf to the peripheral, then stage GET_ACK and record the reply the
+   library builds, beside the state it was built from. */
+static void ack_case(crumbs_context_t *ctx, const uint8_t *buf, size_t len)
+{
+    int rc = len > 0u ? crumbs_peripheral_handle_receive(ctx, buf, len) : 0;
+    uint8_t stage[CRUMBS_MESSAGE_MAX_SIZE];
+    crumbs_message_t m;
+    memset(&m, 0, sizeof(m));
+    m.opcode = CRUMBS_CMD_SET_REPLY;
+    m.data_len = 1u;
+    m.data[0] = CRUMBS_CMD_GET_ACK;
+    size_t n = crumbs_encode_message(&m, stage, sizeof(stage));
+    (void)crumbs_peripheral_handle_receive(ctx, stage, n);
+    uint8_t reply[CRUMBS_MESSAGE_MAX_SIZE];
+    size_t reply_len = 0u;
+    (void)crumbs_peripheral_build_reply(ctx, reply, sizeof(reply), &reply_len);
+    item();
+    fputs("{\"received\": ", out);
+    hex(buf, len);
+    fprintf(out, ", \"result\": %d, \"reply\": ", rc);
+    hex(reply, reply_len);
+    fprintf(out, ", \"counter\": %u, \"opcode\": %u, \"status\": %u, \"reason\": %u}",
+            ctx->ack_counter, ctx->ack_opcode, ctx->ack_status, ctx->ack_reason);
+}
+
+static void classify_case(uint8_t before_counter, uint8_t after_counter, uint8_t after_opcode,
+                          uint8_t status, uint8_t opcode)
+{
+    crumbs_ack_t before;
+    crumbs_ack_t after;
+    memset(&before, 0, sizeof(before));
+    before.counter = before_counter;
+    before.status = CRUMBS_ACK_APPLIED;
+    after.counter = after_counter;
+    after.opcode = after_opcode;
+    after.status = status;
+    after.reason = 0u;
+    item();
+    fprintf(out, "{\"before\": %u, \"after\": [%u, %u, %u], \"opcode\": %u, \"result\": %d}",
+            before_counter, after_counter, after_opcode, status, opcode,
+            crumbs_ack_classify(&before, &after, opcode));
+}
+
 static size_t encode_into(uint8_t *frame, uint8_t type_id, uint8_t opcode,
                           const uint8_t *data, size_t len)
 {
@@ -289,6 +359,69 @@ int main(int argc, char **argv)
         memcpy(buf, frame, fl);
         /* a padded fixed-size read, the exact frame, and one byte short */
         frame_length_case(buf, n % 3 == 0 ? CRUMBS_MESSAGE_MAX_SIZE : (n % 3 == 1 ? fl : fl - 1u));
+    }
+    fputs("\n  ],\n", out);
+
+    /* The acknowledgement a peripheral reports after each received buffer */
+    fputs("  \"ack\": [", out);
+    first = 1;
+    {
+        static crumbs_context_t ack_ctx;
+        crumbs_init(&ack_ctx, CRUMBS_ROLE_PERIPHERAL, 0x10);
+        crumbs_set_type_id(&ack_ctx, ACK_TYPE);
+        (void)crumbs_register_handler(&ack_ctx, ACK_OP_APPLY, ack_apply, NULL);
+        (void)crumbs_register_handler(&ack_ctx, ACK_OP_REFUSE, ack_refuse, NULL);
+        uint8_t data[1] = {0x55};
+
+        ack_case(&ack_ctx, NULL, 0); /* nothing received yet */
+        size_t fl = encode_into(frame, ACK_TYPE, ACK_OP_APPLY, data, 1);
+        ack_case(&ack_ctx, frame, fl);
+        fl = encode_into(frame, ACK_TYPE, ACK_OP_REFUSE, data, 1);
+        ack_case(&ack_ctx, frame, fl);
+        fl = encode_into(frame, ACK_TYPE, 0x03, data, 1); /* no handler */
+        ack_case(&ack_ctx, frame, fl);
+        fl = encode_into(frame, 0x09, ACK_OP_APPLY, data, 1); /* another type */
+        ack_case(&ack_ctx, frame, fl);
+        fl = encode_into(frame, 0x09, CRUMBS_CMD_SET_REPLY, data, 1); /* never counted */
+        ack_case(&ack_ctx, frame, fl);
+        fl = encode_into(frame, ACK_TYPE, ACK_OP_APPLY, data, 1);
+        frame[fl - 1u] ^= 0x01; /* corrupt: lost */
+        ack_case(&ack_ctx, frame, fl);
+        fl = encode_into(frame, ACK_TYPE, ACK_OP_APPLY, data, 1);
+        memcpy(buf, frame, fl);
+        memcpy(buf + fl, frame, fl); /* a retry merged into the failed write */
+        ack_case(&ack_ctx, buf, 2u * fl);
+        for (int n = 0; n < 24; n++)
+        {
+            static const uint8_t types[3] = {CRUMBS_TYPE_ID_ANY, ACK_TYPE, 0x09};
+            uint8_t type_id = types[next_byte() % 3u];
+            uint8_t opcode = (uint8_t)(1u + next_byte() % 4u);
+            fl = encode_into(frame, type_id, opcode, data, 1);
+            ack_case(&ack_ctx, frame, fl);
+        }
+    }
+    fputs("\n  ],\n", out);
+
+    /* Classifying a SET by the acknowledgement read after it, against a
+       baseline that is always status applied */
+    fputs("  \"ack_classify\": [", out);
+    first = 1;
+    classify_case(5, 5, ACK_OP_APPLY, CRUMBS_ACK_APPLIED, ACK_OP_APPLY);
+    classify_case(5, 6, ACK_OP_APPLY, CRUMBS_ACK_APPLIED, ACK_OP_APPLY);
+    classify_case(5, 6, ACK_OP_APPLY, CRUMBS_ACK_REFUSED, ACK_OP_APPLY);
+    classify_case(5, 6, ACK_OP_APPLY, CRUMBS_ACK_REJECTED, ACK_OP_APPLY);
+    classify_case(5, 6, ACK_OP_REFUSE, CRUMBS_ACK_APPLIED, ACK_OP_APPLY);
+    classify_case(5, 6, ACK_OP_APPLY, CRUMBS_ACK_NONE, ACK_OP_APPLY);
+    classify_case(5, 6, ACK_OP_APPLY, 0x04, ACK_OP_APPLY);
+    classify_case(255, 0, ACK_OP_APPLY, CRUMBS_ACK_APPLIED, ACK_OP_APPLY);
+    for (int n = 0; n < 40; n++)
+    {
+        uint8_t before = next_byte();
+        uint8_t step = (uint8_t)(next_byte() % 3u);
+        uint8_t opcode = (uint8_t)(1u + next_byte() % 3u);
+        uint8_t after_opcode = (uint8_t)(1u + next_byte() % 3u);
+        uint8_t status = (uint8_t)(next_byte() % 5u);
+        classify_case(before, (uint8_t)(before + step), after_opcode, status, opcode);
     }
     fputs("\n  ]\n}\n", out);
 
