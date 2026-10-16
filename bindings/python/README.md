@@ -57,7 +57,8 @@ build and read `data`.
   ([GET_ACK](https://github.com/feastorg/CRUMBS/blob/main/docs/protocol.md#get_ack-0xfd-the-set-acknowledgement)):
   it reads the acknowledgement (`Controller.read_ack`), sends, reads it
   again, and returns a `SetOutcome` (`APPLIED`, `REFUSED`, `REJECTED` or
-  `NOT_ADVANCED`) with the last `Ack`. A frame that did not arrive is sent
+  `NOT_ADVANCED`) with the last `Ack`. A frame that did not arrive (all
+  four acknowledgement bytes equal to the baseline, status not none) is sent
   again, up to three times in all; an acknowledgement that cannot be read
   after a send is raised rather than answered with a re-send, so a frame is
   never applied twice because a read failed. `AckMismatch` means another

@@ -281,8 +281,9 @@ class Controller:
         self, address: int, message: Message, *, sends: int = CONFIRMED_SENDS
     ) -> tuple[SetOutcome, Ack]:
         """A SET confirmed by the device's acknowledgement: read it, send,
-        read it again and classify. If the counter did not advance the frame
-        never arrived, and it is sent again, up to ``sends`` times in all. A
+        read it again and classify. If all four bytes equal the baseline and
+        the status is not none, the frame never arrived, and it is sent
+        again, up to ``sends`` times in all; nothing else is re-sent. A
         write that raises is still followed by a read, since the frame may
         have landed. An acknowledgement that cannot be read after a send is
         raised, never answered with a re-send, so a frame is not applied

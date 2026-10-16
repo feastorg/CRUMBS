@@ -144,7 +144,7 @@ extern "C"
 #define CRUMBS_SET_APPLIED 0      /**< The counter advanced and the command was applied. */
 #define CRUMBS_SET_REFUSED 1      /**< The counter advanced and a handler refused the command. */
 #define CRUMBS_SET_REJECTED 2     /**< The counter advanced and nothing took the command. */
-#define CRUMBS_SET_NOT_ADVANCED 3 /**< The counter did not move: the frame never arrived intact. */
+#define CRUMBS_SET_NOT_ADVANCED 3 /**< The record equals the baseline, status not none: the frame never arrived intact. */
 /** @} */
 
 /**
@@ -710,9 +710,10 @@ extern "C"
      * @brief Send a SET and confirm it from the peripheral's acknowledgement.
      *
      * Reads the acknowledgement (the baseline), sends @p msg, reads it
-     * again and classifies the SET with crumbs_ack_classify(). If the
-     * counter did not advance the frame did not arrive, and it is sent
-     * again, up to @p max_sends sends in all. A write that reports an error
+     * again and classifies the SET with crumbs_ack_classify(). If all four
+     * bytes equal the baseline and the status is not none, the frame did
+     * not arrive, and it is sent again, up to @p max_sends sends in all;
+     * nothing else is re-sent. A write that reports an error
      * is still followed by a read, since the frame may have landed. An
      * acknowledgement that cannot be read after a send is returned as an
      * error, never answered with a re-send, so a frame is not applied twice
