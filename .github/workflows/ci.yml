@@ -462,7 +462,7 @@ jobs:
           ./build/vectors/crumbs_gen_vectors tests/golden_vectors/vectors.json
           git diff --exit-code -- tests/golden_vectors/vectors.json
 
-      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
           python-version: ${{ matrix.python }}
 
