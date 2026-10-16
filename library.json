@@ -38,13 +38,10 @@
     "examples/families_usage/lhwit_family/servo"
   ],
   "export": {
-    "exclude": [
-      "bindings",
-      "pyproject.toml",
-      "uv.lock",
-      "tests/golden_vectors",
-      ".ruff_cache",
-      ".venv"
+    "include": [
+      "src",
+      "examples",
+      "CHANGELOG.md"
     ]
   }
 }
