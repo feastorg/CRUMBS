@@ -17,6 +17,7 @@ All notable changes to CRUMBS are documented in this file.
   - `crumbs_ack_decode()` accepts only a record a peripheral can hold (status `1`–`3`, or `0` with the other bytes zero) and returns `CRUMBS_RX_REPLY_MISMATCH` otherwise, so an older peripheral that echoes the requested opcode with a payload of its own is not read as an acknowledgement unless its bytes happen to form one. `crumbs_controller_send_confirmed()` does not check `CRUMBS_ACK_MIN_VERSION`; the caller does.
   - Peripherals built before this release do not answer `0xFD`; `CRUMBS_ACK_MIN_VERSION` (`1600`) is what a controller compares the opcode `0x00` version reply against before relying on it. Nothing else on the wire changed, so older controllers and peripherals work as before.
   - The Python binding mirrors it: `Controller.read_ack`, `Controller.send_confirmed` (returns a `SetOutcome` and the last `Ack`), `decode_ack`, `classify`, `AckMismatch`, `AckUnknown` and the status constants. `tests/golden_vectors/vectors.json` gains `ack` (the reply a C peripheral builds after each of a sequence of frames), `ack_decode` and `ack_classify` cases, which the binding is tested against.
+- Python binding: `Controller.get_version(address, *, type_id=TYPE_ID_ANY)` queries opcode `0x00` and returns a `Version` (`crumbs_version`, `major`, `minor`, `patch`), parsed as `crumbs_build_version_reply()` builds it; `decode_version` is the parse alone. A reply with another opcode or a payload under five bytes raises `ReplyMismatch`. (#88)
 
 ### Changed
 
