@@ -227,6 +227,10 @@ if(CRUMBS_ENABLE_TESTS)
     target_link_libraries(test_payload PRIVATE crumbs)
     add_test(NAME payload_test COMMAND test_payload)
 
+    add_executable(test_common_macros tests/test_common_macros.c)
+    target_link_libraries(test_common_macros PRIVATE crumbs)
+    add_test(NAME common_macros_test COMMAND test_common_macros)
+
     # The compile-time checks in crumbs_ops.h: each source must fail to
     # compile with its own message. The targets are built only by their
     # tests, and a build that fails for any other reason fails the test.
