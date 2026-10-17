@@ -52,6 +52,12 @@ build and read `data`.
   Another device type at the address raises `ReplyMismatch` at once, and any
   other bus error is raised as the `OSError` it is. `send` is never retried,
   since a SET need not be safe to repeat.
+- `Controller.get_version` queries opcode `0x00` and returns a `Version`:
+  the `CRUMBS_VERSION` the device was built with, then its module's major,
+  minor and patch, as `crumbs_build_version_reply` builds them
+  ([Opcode 0x00](https://github.com/feastorg/CRUMBS/blob/main/docs/protocol.md#opcode-0x00-version-information)).
+  It is retried as any query is, and `type_id=` checks the device's type.
+  `decode_version` is the same parse for a caller with its own transport.
 - `Controller.send_confirmed` sends a SET and confirms it from the device's
   acknowledgement
   ([GET_ACK](https://github.com/feastorg/CRUMBS/blob/main/docs/protocol.md#get_ack-0xfd-the-set-acknowledgement)):
@@ -76,7 +82,12 @@ build and read `data`.
   caller with its own transport.
 - `Controller.scan` reads each address once and writes nothing. An address
   with no device, or one that answers with something that is not a frame, is
-  skipped; any other bus error is raised.
+  skipped; any other bus error is raised. It is the C scanner's strict mode
+  only. The non-strict mode writes `00 00 00 00` to every address whose read
+  did not decode, which a CRUMBS peripheral dispatches as an opcode-`0x00`
+  SET and a 24Cxx EEPROM takes as a page write
+  ([Discovery](https://github.com/feastorg/CRUMBS/blob/main/docs/protocol.md#discovery)).
+  A scan that writes nothing cannot make a device do anything.
 - A `Controller` may be shared between threads: each exchange holds its lock,
   so one thread's GET is never interleaved with another's. The lock belongs
   to that `Controller` object and covers only the calls made through it: a

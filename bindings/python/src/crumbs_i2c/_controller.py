@@ -168,6 +168,28 @@ def decode_ack(reply: Message) -> Ack:
     return ack
 
 
+class Version(NamedTuple):
+    """A peripheral's opcode 0x00 version reply, as
+    ``crumbs_build_version_reply()`` builds it: the ``CRUMBS_VERSION`` it
+    was built with (``major * 10000 + minor * 100 + patch``), then its
+    module's own major, minor and patch."""
+
+    crumbs_version: int
+    major: int
+    minor: int
+    patch: int
+
+
+def decode_version(reply: Message) -> Version:
+    """The version in an opcode 0x00 reply: a little-endian u16, then three
+    bytes. Raises ReplyMismatch for another opcode's reply or a payload
+    under five bytes; longer payloads are accepted, as an extension."""
+    if reply.opcode != 0x00 or len(reply.data) < 5:
+        raise ReplyMismatch(reply, TYPE_ID_ANY, 0x00)
+    data = reply.data
+    return Version(int.from_bytes(data[:2], "little"), data[2], data[3], data[4])
+
+
 def classify(before: Ack, after: Ack, opcode: int) -> SetOutcome:
     """What became of a SET with ``opcode``, from the acknowledgements read
     before and after it. NOT_ADVANCED, the one outcome on which a SET may be
@@ -265,6 +287,13 @@ class Controller:
                     if attempt + 1 == self.query_attempts or not _transient(exc):
                         raise
         raise AssertionError("unreachable")
+
+    def get_version(self, address: int, *, type_id: int = TYPE_ID_ANY) -> Version:
+        """The device's version reply: a query for opcode 0x00, retried as
+        any query is, then parsed. Raises what query() and decode_version()
+        raise."""
+        reply = self.query(address, type_id=type_id, opcode=0x00)
+        return decode_version(reply)
 
     def read_ack(self, address: int) -> Ack:
         """The device's acknowledgement: a query for GET_ACK, retried as any
