@@ -740,7 +740,8 @@ extern "C"
      *         cannot say (the peripheral restarted, or its counter came
      *         round), with no re-send; CRUMBS_RX_REPLY_MISMATCH, with
      *         nothing sent, if the version reply is below
-     *         CRUMBS_ACK_MIN_VERSION or shorter than two bytes; otherwise
+     *         CRUMBS_ACK_MIN_VERSION or shorter than the five bytes
+     *         crumbs_build_version_reply() builds; otherwise
      *         the version read's code or crumbs_controller_read_ack()'s, with
      *         nothing sent if it was the version or the baseline that failed.
      */

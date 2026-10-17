@@ -465,6 +465,7 @@ typedef struct
     int old_echo;        /* answer 0xFD as a pre-GET_ACK echoing peripheral */
     int echo_record;     /* ... with [5, 0x10, 1, 0], which is a valid record */
     int version;         /* if non-zero, answer opcode 0x00 with this CRUMBS_VERSION */
+    uint8_t version_len; /* if non-zero, cut the version reply's payload to this */
     int inject_opcode;   /* if non-zero, deliver this frame after each command */
     int delays;
     char log[128];       /* S: SET_REPLY write, C: command write, R: read */
@@ -536,6 +537,10 @@ static int bus_read(void *user, uint8_t addr, uint8_t *buf, size_t len, uint32_t
         crumbs_msg_add_u8(&r, 1);
         crumbs_msg_add_u8(&r, 0);
         crumbs_msg_add_u8(&r, 0);
+        if (b->version_len)
+        {
+            r.data_len = b->version_len;
+        }
         (void)crumbs_encode_message(&r, buf, len);
         return (int)len;
     }
@@ -943,6 +948,20 @@ static int test_send_confirmed_checks_the_version(void)
     TEST_ASSERT(t, crumbs_controller_send_confirmed(&dev, &m, 3, &a) < 0, "no version reply");
     TEST_ASSERT(t, strchr(bus.log, 'C') == NULL, "nothing sent");
     TEST_ASSERT_EQ(t, g_applied, 0, "nothing applied");
+
+    /* A version reply under five bytes is not one
+       crumbs_build_version_reply() builds, even when its first two bytes
+       clear CRUMBS_ACK_MIN_VERSION. */
+    for (uint8_t n = 2; n < 5; n++)
+    {
+        setup(&periph, &ctrl, &bus, &dev);
+        bus.version_len = n;
+        g_applied = 0;
+        TEST_ASSERT_EQ(t, crumbs_controller_send_confirmed(&dev, &m, 3, &a),
+                       CRUMBS_RX_REPLY_MISMATCH, "a version reply under five bytes");
+        TEST_ASSERT_EQ(t, g_applied, 0, "nothing applied");
+        TEST_ASSERT(t, strcmp(bus.log, "SR") == 0, "the version read, and nothing sent");
+    }
     printf("  %s: PASS\n", t);
     return 0;
 }

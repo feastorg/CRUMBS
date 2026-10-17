@@ -685,10 +685,12 @@ int crumbs_controller_read_ack(const crumbs_device_t *dev, crumbs_ack_t *out)
 }
 
 /* Read the opcode 0x00 version reply (docs/protocol.md) and compare its
-   CRUMBS_VERSION with CRUMBS_ACK_MIN_VERSION. An older peripheral's echo of
-   0xFD can form a valid record whose counter never moves, which would read
-   as "not advanced" on every send; its version reply cannot. Staged and
-   read up to CRUMBS_ACK_READ_ATTEMPTS times, as read_ack is. */
+   CRUMBS_VERSION with CRUMBS_ACK_MIN_VERSION. A reply under five bytes is
+   not one crumbs_build_version_reply() builds and is refused. An older
+   peripheral's echo of 0xFD can form a valid record whose counter never
+   moves, which would read as "not advanced" on every send; its version
+   reply cannot. Staged and read up to CRUMBS_ACK_READ_ATTEMPTS times, as
+   read_ack is. */
 static int ack_supported(const crumbs_device_t *dev)
 {
     crumbs_message_t stage;
@@ -712,7 +714,7 @@ static int ack_supported(const crumbs_device_t *dev)
                                            0x00, &reply, dev->read_fn, dev->io);
         if (rc == 0)
         {
-            if (reply.data_len < 2u)
+            if (reply.data_len < 5u)
             {
                 return CRUMBS_RX_REPLY_MISMATCH;
             }
