@@ -128,7 +128,7 @@ package must be published before the merge.
    `tests/golden_vectors/vectors.json`, which records it too), the examples'
    `lib_deps` and
    any doc that quotes it (`git grep 'X.Y.Z'` for the old one, and its
-   `CRUMBS_VERSION` word in hex, e.g. `0x05DC` for 1500); date the
+   `CRUMBS_VERSION` word in hex, e.g. `0x0640` for 1600); date the
    `[Unreleased]` section with the day the tag will be made, in local time
    (a UTC date would have put v0.14.0 and v0.12.5 a day late: both were
    tagged after 23:00 Eastern). Open the PR. Its `platformio` lane builds the

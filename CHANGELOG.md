@@ -6,6 +6,8 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-17
+
 ### Added
 
 - SET acknowledgement, **protocol 1.1** (#98). A SET was fire-and-forget: a frame lost on the bus (a Raspberry Pi 4 retry merged into the failed write), dropped by firmware, or refused by design (a tripped latch) read as success to the controller. Now:
