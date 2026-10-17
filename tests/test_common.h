@@ -19,6 +19,8 @@
  * ============================================================================
  *
  * All macros print the test name and condition on failure, then return 1.
+ * Each argument is evaluated once, so a failure reports the value that
+ * failed and does not repeat a call that has side effects.
  * Use these inside test functions that return int (0=pass, 1=fail).
  */
 
@@ -45,10 +47,12 @@
 #define TEST_ASSERT_EQ(test_name, actual, expected, msg)                       \
     do                                                                         \
     {                                                                          \
-        if ((actual) != (expected))                                            \
+        long long test_actual_ = (long long)(actual);                          \
+        long long test_expected_ = (long long)(expected);                      \
+        if (test_actual_ != test_expected_)                                    \
         {                                                                      \
-            fprintf(stderr, "%s: %s (got %d, expected %d)\n", (test_name),     \
-                    (msg), (int)(actual), (int)(expected));                    \
+            fprintf(stderr, "%s: %s (got %lld, expected %lld)\n", (test_name), \
+                    (msg), test_actual_, test_expected_);                      \
             return 1;                                                          \
         }                                                                      \
     } while (0)
@@ -59,10 +63,12 @@
 #define TEST_ASSERT_SIZE_EQ(test_name, actual, expected, msg)                  \
     do                                                                         \
     {                                                                          \
-        if ((actual) != (expected))                                            \
+        size_t test_actual_ = (size_t)(actual);                                \
+        size_t test_expected_ = (size_t)(expected);                            \
+        if (test_actual_ != test_expected_)                                    \
         {                                                                      \
             fprintf(stderr, "%s: %s (got %zu, expected %zu)\n", (test_name),   \
-                    (msg), (size_t)(actual), (size_t)(expected));              \
+                    (msg), test_actual_, test_expected_);                      \
             return 1;                                                          \
         }                                                                      \
     } while (0)
@@ -73,10 +79,11 @@
 #define TEST_ASSERT_NULL(test_name, ptr, msg)                                  \
     do                                                                         \
     {                                                                          \
-        if ((ptr) != NULL)                                                     \
+        const void *test_ptr_ = (const void *)(ptr);                           \
+        if (test_ptr_ != NULL)                                                 \
         {                                                                      \
             fprintf(stderr, "%s: %s (expected NULL, got %p)\n", (test_name),   \
-                    (msg), (void *)(ptr));                                     \
+                    (msg), test_ptr_);                                         \
             return 1;                                                          \
         }                                                                      \
     } while (0)
