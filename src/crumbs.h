@@ -709,8 +709,9 @@ extern "C"
     /**
      * @brief Send a SET and confirm it from the peripheral's acknowledgement.
      *
-     * Reads the acknowledgement (the baseline), sends @p msg, reads it
-     * again and classifies the SET with crumbs_ack_classify(). If all four
+     * Reads the peripheral's opcode 0x00 version reply, then the
+     * acknowledgement (the baseline), sends @p msg, reads it again and
+     * classifies the SET with crumbs_ack_classify(). If all four
      * bytes equal the baseline and the status is not none, the frame did
      * not arrive, and it is sent again, up to @p max_sends sends in all;
      * nothing else is re-sent. A write that reports an error
@@ -719,10 +720,13 @@ extern "C"
      * error, never answered with a re-send, so a frame is not applied twice
      * because a read failed.
      *
-     * Use it only with a peripheral whose version reply is at least
-     * CRUMBS_ACK_MIN_VERSION; this function does not check, and an older
-     * peripheral can be re-sent the SET (see crumbs_controller_read_ack()).
-     * If the baseline cannot be read, nothing is sent.
+     * A peripheral whose version reply carries a CRUMBS_VERSION below
+     * CRUMBS_ACK_MIN_VERSION has no acknowledgement, even if its answer to
+     * GET_ACK happens to decode as one (see crumbs_controller_read_ack()):
+     * it is sent nothing, and CRUMBS_RX_REPLY_MISMATCH is returned. Send to
+     * it with crumbs_controller_send() and treat the result as unconfirmed.
+     * The version reply is staged and read up to CRUMBS_ACK_READ_ATTEMPTS
+     * times. If it or the baseline cannot be read, nothing is sent.
      *
      * @param dev       Device with ctx, write_fn, read_fn and delay_fn bound.
      * @param msg       The SET. SET_REPLY is refused: it is never counted.
@@ -734,8 +738,12 @@ extern "C"
      *         SET_REPLY message; CRUMBS_RX_ACK_MISMATCH if another command
      *         was counted; CRUMBS_RX_ACK_UNKNOWN if the acknowledgement
      *         cannot say (the peripheral restarted, or its counter came
-     *         round), with no re-send; otherwise crumbs_controller_read_ack()'s code, with
-     *         nothing sent if it was the baseline that failed.
+     *         round), with no re-send; CRUMBS_RX_REPLY_MISMATCH, with
+     *         nothing sent, if the version reply is below
+     *         CRUMBS_ACK_MIN_VERSION or shorter than the five bytes
+     *         crumbs_build_version_reply() builds; otherwise
+     *         the version read's code or crumbs_controller_read_ack()'s, with
+     *         nothing sent if it was the version or the baseline that failed.
      */
     int crumbs_controller_send_confirmed(const crumbs_device_t *dev,
                                          const crumbs_message_t *msg,

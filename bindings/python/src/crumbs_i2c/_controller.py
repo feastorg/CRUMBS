@@ -306,30 +306,42 @@ class Controller:
         reply = self.query(address, type_id=TYPE_ID_ANY, opcode=GET_ACK)
         return decode_ack(reply)
 
+    def _check_ack_version(self, address: int) -> None:
+        """Raise ReplyMismatch unless the device's version reply (opcode
+        0x00) decodes and reports a CRUMBS_VERSION of at least
+        ACK_MIN_VERSION. An older device's echo of GET_ACK can form a valid
+        record whose counter never moves; its version reply cannot."""
+        reply = self.query(address, type_id=TYPE_ID_ANY, opcode=0x00)
+        if decode_version(reply).crumbs_version < ACK_MIN_VERSION:
+            raise ReplyMismatch(reply, TYPE_ID_ANY, GET_ACK)
+
     def send_confirmed(
         self, address: int, message: Message, *, sends: int = CONFIRMED_SENDS
     ) -> tuple[SetOutcome, Ack]:
-        """A SET confirmed by the device's acknowledgement: read it, send,
-        read it again and classify. If all four bytes equal the baseline and
-        the status is not none, the frame never arrived, and it is sent
-        again, up to ``sends`` times in all; nothing else is re-sent. A
+        """A SET confirmed by the device's acknowledgement: check its version
+        reply, read the acknowledgement, send, read it again and classify.
+        If all four bytes equal the baseline and the status is not none, the
+        frame never arrived, and it is sent again, up to ``sends`` times in
+        all; nothing else is re-sent. A
         write that raises is still followed by a read, since the frame may
         have landed. An acknowledgement that cannot be read after a send is
         raised, never answered with a re-send, so a frame is not applied
-        twice because a read failed; if the first read fails, nothing is
-        sent.
+        twice because a read failed; if the version or the first
+        acknowledgement cannot be read, nothing is sent.
 
         Returns the outcome and the last acknowledgement read, with
         NOT_ADVANCED once the sends are spent. Raises AckMismatch if another
         command was counted, AckUnknown if the acknowledgement cannot say
-        (the device restarted, or its counter came round), and what
-        read_ack() raises. It does not check the device's version: use it
-        only with one whose version reply is at least ACK_MIN_VERSION."""
+        (the device restarted, or its counter came round), ReplyMismatch if
+        its version reply reports a CRUMBS_VERSION below ACK_MIN_VERSION
+        (it has no acknowledgement; send to it with send(), unconfirmed),
+        and what query(), decode_version() and read_ack() raise."""
         if sends < 1:
             raise ValueError("sends must be at least 1")
         if message.opcode == SET_REPLY:
             raise ValueError("SET_REPLY is never counted, so it cannot be confirmed")
         with self._lock:
+            self._check_ack_version(address)
             before = self.read_ack(address)
             after = before
             for _ in range(sends):

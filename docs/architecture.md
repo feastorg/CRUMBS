@@ -98,8 +98,9 @@ the header-declared length and decodes; `crumbs_controller_read_expect()` adds
 the reply-identity check. The generated `_get_` wrappers chain SET_REPLY →
 `delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US)` → read-expect → parse.
 `crumbs_controller_read_ack()` is that chain for GET_ACK, retried up to
-`CRUMBS_ACK_READ_ATTEMPTS` times; `crumbs_controller_send_confirmed()` reads
-it, sends, reads it again, and re-sends only while all four acknowledgement
+`CRUMBS_ACK_READ_ATTEMPTS` times; `crumbs_controller_send_confirmed()` checks
+the opcode `0x00` version reply against `CRUMBS_ACK_MIN_VERSION`, reads it,
+sends, reads it again, and re-sends only while all four acknowledgement
 bytes equal the baseline and the status is not none, up to its bound.
 
 ## The family contract

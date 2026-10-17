@@ -13,6 +13,7 @@ import pytest
 import crumbs_i2c
 from crumbs_i2c import (
     ACK_APPLIED,
+    ACK_MIN_VERSION,
     ACK_REFUSED,
     ACK_REJECTED,
     GET_ACK,
@@ -125,12 +126,30 @@ class AckPeripheral:
     rejected. ``ack=False`` models one built before GET_ACK, which answers
     every read with its version reply; ``echo=True`` one that answers by
     echoing the requested opcode with a status block of its own, as
-    basic_peripheral's on_request does. ``reset_after`` restarts the device
-    (a brown-out) after that many command writes."""
+    basic_peripheral's on_request does; ``echo_record=True`` one that
+    answers GET_ACK with [5, 0x10, 1, 0], a valid record, and anything else
+    with its version reply. The version reply carries ``version``, by
+    default ACK_MIN_VERSION with ``ack`` and 1500 (0.15.0) without.
+    ``reset_after`` restarts the device (a brown-out) after that many
+    command writes."""
 
-    def __init__(self, *, ack: bool = True, echo: bool = False, reset_after: int = 0):
+    def __init__(
+        self,
+        *,
+        ack: bool = True,
+        echo: bool = False,
+        echo_record: bool = False,
+        version: int | None = None,
+        reset_after: int = 0,
+    ):
         self.ack = ack
         self.echo = echo
+        self.echo_record = echo_record
+        if version is None:
+            version = ACK_MIN_VERSION if ack and not echo_record else 1500
+        self.version = version
+        # The bytes after the u16 in the version reply: major, minor, patch.
+        self.version_tail = b"\x01\x00\x00"
         self.reset_after = reset_after
         self.commands = 0
         self.applied = 0
@@ -171,10 +190,12 @@ class AckPeripheral:
             raise OSError(errno.EREMOTEIO, "Remote I/O error")
         if self.echo:
             reply = Message(TYPE, self.staged, bytes(range(0x10, 0x16)))
+        elif self.echo_record and self.staged == GET_ACK:
+            reply = Message(TYPE, GET_ACK, bytes((5, 0x10, ACK_APPLIED, 0)))
         elif self.ack and self.staged == GET_ACK:
             reply = Message(TYPE, GET_ACK, bytes(self.state))
         else:
-            reply = Message(TYPE, 0x00, b"\x40\x06\x01\x00\x00")
+            reply = Message(TYPE, 0x00, self.version.to_bytes(2, "little") + self.version_tail)
         return (encode(reply) + PAD)[:count]
 
 
@@ -219,7 +240,7 @@ def test_send_confirmed_applied():
         SetOutcome.APPLIED,
         Ack(1, APPLY, ACK_APPLIED, 0),
     )
-    assert bus.log == ["stage", "read", "set", "stage", "read"]
+    assert bus.log == ["stage", "read"] * 2 + ["set", "stage", "read"]
 
 
 def test_send_confirmed_resends_a_lost_frame():
@@ -230,7 +251,7 @@ def test_send_confirmed_resends_a_lost_frame():
     outcome, ack = c.send_confirmed(0x10, Message(TYPE, APPLY))
     assert outcome is SetOutcome.APPLIED
     assert ack.counter == 2
-    assert bus.log == ["stage", "read"] + ["set", "stage", "read"] * 2
+    assert bus.log == ["stage", "read"] * 2 + ["set", "stage", "read"] * 2
 
 
 def test_send_confirmed_stops_at_its_bound():
@@ -295,17 +316,17 @@ def test_a_refused_or_rejected_set_is_not_resent():
 
 def test_a_failed_ack_read_is_read_again_not_answered_with_a_resend():
     device = AckPeripheral()
-    device.failed_reads = {1, 2}  # read 0 is the baseline
+    device.failed_reads = {2, 3}  # read 0 is the version, read 1 the baseline
     c, bus = controller(device)
     outcome, ack = c.send_confirmed(0x10, Message(TYPE, APPLY))
     assert outcome is SetOutcome.APPLIED
     assert ack.counter == 1
-    assert bus.log == ["stage", "read", "set"] + ["stage", "read"] * 3
+    assert bus.log == ["stage", "read"] * 2 + ["set"] + ["stage", "read"] * 3
 
 
 def test_an_unreadable_ack_after_the_send_is_raised():
     device = AckPeripheral()
-    device.failed_reads = {1, 2, 3}
+    device.failed_reads = {2, 3, 4}
     c, bus = controller(device)
     with pytest.raises(OSError):
         c.send_confirmed(0x10, Message(TYPE, APPLY))
@@ -314,7 +335,7 @@ def test_an_unreadable_ack_after_the_send_is_raised():
 
 
 def test_nothing_is_sent_without_a_baseline():
-    c, bus = controller(AckPeripheral(ack=False))
+    c, bus = controller(AckPeripheral(ack=False, version=ACK_MIN_VERSION))
     with pytest.raises(ReplyMismatch):
         c.send_confirmed(0x10, Message(TYPE, APPLY))
     assert "set" not in bus.log
@@ -343,6 +364,30 @@ def test_another_command_counted_is_an_ack_mismatch():
         c.send_confirmed(0x10, Message(TYPE, APPLY))
     assert e.value.after.opcode == REFUSE
     assert e.value.opcode == APPLY
+
+
+def test_send_confirmed_checks_the_version():
+    """An older device whose echo of GET_ACK happens to form a valid record
+    reads as an acknowledgement whose counter never moves. Its version reply
+    tells it apart, and it is sent nothing."""
+    device = AckPeripheral(echo_record=True)
+    c, bus = controller(device)
+    with pytest.raises(ReplyMismatch):
+        c.send_confirmed(0x10, Message(TYPE, APPLY))
+    assert device.applied == 0
+    assert bus.log == ["stage", "read"]
+
+
+def test_a_version_reply_that_does_not_decode_is_sent_nothing():
+    """A version reply under five bytes is not one crumbs_build_version_reply
+    builds, even when its first two bytes clear ACK_MIN_VERSION."""
+    device = AckPeripheral()
+    device.version_tail = b"\x01"
+    c, bus = controller(device)
+    with pytest.raises(ReplyMismatch):
+        c.send_confirmed(0x10, Message(TYPE, APPLY))
+    assert device.applied == 0
+    assert bus.log == ["stage", "read"]
 
 
 def test_send_confirmed_refuses_what_it_cannot_confirm():
