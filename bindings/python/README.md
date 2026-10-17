@@ -80,7 +80,12 @@ build and read `data`.
   caller with its own transport.
 - `Controller.scan` reads each address once and writes nothing. An address
   with no device, or one that answers with something that is not a frame, is
-  skipped; any other bus error is raised.
+  skipped; any other bus error is raised. It is the C scanner's strict mode
+  only. The non-strict mode writes `00 00 00 00` to every address whose read
+  did not decode, which a CRUMBS peripheral dispatches as an opcode-`0x00`
+  SET and a 24Cxx EEPROM takes as a page write
+  ([Discovery](https://github.com/feastorg/CRUMBS/blob/main/docs/protocol.md#discovery)).
+  A scan that writes nothing cannot make a device do anything.
 - A `Controller` may be shared between threads: each exchange holds its lock,
   so one thread's GET is never interleaved with another's. The lock belongs
   to that `Controller` object and covers only the calls made through it: a
