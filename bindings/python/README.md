@@ -75,7 +75,8 @@ build and read `data`.
   since it started is never re-sent. A device built with CRUMBS before
   0.16.0 has no acknowledgement: its version reply reports a
   `CRUMBS_VERSION` below `ACK_MIN_VERSION`, and `send_confirmed` sends it
-  nothing and raises `ReplyMismatch`; send to it with `send`, unconfirmed.
+  nothing and raises `ReplyMismatch`, as it does when the version reply
+  does not decode (`decode_version`); send to it with `send`, unconfirmed.
   `read_ack` alone does not check the version: it usually raises
   `ReplyMismatch` for such a device, but one that echoes the opcode with
   bytes that happen to form a valid record is not caught. `decode_ack` and `classify` are the same steps for a

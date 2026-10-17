@@ -148,6 +148,8 @@ class AckPeripheral:
         if version is None:
             version = ACK_MIN_VERSION if ack and not echo_record else 1500
         self.version = version
+        # The bytes after the u16 in the version reply: major, minor, patch.
+        self.version_tail = b"\x01\x00\x00"
         self.reset_after = reset_after
         self.commands = 0
         self.applied = 0
@@ -193,7 +195,7 @@ class AckPeripheral:
         elif self.ack and self.staged == GET_ACK:
             reply = Message(TYPE, GET_ACK, bytes(self.state))
         else:
-            reply = Message(TYPE, 0x00, self.version.to_bytes(2, "little") + b"\x01\x00\x00")
+            reply = Message(TYPE, 0x00, self.version.to_bytes(2, "little") + self.version_tail)
         return (encode(reply) + PAD)[:count]
 
 
@@ -369,6 +371,18 @@ def test_send_confirmed_checks_the_version():
     reads as an acknowledgement whose counter never moves. Its version reply
     tells it apart, and it is sent nothing."""
     device = AckPeripheral(echo_record=True)
+    c, bus = controller(device)
+    with pytest.raises(ReplyMismatch):
+        c.send_confirmed(0x10, Message(TYPE, APPLY))
+    assert device.applied == 0
+    assert bus.log == ["stage", "read"]
+
+
+def test_a_version_reply_that_does_not_decode_is_sent_nothing():
+    """A version reply under five bytes is not one crumbs_build_version_reply
+    builds, even when its first two bytes clear ACK_MIN_VERSION."""
+    device = AckPeripheral()
+    device.version_tail = b"\x01"
     c, bus = controller(device)
     with pytest.raises(ReplyMismatch):
         c.send_confirmed(0x10, Message(TYPE, APPLY))

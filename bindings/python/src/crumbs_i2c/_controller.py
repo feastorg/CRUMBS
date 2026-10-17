@@ -308,11 +308,11 @@ class Controller:
 
     def _check_ack_version(self, address: int) -> None:
         """Raise ReplyMismatch unless the device's version reply (opcode
-        0x00) reports a CRUMBS_VERSION of at least ACK_MIN_VERSION. An older
-        device's echo of GET_ACK can form a valid record whose counter never
-        moves; its version reply cannot."""
+        0x00) decodes and reports a CRUMBS_VERSION of at least
+        ACK_MIN_VERSION. An older device's echo of GET_ACK can form a valid
+        record whose counter never moves; its version reply cannot."""
         reply = self.query(address, type_id=TYPE_ID_ANY, opcode=0x00)
-        if len(reply.data) < 2 or int.from_bytes(reply.data[:2], "little") < ACK_MIN_VERSION:
+        if decode_version(reply).crumbs_version < ACK_MIN_VERSION:
             raise ReplyMismatch(reply, TYPE_ID_ANY, GET_ACK)
 
     def send_confirmed(
@@ -335,7 +335,7 @@ class Controller:
         (the device restarted, or its counter came round), ReplyMismatch if
         its version reply reports a CRUMBS_VERSION below ACK_MIN_VERSION
         (it has no acknowledgement; send to it with send(), unconfirmed),
-        and what query() and read_ack() raise."""
+        and what query(), decode_version() and read_ack() raise."""
         if sends < 1:
             raise ValueError("sends must be at least 1")
         if message.opcode == SET_REPLY:
