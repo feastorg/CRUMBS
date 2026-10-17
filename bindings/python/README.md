@@ -76,7 +76,15 @@ build and read `data`.
   with no device, or one that answers with something that is not a frame, is
   skipped; any other bus error is raised.
 - A `Controller` may be shared between threads: each exchange holds its lock,
-  so one thread's GET is never interleaved with another's.
+  so one thread's GET is never interleaved with another's. The lock belongs
+  to that `Controller` object and covers only the calls made through it: a
+  `send` or `read`, a `query`'s write, pause, read and retries, the whole of
+  `send_confirmed`, and a whole `scan`. It does not cover a second
+  `Controller`, even one on the same bus object, a second `LinuxBus` on the
+  same `/dev/i2c-N`, another process on that bus, or a call made on the bus
+  object directly. Any of those can land between a GET's SET_REPLY and its
+  read, and the read then returns the reply the other caller asked for. To
+  share a bus between threads, share one `Controller`.
 - Protocol errors share the base `CrumbsError` (`FrameError`,
   `ReplyMismatch`, `AckMismatch`, `AckUnknown`); bus errors are `OSError`.
 - `LinuxBus` uses `/dev/i2c-N` like the C library's Linux HAL: the
