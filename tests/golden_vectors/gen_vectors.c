@@ -115,6 +115,94 @@ static void frame_length_case(const uint8_t *buf, size_t len)
     }
 }
 
+/* The acknowledgement cases: a peripheral with one handler that applies,
+   one that refuses, and none for any other opcode. */
+#define ACK_TYPE 0x07
+#define ACK_OP_APPLY 0x01
+#define ACK_OP_REFUSE 0x02
+#define ACK_REASON 0x2A
+
+static void ack_apply(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data,
+                      uint8_t data_len, void *user_data)
+{
+    (void)ctx;
+    (void)opcode;
+    (void)data;
+    (void)data_len;
+    (void)user_data;
+}
+
+static void ack_refuse(crumbs_context_t *ctx, uint8_t opcode, const uint8_t *data,
+                       uint8_t data_len, void *user_data)
+{
+    (void)opcode;
+    (void)data;
+    (void)data_len;
+    (void)user_data;
+    (void)crumbs_refuse(ctx, ACK_REASON);
+}
+
+/* Feed buf to the peripheral, then stage GET_ACK and record the reply the
+   library builds, beside the state it was built from. */
+static void ack_case(crumbs_context_t *ctx, const uint8_t *buf, size_t len)
+{
+    int rc = len > 0u ? crumbs_peripheral_handle_receive(ctx, buf, len) : 0;
+    uint8_t stage[CRUMBS_MESSAGE_MAX_SIZE];
+    crumbs_message_t m;
+    memset(&m, 0, sizeof(m));
+    m.opcode = CRUMBS_CMD_SET_REPLY;
+    m.data_len = 1u;
+    m.data[0] = CRUMBS_CMD_GET_ACK;
+    size_t n = crumbs_encode_message(&m, stage, sizeof(stage));
+    (void)crumbs_peripheral_handle_receive(ctx, stage, n);
+    uint8_t reply[CRUMBS_MESSAGE_MAX_SIZE];
+    size_t reply_len = 0u;
+    (void)crumbs_peripheral_build_reply(ctx, reply, sizeof(reply), &reply_len);
+    item();
+    fputs("{\"received\": ", out);
+    hex(buf, len);
+    fprintf(out, ", \"result\": %d, \"reply\": ", rc);
+    hex(reply, reply_len);
+    fprintf(out, ", \"counter\": %u, \"opcode\": %u, \"status\": %u, \"reason\": %u}",
+            ctx->ack_counter, ctx->ack_opcode, ctx->ack_status, ctx->ack_reason);
+}
+
+static crumbs_ack_t ack_of(uint8_t counter, uint8_t opcode, uint8_t status, uint8_t reason)
+{
+    crumbs_ack_t a;
+    a.counter = counter;
+    a.opcode = opcode;
+    a.status = status;
+    a.reason = reason;
+    return a;
+}
+
+static void classify_case(crumbs_ack_t before, crumbs_ack_t after, uint8_t opcode)
+{
+    item();
+    fprintf(out, "{\"before\": [%u, %u, %u, %u], \"after\": [%u, %u, %u, %u], "
+                 "\"opcode\": %u, \"result\": %d}",
+            before.counter, before.opcode, before.status, before.reason,
+            after.counter, after.opcode, after.status, after.reason, opcode,
+            crumbs_ack_classify(&before, &after, opcode));
+}
+
+/* crumbs_ack_decode() over a GET_ACK reply carrying these payload bytes. */
+static void ack_decode_case(const uint8_t *data, size_t len)
+{
+    crumbs_message_t m;
+    crumbs_ack_t a;
+    memset(&m, 0, sizeof(m));
+    m.type_id = ACK_TYPE;
+    m.opcode = CRUMBS_CMD_GET_ACK;
+    m.data_len = (uint8_t)len;
+    memcpy(m.data, data, len);
+    item();
+    fputs("{\"data\": ", out);
+    hex(data, len);
+    fprintf(out, ", \"result\": %d}", crumbs_ack_decode(&m, &a));
+}
+
 static size_t encode_into(uint8_t *frame, uint8_t type_id, uint8_t opcode,
                           const uint8_t *data, size_t len)
 {
@@ -289,6 +377,108 @@ int main(int argc, char **argv)
         memcpy(buf, frame, fl);
         /* a padded fixed-size read, the exact frame, and one byte short */
         frame_length_case(buf, n % 3 == 0 ? CRUMBS_MESSAGE_MAX_SIZE : (n % 3 == 1 ? fl : fl - 1u));
+    }
+    fputs("\n  ],\n", out);
+
+    /* The acknowledgement a peripheral reports after each received buffer */
+    fputs("  \"ack\": [", out);
+    first = 1;
+    {
+        static crumbs_context_t ack_ctx;
+        crumbs_init(&ack_ctx, CRUMBS_ROLE_PERIPHERAL, 0x10);
+        crumbs_set_type_id(&ack_ctx, ACK_TYPE);
+        (void)crumbs_register_handler(&ack_ctx, ACK_OP_APPLY, ack_apply, NULL);
+        (void)crumbs_register_handler(&ack_ctx, ACK_OP_REFUSE, ack_refuse, NULL);
+        uint8_t data[1] = {0x55};
+
+        ack_case(&ack_ctx, NULL, 0); /* nothing received yet */
+        size_t fl = encode_into(frame, ACK_TYPE, ACK_OP_APPLY, data, 1);
+        ack_case(&ack_ctx, frame, fl);
+        fl = encode_into(frame, ACK_TYPE, ACK_OP_REFUSE, data, 1);
+        ack_case(&ack_ctx, frame, fl);
+        fl = encode_into(frame, ACK_TYPE, 0x03, data, 1); /* no handler */
+        ack_case(&ack_ctx, frame, fl);
+        fl = encode_into(frame, 0x09, ACK_OP_APPLY, data, 1); /* another type */
+        ack_case(&ack_ctx, frame, fl);
+        fl = encode_into(frame, 0x09, CRUMBS_CMD_SET_REPLY, data, 1); /* never counted */
+        ack_case(&ack_ctx, frame, fl);
+        fl = encode_into(frame, ACK_TYPE, ACK_OP_APPLY, data, 1);
+        frame[fl - 1u] ^= 0x01; /* corrupt: lost */
+        ack_case(&ack_ctx, frame, fl);
+        fl = encode_into(frame, ACK_TYPE, ACK_OP_APPLY, data, 1);
+        memcpy(buf, frame, fl);
+        memcpy(buf + fl, frame, fl); /* a retry merged into the failed write */
+        ack_case(&ack_ctx, buf, 2u * fl);
+        for (int n = 0; n < 24; n++)
+        {
+            static const uint8_t types[3] = {CRUMBS_TYPE_ID_ANY, ACK_TYPE, 0x09};
+            uint8_t type_id = types[next_byte() % 3u];
+            uint8_t opcode = (uint8_t)(1u + next_byte() % 4u);
+            fl = encode_into(frame, type_id, opcode, data, 1);
+            ack_case(&ack_ctx, frame, fl);
+        }
+    }
+    fputs("\n  ],\n", out);
+
+    /* Which GET_ACK payloads are an acknowledgement */
+    fputs("  \"ack_decode\": [", out);
+    first = 1;
+    {
+        static const uint8_t cases[][6] = {
+            {9, ACK_OP_REFUSE, CRUMBS_ACK_REFUSED, ACK_REASON, 0, 0},
+            {0, 0, CRUMBS_ACK_NONE, 0, 0, 0},
+            {1, 0, CRUMBS_ACK_NONE, 0, 0, 0},
+            {0, 1, CRUMBS_ACK_NONE, 0, 0, 0},
+            {0, 0, CRUMBS_ACK_NONE, 1, 0, 0},
+            {0x10, 0x11, 0x12, 0x13, 0x14, 0x15}, /* an echoing old peripheral */
+            {3, 3, CRUMBS_ACK_REJECTED, CRUMBS_ACK_REJECT_NO_HANDLER, 0xEE, 0},
+            {3, 3, 0x04, 0, 0, 0},
+        };
+        static const uint8_t lens[] = {4, 4, 4, 4, 4, 6, 5, 4};
+        for (size_t i = 0; i < sizeof(lens); i++)
+        {
+            ack_decode_case(cases[i], lens[i]);
+        }
+        ack_decode_case(cases[0], 3);
+        ack_decode_case(cases[0], 0);
+    }
+    fputs("\n  ],\n", out);
+
+    /* Classifying a SET by the acknowledgements read before and after it */
+    fputs("  \"ack_classify\": [", out);
+    first = 1;
+    {
+        const crumbs_ack_t none = ack_of(0, 0, CRUMBS_ACK_NONE, 0);
+        const crumbs_ack_t five = ack_of(5, ACK_OP_REFUSE, CRUMBS_ACK_APPLIED, 0);
+        classify_case(five, five, ACK_OP_APPLY);
+        classify_case(five, ack_of(6, ACK_OP_APPLY, CRUMBS_ACK_APPLIED, 0), ACK_OP_APPLY);
+        classify_case(five, ack_of(6, ACK_OP_APPLY, CRUMBS_ACK_REFUSED, ACK_REASON), ACK_OP_APPLY);
+        classify_case(five, ack_of(6, ACK_OP_APPLY, CRUMBS_ACK_REJECTED, 1), ACK_OP_APPLY);
+        classify_case(five, ack_of(6, ACK_OP_REFUSE, CRUMBS_ACK_APPLIED, 0), ACK_OP_APPLY);
+        classify_case(five, ack_of(5, ACK_OP_APPLY, CRUMBS_ACK_APPLIED, 0), ACK_OP_APPLY);
+        classify_case(five, none, ACK_OP_APPLY);                                  /* reset */
+        classify_case(none, none, ACK_OP_APPLY);                                  /* fresh */
+        classify_case(ack_of(0, ACK_OP_REFUSE, CRUMBS_ACK_APPLIED, 0), none, ACK_OP_APPLY); /* wrapped */
+        classify_case(five, ack_of(6, ACK_OP_APPLY, CRUMBS_ACK_NONE, 0), ACK_OP_APPLY);
+        classify_case(five, ack_of(6, ACK_OP_APPLY, 0x04, 0), ACK_OP_APPLY);
+        classify_case(ack_of(255, ACK_OP_REFUSE, CRUMBS_ACK_APPLIED, 0),
+                      ack_of(0, ACK_OP_APPLY, CRUMBS_ACK_APPLIED, 0), ACK_OP_APPLY);
+        for (int n = 0; n < 60; n++)
+        {
+            /* One draw per statement, as above. */
+            uint8_t counter = next_byte();
+            uint8_t before_op = (uint8_t)(1u + next_byte() % 3u);
+            uint8_t before_status = (uint8_t)(1u + next_byte() % 3u);
+            uint8_t step = (uint8_t)(next_byte() % 3u);
+            uint8_t after_op = (uint8_t)(1u + next_byte() % 3u);
+            uint8_t after_status = (uint8_t)(next_byte() % 5u);
+            uint8_t opcode = (uint8_t)(1u + next_byte() % 3u);
+            crumbs_ack_t before = ack_of(counter, before_op, before_status, 0);
+            crumbs_ack_t after = after_status == CRUMBS_ACK_NONE && n % 2
+                                     ? none
+                                     : ack_of((uint8_t)(counter + step), after_op, after_status, 0);
+            classify_case(before, after, opcode);
+        }
     }
     fputs("\n  ]\n}\n", out);
 

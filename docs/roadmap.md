@@ -171,6 +171,6 @@ Building REST/MQTT/WebSocket services is **application territory**, not library 
 
 Current discovery (version query via opcode 0x00) is sufficient. Capability negotiation, hierarchical addressing, and multicast add protocol complexity without demonstrated user need.
 
-The same applies to further reserved opcodes that have been floated — a CAPABILITIES bitmap (multi-frame, low-power, streaming), CONFIG_GET/CONFIG_SET, and STATS counters. Only SET_REPLY (`0xFE`) is reserved today.
+The same applies to further reserved opcodes that have been floated — a CAPABILITIES bitmap (multi-frame, low-power, streaming), CONFIG_GET/CONFIG_SET, and STATS counters. Two are reserved today: SET_REPLY (`0xFE`) and GET_ACK (`0xFD`), the SET acknowledgement, which earned its place by a measured need ([#98](https://github.com/feastorg/CRUMBS/issues/98)): SETs lost on the bus and refused by firmware were reported as applied.
 
 **Alternative:** Wait for actual pain points; if needed, module families can extend version query payload.

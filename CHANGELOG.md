@@ -6,6 +6,23 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- SET acknowledgement, **protocol 1.1** (#98). A SET was fire-and-forget: a frame lost on the bus (a Raspberry Pi 4 retry merged into the failed write), dropped by firmware, or refused by design (a tripped latch) read as success to the controller. Now:
+  - A peripheral counts every command frame it decodes (SET_REPLY excluded) and records the last one's opcode and status: applied, refused with a one-byte reason, or rejected (no `on_message` and no handler for the opcode, or a failed type check). A frame that does not decode is not counted.
+  - The library answers the reserved query `CRUMBS_CMD_GET_ACK` (`0xFD`), staged with SET_REPLY like any GET, with `[counter][opcode][status][reason]`; a reply handler for `0xFD` is never called. The counter is one byte and wraps.
+  - `crumbs_refuse(ctx, reason)`: from `on_message` or a SET handler, report the command refused. Outside a dispatch it returns `-1` and changes nothing.
+  - Controller: `crumbs_controller_read_ack()` (staged and read again on any failure, `CRUMBS_ACK_READ_ATTEMPTS` times), `crumbs_ack_decode()`, `crumbs_ack_classify()` (applied, refused, rejected or not advanced) and `crumbs_controller_send_confirmed()`, which reads a baseline, sends, reads again and re-sends a frame whose acknowledgement is unchanged from the baseline, up to a bound. A failed acknowledgement read is returned, never answered with a re-send, so a frame is not applied twice on a read error. New code `CRUMBS_RX_ACK_MISMATCH` (`-9`) for a counter that advanced on another opcode.
+  - A SET is re-sent only when all four bytes equal the baseline and the status is not "none". A peripheral that restarted reads all zero with status none, which is also a fresh baseline and what a wrapped counter can come back to, so that, or the same counter with another record, is `CRUMBS_RX_ACK_UNKNOWN` (`-10`) with no re-send. The first SET to a peripheral that has counted nothing since it started is therefore never re-sent.
+  - `crumbs_ack_decode()` accepts only a record a peripheral can hold (status `1`–`3`, or `0` with the other bytes zero) and returns `CRUMBS_RX_REPLY_MISMATCH` otherwise, so an older peripheral that echoes the requested opcode with a payload of its own is not read as an acknowledgement unless its bytes happen to form one. `crumbs_controller_send_confirmed()` does not check `CRUMBS_ACK_MIN_VERSION`; the caller does.
+  - Peripherals built before this release do not answer `0xFD`; `CRUMBS_ACK_MIN_VERSION` (`1600`) is what a controller compares the opcode `0x00` version reply against before relying on it. Nothing else on the wire changed, so older controllers and peripherals work as before.
+  - The Python binding mirrors it: `Controller.read_ack`, `Controller.send_confirmed` (returns a `SetOutcome` and the last `Ack`), `decode_ack`, `classify`, `AckMismatch`, `AckUnknown` and the status constants. `tests/golden_vectors/vectors.json` gains `ack` (the reply a C peripheral builds after each of a sequence of frames), `ack_decode` and `ack_classify` cases, which the binding is tested against.
+
+### Changed
+
+- **A family header that declares opcode `0xFD` no longer compiles.** `CRUMBS_DEFINE_FAMILY` refuses it, now that it is reserved for GET_ACK, with "every opcode must be 0x00-0xFF and not 0xFD or 0xFE"; renumber that opcode. A family that declared it would otherwise lose its `0xFD` reply handler silently, since the library answers that query itself. (#98)
+- `crumbs_context_t` grows by the five-byte acknowledgement record: 183 B on ATmega328P and 324 B on Cortex-M0 at the default table size (was 178 and 320), unchanged on x86-64 (alignment padding). The minimal Uno peripheral in `tests/footprint/` is 148 B of flash and 5 B of RAM larger. (#98)
+
 ### Fixed
 
 - The PlatformIO package ships `src/`, `examples/`, the two manifests, `README.md`, `LICENSE` and `CHANGELOG.md`, and nothing else. 0.15.0's `export.exclude` list had switched off PlatformIO's own exclusions and the `.gitignore` filters, so its package carried `docs/` and `tests/` (161 files against 0.14.0's 112); `library.json` now names what ships with `export.include`. `scripts/check_pio_package.sh` packs a `git archive` export and fails unless the tarball holds exactly those files; the `platformio` CI job runs it. 0.15.0 stays on the registry as published. (#93)

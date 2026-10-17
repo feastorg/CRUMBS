@@ -17,7 +17,7 @@ are collected at the end.
 
 | Symbol | |
 | --- | --- |
-| `crumbs_context_t` | One per role. Address, role, declared type, CRC statistics, callbacks, requested opcode, handler tables. Size depends on `CRUMBS_MAX_HANDLERS`. |
+| `crumbs_context_t` | One per role. Address, role, declared type, CRC statistics, callbacks, requested opcode, last-command acknowledgement, handler tables. Size depends on `CRUMBS_MAX_HANDLERS`. |
 | `crumbs_role_t` | `CRUMBS_ROLE_CONTROLLER` (0) or `CRUMBS_ROLE_PERIPHERAL` (1). |
 | `crumbs_init(ctx, role, address)` | Zero the counters and callbacks; keep `address` only for a peripheral. Handler arrays are left as they are, counts reset. |
 | `crumbs_set_callbacks(ctx, on_message, on_request, user_data)` | Install or clear (`NULL`) the fallback callbacks. |
@@ -59,14 +59,15 @@ bytes; every read fails with `-1` when `offset + width > len`.
 
 | Symbol | |
 | --- | --- |
-| `crumbs_peripheral_handle_receive(ctx, buffer, len)` | Decode → type check → SET_REPLY intercept → `on_message` → matching handler. `0`, `-1`, `-2`, or `CRUMBS_RX_TYPE_MISMATCH`. The HAL calls this from its receive callback. |
-| `crumbs_peripheral_build_reply(ctx, out_buf, out_buf_len, *out_len)` | Reply handler for the requested opcode, else `on_request`, else nothing (`*out_len = 0`, returns 0). `-1` bad args, `-2` encode failed. The HAL calls this from its request callback. |
+| `crumbs_peripheral_handle_receive(ctx, buffer, len)` | Decode → type check → SET_REPLY intercept → `on_message` → matching handler; every decoded frame but SET_REPLY is recorded for GET_ACK. `0`, `-1`, `-2`, or `CRUMBS_RX_TYPE_MISMATCH`. The HAL calls this from its receive callback. |
+| `crumbs_peripheral_build_reply(ctx, out_buf, out_buf_len, *out_len)` | The acknowledgement for `0xFD`, else the reply handler for the requested opcode, else `on_request`, else nothing (`*out_len = 0`, returns 0). `-1` bad args, `-2` encode failed. The HAL calls this from its request callback. |
 | `crumbs_register_handler(ctx, opcode, fn, user_data)` | Add or replace the SET handler for `opcode`; `fn == NULL` removes it. `-1` when the table is full, `ctx` is `NULL`, or tables are compiled out. |
 | `crumbs_unregister_handler(ctx, opcode)` | Same as registering `NULL`. |
 | `crumbs_register_reply_handler(ctx, opcode, fn, user_data)` | Same contract for the reply-handler table; `fn == NULL` removes. |
 | `crumbs_handler_fn` | `fn(ctx, opcode, data, data_len, user_data)`. `data` is never `NULL`. |
 | `crumbs_reply_fn` | `fn(ctx, reply, user_data)`: fill `reply`; an untouched reply goes out as `00 00 00 00`. |
 | `CRUMBS_CMD_SET_REPLY` | `0xFE`. Never dispatched to user code. |
+| `crumbs_refuse(ctx, reason)` | From `on_message` or a SET handler: report the command being dispatched as refused, with a reason byte the family defines. `-1` for `NULL` or outside a dispatch. |
 | `CRUMBS_RX_TYPE_MISMATCH` | `-8`: frame carried another non-zero type. Not a CRC error. |
 
 ## Controller — `crumbs.h`, `crumbs_ops.h`
@@ -77,9 +78,30 @@ bytes; every read fails with `-1` when `offset + width > len`.
 | `crumbs_controller_read(ctx, target_addr, *out_msg, read_fn, read_ctx)` | Read 31 bytes, trim, decode. `-1` short read or bad header, `-2` CRC, `0` with `out_msg` filled. Accepts any identity. |
 | `crumbs_controller_read_expect(ctx, target_addr, expect_type_id, expect_opcode, *out_msg, read_fn, read_ctx)` | `crumbs_controller_read` plus an identity check; `CRUMBS_RX_REPLY_MISMATCH` with `out_msg` still filled. `expect_type_id == CRUMBS_TYPE_ID_ANY` skips the type half; the opcode is always compared. |
 | `CRUMBS_RX_REPLY_MISMATCH` | `-7`. |
+
+### SET acknowledgement — `crumbs.h`
+
+The wire format is [GET_ACK](protocol.md#get_ack-0xfd-the-set-acknowledgement).
+
+| Symbol | |
+| --- | --- |
+| `CRUMBS_CMD_GET_ACK` | `0xFD`. Answered by the library from the last-command record; a reply handler for it is never called. |
+| `CRUMBS_ACK_PAYLOAD_LEN` | 4: `[counter][opcode][status][reason]`. |
+| `crumbs_ack_t` | `counter`, `opcode`, `status`, `reason`, as the reply carries them. |
+| `CRUMBS_ACK_NONE`, `CRUMBS_ACK_APPLIED`, `CRUMBS_ACK_REFUSED`, `CRUMBS_ACK_REJECTED` | Status byte: `0` … `3`. |
+| `CRUMBS_ACK_REJECT_NO_HANDLER`, `CRUMBS_ACK_REJECT_TYPE` | Reason byte of a rejection: `1` nothing took the opcode, `2` failed the type check. |
+| `CRUMBS_ACK_MIN_VERSION` | `1600`: a version reply's `CRUMBS_VERSION` below this has no acknowledgement. |
+| `crumbs_ack_decode(reply, *out)` | Parse a GET_ACK reply. `-1` `NULL`; `-7` another opcode, a payload under 4 bytes, or bytes that are not a valid record (a status outside `0`–`3`, or status `0` with a non-zero byte). |
+| `crumbs_ack_classify(*before, *after, opcode)` | `CRUMBS_SET_NOT_ADVANCED` only if `after` equals `before` and is not status none; `-10` status none, or the same counter with another record; otherwise the status as `CRUMBS_SET_*`, or `-9` advanced on another opcode; `-1` `NULL` or an invalid record. |
+| `CRUMBS_SET_APPLIED`, `CRUMBS_SET_REFUSED`, `CRUMBS_SET_REJECTED`, `CRUMBS_SET_NOT_ADVANCED` | `0` … `3`. Only `0` means the command took effect. |
+| `crumbs_controller_read_ack(dev, *out)` | SET_REPLY(`0xFD`), delay, `read_expect`, decode; each failure staged and read again, `CRUMBS_ACK_READ_ATTEMPTS` (3) times in all. `-1` unbound device, else the last attempt's code. A peripheral without GET_ACK gives `-7` (another opcode's reply, or an echo that is not a valid record) or `-1` (no reply), or, for an echo that happens to be a valid record, success; see [protocol.md](protocol.md#get_ack-0xfd-the-set-acknowledgement). |
+| `CRUMBS_ACK_READ_ATTEMPTS` | 3. |
+| `crumbs_controller_send_confirmed(dev, msg, max_sends, *out_ack)` | Baseline ack, send, ack, classify; re-send only while not advanced (all four bytes equal to the baseline, status not none), `max_sends` in all. A failed ack read is returned, never re-sent; with no baseline nothing is sent. Returns a `CRUMBS_SET_*` code, `-1`, `-9`, `-10` (no re-send), or `read_ack`'s code. Does not check `CRUMBS_ACK_MIN_VERSION`; the caller does. |
+| `CRUMBS_RX_ACK_MISMATCH` | `-9`. |
+| `CRUMBS_RX_ACK_UNKNOWN` | `-10`: the acknowledgement cannot say whether the SET was applied (the peripheral restarted, or its counter came round). |
 | `crumbs_device_t` | `ctx`, `addr`, `write_fn`, `read_fn`, `delay_fn`, `io`: one bound target for the wrappers and raw helpers. |
 | `crumbs_ops_can_send(dev)` / `crumbs_ops_can_get(dev)` | Whether `dev` has what a send (context + write) or a get (also read + delay) needs. |
-| `CRUMBS_DEFINE_FAMILY(PREFIX, type_id, OPS)` | From an `X(NAME, value)` list: `PREFIX_TYPE_ID` and one enum constant per opcode. Fails the build if the type is not `0x01`–`0xFF`, an opcode is above `0xFF` or is `0xFE`, or two opcodes share a value. |
+| `CRUMBS_DEFINE_FAMILY(PREFIX, type_id, OPS)` | From an `X(NAME, value)` list: `PREFIX_TYPE_ID` and one enum constant per opcode. Fails the build if the type is not `0x01`–`0xFF`, an opcode is above `0xFF` or is `0xFD` or `0xFE`, or two opcodes share a value. |
 | `CRUMBS_DEFINE_PAYLOAD(name, wire_bytes, FIELDS)` | From an `X(type, name)` list (`u8 u16 u32 i8 i16 i32 float`, wire order): `name_t`, `name_wire_size`, `name_pack(msg, *v)` (appends; `-1` if it would exceed 27) and `name_unpack(data, len, *v)` (`-1` if `len < name_wire_size`; longer accepted). Fails the build if the list does not sum to `wire_bytes` or `wire_bytes` exceeds 27. `name_unpack` is a `parse_fn` for `CRUMBS_DEFINE_GET_OP`. |
 | `CRUMBS_STATIC_ASSERT(cond, msg)` | `static_assert` / `_Static_assert`, usable at file scope in C11 and C++11. |
 | `CRUMBS_DEFINE_SEND_OP(family, name, type_id, opcode, param_decl, pack_stmt)` | Defines `family_send_name(dev, param)`: one SET with one parameter, usually a payload struct pointer and its `_pack` call. `-1` for an unbound device or when `pack_stmt` returns non-zero, else the send code. |
@@ -174,6 +196,7 @@ stored on the bus handle and not enforced.
 | Range | Meaning |
 | --- | --- |
 | `0` | Success; scanners return a count ≥ 0, and a HAL read returns its byte count, so `0` there means nothing was read. |
+| `1` … `3` | From `crumbs_ack_classify` and `crumbs_controller_send_confirmed`: the SET arrived but was refused (`1`) or rejected (`2`), or never arrived (`3`). |
 | `-1` … `-6` | Function-specific: `-1` bad argument / wrong role / structural decode failure; `-2` CRC (codec), wrong role (`send`), address select (Linux); `-3` encode failed (`send`), read/write failed (Linux), read callback failed (helpers); `-4` short read/write; `-5` no repeated start; `-6` too long for a buffer. The tables above give each function's own set. |
-| `CRUMBS_RX_REPLY_MISMATCH` (`-7`), `CRUMBS_RX_TYPE_MISMATCH` (`-8`) | Protocol-level, deliberately below every transport code so a getter's caller can tell them apart. New `CRUMBS_RX_*` codes continue downward. |
+| `CRUMBS_RX_REPLY_MISMATCH` (`-7`), `CRUMBS_RX_TYPE_MISMATCH` (`-8`), `CRUMBS_RX_ACK_MISMATCH` (`-9`), `CRUMBS_RX_ACK_UNKNOWN` (`-10`) | Protocol-level, deliberately below every transport code so a getter's caller can tell them apart. New `CRUMBS_RX_*` codes continue downward. |
 | positive | From an Arduino write: the `Wire.endTransmission()` code. |

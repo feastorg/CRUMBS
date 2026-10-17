@@ -51,7 +51,7 @@ CRUMBS_DEFINE_PAYLOAD(therm_temp, 4, THERM_TEMP_FIELDS)
 
 `CRUMBS_DEFINE_FAMILY` gives you `THERM_TYPE_ID` and the opcode constants and
 refuses to compile a type of `0x00` (the wildcard), an opcode above `0xFF` or
-equal to `0xFE` (SET_REPLY), or two opcodes with one value. Pick a type unused
+equal to `0xFD` (GET_ACK) or `0xFE` (SET_REPLY), or two opcodes with one value. Pick a type unused
 by any other family that will share a controller.
 
 `CRUMBS_DEFINE_PAYLOAD(name, bytes, FIELDS)` gives you `name_t`,
@@ -181,6 +181,12 @@ out and return. Install handlers and the type after
 non-zero type before any handler runs, which is what lets two families share a
 controller's address space without one misreading the other's opcodes.
 
+A handler that declines a command, as `on_set_rate` does with a rate outside
+1–10, can say so with `crumbs_refuse(c, reason)` before it returns. The
+acknowledgement a controller reads then reports the command refused, with
+your reason byte, instead of applied
+([GET_ACK](protocol.md#get_ack-0xfd-the-set-acknowledgement)).
+
 ## 4. Using the family from a controller
 
 Bind a `crumbs_device_t` once per peripheral, then call the wrappers.
@@ -236,6 +242,17 @@ void loop(void) {}
 The field order is `ctx, addr, write_fn, read_fn, delay_fn, io`; the last is
 the pointer the HAL wants back (`&bus` on Linux, `NULL` or a `TwoWire*` on
 Arduino).
+
+The `_send_` wrappers return once the frame is written. When the controller
+must know the SET took effect, build the message with `crumbs_msg_init()` and
+the payload's `_pack`, and send it with
+`crumbs_controller_send_confirmed(&dev, &msg, 3, &ack)`: it reads the
+peripheral's acknowledgement before and after, re-sends a frame that did not
+arrive, and returns `CRUMBS_SET_APPLIED`, `_REFUSED`, `_REJECTED` or
+`_NOT_ADVANCED`, or a negative code when it cannot tell (the peripheral
+restarted, say) and has not re-sent. It needs a peripheral built with a
+library that answers GET_ACK, and does not check: compare its version reply
+with `CRUMBS_ACK_MIN_VERSION` first.
 
 ## 5. When the macros do not fit
 

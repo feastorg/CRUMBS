@@ -61,6 +61,11 @@ void crumbs_init(crumbs_context_t *ctx,
     ctx->on_request = NULL;
     ctx->user_data = NULL;
     ctx->requested_opcode = 0u; /* Default: opcode 0 (device info by convention) */
+    ctx->ack_counter = 0u;
+    ctx->ack_opcode = 0u;
+    ctx->ack_status = CRUMBS_ACK_NONE;
+    ctx->ack_reason = 0u;
+    ctx->ack_dispatching = 0u;
 
     /*
      * Handler arrays are left untouched. If the context is in static storage,
@@ -556,6 +561,201 @@ int crumbs_controller_read_expect(crumbs_context_t *ctx,
     return 0;
 }
 
+/* A record a peripheral can actually hold: one of the four statuses, and
+   status none only before the first command, when every byte is zero. An
+   older peripheral that echoes the requested opcode with a payload of its
+   own fails this, so its bytes are not read as a counter. */
+static int ack_valid(const crumbs_ack_t *a)
+{
+    switch (a->status)
+    {
+    case CRUMBS_ACK_NONE:
+        return a->counter == 0u && a->opcode == 0u && a->reason == 0u;
+    case CRUMBS_ACK_APPLIED:
+    case CRUMBS_ACK_REFUSED:
+    case CRUMBS_ACK_REJECTED:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+int crumbs_ack_decode(const crumbs_message_t *reply, crumbs_ack_t *out)
+{
+    if (!reply || !out)
+    {
+        return -1;
+    }
+    if (reply->opcode != CRUMBS_CMD_GET_ACK || reply->data_len < CRUMBS_ACK_PAYLOAD_LEN)
+    {
+        return CRUMBS_RX_REPLY_MISMATCH;
+    }
+    crumbs_ack_t a;
+    a.counter = reply->data[0];
+    a.opcode = reply->data[1];
+    a.status = reply->data[2];
+    a.reason = reply->data[3];
+    if (!ack_valid(&a))
+    {
+        return CRUMBS_RX_REPLY_MISMATCH;
+    }
+    *out = a;
+    return 0;
+}
+
+int crumbs_ack_classify(const crumbs_ack_t *before,
+                        const crumbs_ack_t *after,
+                        uint8_t opcode)
+{
+    if (!before || !after || !ack_valid(before) || !ack_valid(after))
+    {
+        return -1;
+    }
+    if (after->status == CRUMBS_ACK_NONE)
+    {
+        /* The peripheral holds no record: it has just started, or started
+           again after acting on this SET. Re-sending could apply it twice. */
+        return CRUMBS_RX_ACK_UNKNOWN;
+    }
+    if (after->counter == before->counter)
+    {
+        if (after->opcode == before->opcode && after->status == before->status &&
+            after->reason == before->reason)
+        {
+            return CRUMBS_SET_NOT_ADVANCED;
+        }
+        /* Same counter, another record: it came round, or restarted and
+           counted back to here. Not proof the frame was lost. */
+        return CRUMBS_RX_ACK_UNKNOWN;
+    }
+    if (after->opcode != opcode)
+    {
+        return CRUMBS_RX_ACK_MISMATCH;
+    }
+    switch (after->status)
+    {
+    case CRUMBS_ACK_APPLIED:
+        return CRUMBS_SET_APPLIED;
+    case CRUMBS_ACK_REFUSED:
+        return CRUMBS_SET_REFUSED;
+    default:
+        return CRUMBS_SET_REJECTED;
+    }
+}
+
+int crumbs_controller_read_ack(const crumbs_device_t *dev, crumbs_ack_t *out)
+{
+    if (!dev || !dev->ctx || !dev->write_fn || !dev->read_fn || !dev->delay_fn || !out)
+    {
+        return -1;
+    }
+
+    crumbs_message_t stage;
+    memset(&stage, 0, sizeof(stage));
+    stage.type_id = CRUMBS_TYPE_ID_ANY;
+    stage.opcode = CRUMBS_CMD_SET_REPLY;
+    stage.data_len = 1u;
+    stage.data[0] = CRUMBS_CMD_GET_ACK;
+
+    int rc = -1;
+    for (int attempt = 0; attempt < CRUMBS_ACK_READ_ATTEMPTS; attempt++)
+    {
+        /* Stage every time: a lost SET_REPLY leaves another opcode staged,
+           and reading again alone would return that reply each time. */
+        rc = crumbs_controller_send(dev->ctx, dev->addr, &stage, dev->write_fn, dev->io);
+        if (rc != 0)
+        {
+            continue;
+        }
+        dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);
+        crumbs_message_t reply;
+        rc = crumbs_controller_read_expect(dev->ctx, dev->addr, CRUMBS_TYPE_ID_ANY,
+                                           CRUMBS_CMD_GET_ACK, &reply, dev->read_fn, dev->io);
+        if (rc == 0)
+        {
+            rc = crumbs_ack_decode(&reply, out);
+            if (rc == 0)
+            {
+                return 0;
+            }
+        }
+        CRUMBS_DBG("ack: attempt %d failed (%d)\n", attempt + 1, rc);
+    }
+    return rc;
+}
+
+int crumbs_controller_send_confirmed(const crumbs_device_t *dev,
+                                     const crumbs_message_t *msg,
+                                     uint8_t max_sends,
+                                     crumbs_ack_t *out_ack)
+{
+    if (!dev || !dev->ctx || !dev->write_fn || !dev->read_fn || !dev->delay_fn ||
+        !msg || max_sends == 0u || msg->opcode == CRUMBS_CMD_SET_REPLY)
+    {
+        return -1;
+    }
+
+    crumbs_ack_t before;
+    int rc = crumbs_controller_read_ack(dev, &before);
+    if (rc != 0)
+    {
+        return rc; /* no baseline: nothing sent */
+    }
+    if (out_ack)
+    {
+        *out_ack = before;
+    }
+
+    for (uint8_t sent = 0u; sent < max_sends; sent++)
+    {
+        /* A write error is not proof the frame was lost (nor success proof
+           it arrived), so the acknowledgement decides either way. */
+        (void)crumbs_controller_send(dev->ctx, dev->addr, msg, dev->write_fn, dev->io);
+
+        crumbs_ack_t after;
+        rc = crumbs_controller_read_ack(dev, &after);
+        if (rc != 0)
+        {
+            /* The frame may have been applied: re-sending could apply it
+               twice. The caller learns the state is unknown. */
+            return rc;
+        }
+        if (out_ack)
+        {
+            *out_ack = after;
+        }
+        rc = crumbs_ack_classify(&before, &after, msg->opcode);
+        if (rc != CRUMBS_SET_NOT_ADVANCED)
+        {
+            return rc;
+        }
+        CRUMBS_DBG("ack: opcode 0x%02X not counted, send %u of %u\n",
+                   msg->opcode, (unsigned)(sent + 1u), (unsigned)max_sends);
+    }
+    return CRUMBS_SET_NOT_ADVANCED;
+}
+
+/* Record a counted command frame. The counter moves last, so a reply built
+   between the two writes never pairs a new counter with an old status. */
+static void ack_record(crumbs_context_t *ctx, uint8_t opcode, uint8_t status, uint8_t reason)
+{
+    ctx->ack_opcode = opcode;
+    ctx->ack_status = status;
+    ctx->ack_reason = reason;
+    ctx->ack_counter++;
+}
+
+int crumbs_refuse(crumbs_context_t *ctx, uint8_t reason)
+{
+    if (!ctx || !ctx->ack_dispatching)
+    {
+        return -1;
+    }
+    ctx->ack_status = CRUMBS_ACK_REFUSED;
+    ctx->ack_reason = reason;
+    return 0;
+}
+
 /**
  * @brief Peripheral-side handler for raw bytes received by a HAL.
  */
@@ -603,6 +803,10 @@ int crumbs_peripheral_handle_receive(crumbs_context_t *ctx,
         msg.type_id != ctx->type_id)
     {
         CRUMBS_DBG("rx: type 0x%02X is not ours (0x%02X), dropped\n", msg.type_id, ctx->type_id);
+        if (msg.opcode != CRUMBS_CMD_SET_REPLY)
+        {
+            ack_record(ctx, msg.opcode, CRUMBS_ACK_REJECTED, CRUMBS_ACK_REJECT_TYPE);
+        }
         return CRUMBS_RX_TYPE_MISMATCH;
     }
 
@@ -624,11 +828,24 @@ int crumbs_peripheral_handle_receive(crumbs_context_t *ctx,
         return 0; /* Do not dispatch to user handlers */
     }
 
+    /*
+     * A command frame. Provisionally applied while user code runs, so that
+     * crumbs_refuse() can overwrite the status; rejected afterwards if
+     * nothing took it. ack_record() is not used here because the counter
+     * must move only once the status is final.
+     */
+    uint8_t taken = 0u;
+    ctx->ack_opcode = msg.opcode;
+    ctx->ack_status = CRUMBS_ACK_APPLIED;
+    ctx->ack_reason = 0u;
+    ctx->ack_dispatching = 1u;
+
     /* Invoke general on_message callback if set. */
     if (ctx->on_message)
     {
         CRUMBS_DBG("rx: calling on_message\n");
         ctx->on_message(ctx, &msg);
+        taken = 1u;
     }
 
 #if CRUMBS_MAX_HANDLERS > 0
@@ -647,6 +864,7 @@ int crumbs_peripheral_handle_receive(crumbs_context_t *ctx,
                         msg.data,
                         msg.data_len,
                         ctx->handler_userdata[i]);
+                taken = 1u;
             }
             found = 1;
             break;
@@ -658,6 +876,14 @@ int crumbs_peripheral_handle_receive(crumbs_context_t *ctx,
                    msg.opcode, ctx->handler_count);
     }
 #endif /* CRUMBS_MAX_HANDLERS > 0 */
+
+    ctx->ack_dispatching = 0u;
+    if (!taken)
+    {
+        ctx->ack_status = CRUMBS_ACK_REJECTED;
+        ctx->ack_reason = CRUMBS_ACK_REJECT_NO_HANDLER;
+    }
+    ctx->ack_counter++;
 
     return 0;
 }
@@ -692,9 +918,22 @@ int crumbs_peripheral_build_reply(crumbs_context_t *ctx,
 
     int dispatched = 0;
 
+    if (ctx->requested_opcode == CRUMBS_CMD_GET_ACK)
+    {
+        /* Answered by the library, like SET_REPLY is consumed by it. */
+        msg.type_id = ctx->type_id;
+        msg.opcode = CRUMBS_CMD_GET_ACK;
+        msg.data_len = CRUMBS_ACK_PAYLOAD_LEN;
+        msg.data[0] = ctx->ack_counter;
+        msg.data[1] = ctx->ack_opcode;
+        msg.data[2] = ctx->ack_status;
+        msg.data[3] = ctx->ack_reason;
+        dispatched = 1;
+    }
+
 #if CRUMBS_MAX_HANDLERS > 0
     /* Check per-opcode reply handler table first. */
-    for (uint8_t i = 0; i < ctx->reply_handler_count; i++)
+    for (uint8_t i = 0; !dispatched && i < ctx->reply_handler_count; i++)
     {
         if (ctx->reply_handler_opcode[i] == ctx->requested_opcode)
         {

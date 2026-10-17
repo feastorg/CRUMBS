@@ -21,13 +21,17 @@ and Linux (controller, over `i2c-dev`).
   frame is a return code, never a callback.
 - SET commands and GET queries: a peripheral registers a handler per opcode
   and a reply builder per query; a controller sends, or asks and reads.
+- Confirmed SETs: a peripheral counts the commands it receives and reports
+  the last one as applied, refused or rejected, so a controller can tell a
+  SET that took effect from one that was lost on the bus or declined, and
+  re-send the lost one.
 - Device *families*: one shared header declares a device class's type,
   opcodes and payload layouts once, checked at compile time, and generates
   the codec both sides use and the controller-side functions.
 - Discovery: find CRUMBS devices on a bus, with their types, and tell them
   from everything else that ACKs.
-- No heap, one static context; a minimal peripheral costs about 1.2 KB of
-  flash and 160 B of RAM on an Uno.
+- No heap, one static context; a minimal peripheral costs about 1.35 KB of
+  flash and 164 B of RAM on an Uno.
 
 ## Quick start
 
