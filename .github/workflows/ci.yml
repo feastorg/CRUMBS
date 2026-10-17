@@ -484,6 +484,19 @@ jobs:
       - name: Build the sdist and wheel
         run: uv build
 
+      # uv sync installs the package from the tree, so the steps above never
+      # use the sdist. Install it alone into a fresh environment and run the
+      # suite against it, so a file missing from the sdist fails here.
+      - name: Install the sdist into a clean environment and test it
+        run: |
+          env="$RUNNER_TEMP/sdist-env"
+          uv venv --python ${{ matrix.python }} "$env"
+          uv export --locked --only-group dev --no-emit-project -o "$RUNNER_TEMP/dev.txt"
+          uv pip install --python "$env" -r "$RUNNER_TEMP/dev.txt"
+          uv pip install --python "$env" dist/crumbs_i2c-*.tar.gz
+          "$env/bin/python" -c 'import crumbs_i2c, sys; assert crumbs_i2c.__file__.startswith(sys.prefix), crumbs_i2c.__file__'
+          "$env/bin/python" -m pytest -p no:cacheprovider
+
   # ─── Unified gate ─────────────────────────────────────────────────────────
   # Branch protection requires only: CI / ok
   ok:

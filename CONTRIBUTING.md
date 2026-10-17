@@ -107,7 +107,7 @@ changed, why, and how it was verified. Add a `[Unreleased]` entry to
 | `doxygen` | `doccheck.sh` and `check_api_index.py` (pinned to `ubuntu-24.04` for a fixed Doxygen) |
 | `docs-links` | `check_docs_links.py` |
 | `crc-regen` | Committed CRC source matches the pycrc output |
-| `python` | `tests/golden_vectors/vectors.json` is what `crumbs_gen_vectors` writes from the core today; the Python binding is formatted, lint-clean, strictly typed and passes its tests against those vectors on 3.11 and 3.13, and its sdist and wheel build |
+| `python` | `tests/golden_vectors/vectors.json` is what `crumbs_gen_vectors` writes from the core today; the Python binding is formatted, lint-clean, strictly typed and passes its tests against those vectors on 3.11 and 3.13, and its sdist and wheel build, with the tests passing again against the sdist installed alone into a fresh environment |
 
 `release.yml`, for a `v*` tag, first checks that the tag names the version in
 every package file, then builds the Linux x86_64 tarball, source archive,
