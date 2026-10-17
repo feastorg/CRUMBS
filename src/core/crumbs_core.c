@@ -684,6 +684,46 @@ int crumbs_controller_read_ack(const crumbs_device_t *dev, crumbs_ack_t *out)
     return rc;
 }
 
+/* Read the opcode 0x00 version reply (docs/protocol.md) and compare its
+   CRUMBS_VERSION with CRUMBS_ACK_MIN_VERSION. An older peripheral's echo of
+   0xFD can form a valid record whose counter never moves, which would read
+   as "not advanced" on every send; its version reply cannot. Staged and
+   read up to CRUMBS_ACK_READ_ATTEMPTS times, as read_ack is. */
+static int ack_supported(const crumbs_device_t *dev)
+{
+    crumbs_message_t stage;
+    memset(&stage, 0, sizeof(stage));
+    stage.type_id = CRUMBS_TYPE_ID_ANY;
+    stage.opcode = CRUMBS_CMD_SET_REPLY;
+    stage.data_len = 1u;
+    stage.data[0] = 0x00;
+
+    int rc = -1;
+    for (int attempt = 0; attempt < CRUMBS_ACK_READ_ATTEMPTS; attempt++)
+    {
+        rc = crumbs_controller_send(dev->ctx, dev->addr, &stage, dev->write_fn, dev->io);
+        if (rc != 0)
+        {
+            continue;
+        }
+        dev->delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US);
+        crumbs_message_t reply;
+        rc = crumbs_controller_read_expect(dev->ctx, dev->addr, CRUMBS_TYPE_ID_ANY,
+                                           0x00, &reply, dev->read_fn, dev->io);
+        if (rc == 0)
+        {
+            if (reply.data_len < 2u)
+            {
+                return CRUMBS_RX_REPLY_MISMATCH;
+            }
+            uint16_t version = (uint16_t)(reply.data[0] | ((uint16_t)reply.data[1] << 8));
+            return version >= CRUMBS_ACK_MIN_VERSION ? 0 : CRUMBS_RX_REPLY_MISMATCH;
+        }
+        CRUMBS_DBG("ack: version attempt %d failed (%d)\n", attempt + 1, rc);
+    }
+    return rc;
+}
+
 int crumbs_controller_send_confirmed(const crumbs_device_t *dev,
                                      const crumbs_message_t *msg,
                                      uint8_t max_sends,
@@ -695,8 +735,14 @@ int crumbs_controller_send_confirmed(const crumbs_device_t *dev,
         return -1;
     }
 
+    int rc = ack_supported(dev);
+    if (rc != 0)
+    {
+        return rc; /* no acknowledgement to confirm with: nothing sent */
+    }
+
     crumbs_ack_t before;
-    int rc = crumbs_controller_read_ack(dev, &before);
+    rc = crumbs_controller_read_ack(dev, &before);
     if (rc != 0)
     {
         return rc; /* no baseline: nothing sent */

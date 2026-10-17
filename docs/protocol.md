@@ -215,7 +215,8 @@ still reads as not advanced; the counter cannot rule that out.
 A failed read of the acknowledgement is read again, never answered by sending
 the SET again, so a frame is not applied twice because a read failed.
 `crumbs_controller_send_confirmed()` and the Python binding's
-`Controller.send_confirmed()` do exactly this, with a bounded number of sends.
+`Controller.send_confirmed()` do exactly this, with a bounded number of sends,
+after checking the peripheral's version reply (below).
 
 **Compatibility.** A peripheral built with a library older than 0.16.0 does not
 answer `0xFD`: it returns whatever its reply handlers or `on_request` build
@@ -227,14 +228,16 @@ that fallback:
 | another opcode's reply (a version reply from `on_request`) | `CRUMBS_RX_REPLY_MISMATCH` (`-7`) |
 | an echo of `0xFD` with a short payload or one that is not a valid record (the `basic_peripheral` example's `on_request`) | `-7` |
 | no reply | `-1`: the read does not decode |
-| an echo whose first four bytes happen to form a valid record | success, with a counter that never moves; `send_confirmed` would send up to its bound |
+| an echo whose first four bytes happen to form a valid record | success, with a counter that never moves |
 
 So only its [version reply](#opcode-0x00-version-information) tells a
 controller reliably which it is: a `CRUMBS_VERSION` below `1600`
 (`CRUMBS_ACK_MIN_VERSION`) has no acknowledgement, and its SETs can only be
-sent unconfirmed. `crumbs_controller_send_confirmed()` does not check it; the
-caller does. Nothing else on the wire changed, so old controllers and new
-peripherals work together unchanged.
+sent unconfirmed. `crumbs_controller_send_confirmed()` reads the version reply
+first and sends nothing to such a peripheral (`-7`), so the echo in the last
+row is not re-sent to its bound; a controller that reads the acknowledgement
+itself checks the version the same way. Nothing else on the wire changed, so
+old controllers and new peripherals work together unchanged.
 
 ### Type check
 

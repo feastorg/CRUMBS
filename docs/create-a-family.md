@@ -250,9 +250,10 @@ the payload's `_pack`, and send it with
 peripheral's acknowledgement before and after, re-sends a frame that did not
 arrive, and returns `CRUMBS_SET_APPLIED`, `_REFUSED`, `_REJECTED` or
 `_NOT_ADVANCED`, or a negative code when it cannot tell (the peripheral
-restarted, say) and has not re-sent. It needs a peripheral built with a
-library that answers GET_ACK, and does not check: compare its version reply
-with `CRUMBS_ACK_MIN_VERSION` first.
+restarted, say) and has not re-sent. It reads the peripheral's version reply
+first: one built with a library older than `CRUMBS_ACK_MIN_VERSION` has no
+acknowledgement, is sent nothing, and gets `CRUMBS_RX_REPLY_MISMATCH`; send to
+it with the `_send_` wrapper, unconfirmed.
 
 ## 5. When the macros do not fit
 

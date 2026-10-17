@@ -55,9 +55,10 @@ build and read `data`.
 - `Controller.send_confirmed` sends a SET and confirms it from the device's
   acknowledgement
   ([GET_ACK](https://github.com/feastorg/CRUMBS/blob/main/docs/protocol.md#get_ack-0xfd-the-set-acknowledgement)):
-  it reads the acknowledgement (`Controller.read_ack`), sends, reads it
-  again, and returns a `SetOutcome` (`APPLIED`, `REFUSED`, `REJECTED` or
-  `NOT_ADVANCED`) with the last `Ack`. A frame that did not arrive (all
+  it checks the device's version reply, reads the acknowledgement
+  (`Controller.read_ack`), sends, reads it again, and returns a
+  `SetOutcome` (`APPLIED`, `REFUSED`, `REJECTED` or `NOT_ADVANCED`) with the
+  last `Ack`. A frame that did not arrive (all
   four acknowledgement bytes equal to the baseline, status not none) is sent
   again, up to three times in all; an acknowledgement that cannot be read
   after a send is raised rather than answered with a re-send, so a frame is
@@ -66,11 +67,12 @@ build and read `data`.
   cannot say, because the device restarted or its counter came round, so the
   SET is not sent again. The first SET to a device that has counted nothing
   since it started is never re-sent. A device built with CRUMBS before
-  0.16.0 has no acknowledgement and `send_confirmed` does not check for one:
-  its version reply reports a `CRUMBS_VERSION` below `ACK_MIN_VERSION`, so
-  check that and send to it with `send`, unconfirmed. `read_ack` usually
-  raises `ReplyMismatch` for such a device, but one that echoes the opcode
-  with bytes that happen to form a valid record is not caught. `decode_ack` and `classify` are the same steps for a
+  0.16.0 has no acknowledgement: its version reply reports a
+  `CRUMBS_VERSION` below `ACK_MIN_VERSION`, and `send_confirmed` sends it
+  nothing and raises `ReplyMismatch`; send to it with `send`, unconfirmed.
+  `read_ack` alone does not check the version: it usually raises
+  `ReplyMismatch` for such a device, but one that echoes the opcode with
+  bytes that happen to form a valid record is not caught. `decode_ack` and `classify` are the same steps for a
   caller with its own transport.
 - `Controller.scan` reads each address once and writes nothing. An address
   with no device, or one that answers with something that is not a frame, is
