@@ -52,6 +52,12 @@ build and read `data`.
   Another device type at the address raises `ReplyMismatch` at once, and any
   other bus error is raised as the `OSError` it is. `send` is never retried,
   since a SET need not be safe to repeat.
+- `Controller.get_version` queries opcode `0x00` and returns a `Version`:
+  the `CRUMBS_VERSION` the device was built with, then its module's major,
+  minor and patch, as `crumbs_build_version_reply` builds them
+  ([Opcode 0x00](https://github.com/feastorg/CRUMBS/blob/main/docs/protocol.md#opcode-0x00-version-information)).
+  It is retried as any query is, and `type_id=` checks the device's type.
+  `decode_version` is the same parse for a caller with its own transport.
 - `Controller.send_confirmed` sends a SET and confirms it from the device's
   acknowledgement
   ([GET_ACK](https://github.com/feastorg/CRUMBS/blob/main/docs/protocol.md#get_ack-0xfd-the-set-acknowledgement)):
@@ -68,7 +74,7 @@ build and read `data`.
   since it started is never re-sent. A device built with CRUMBS before
   0.16.0 has no acknowledgement and `send_confirmed` does not check for one:
   its version reply reports a `CRUMBS_VERSION` below `ACK_MIN_VERSION`, so
-  check that and send to it with `send`, unconfirmed. `read_ack` usually
+  check `get_version(address).crumbs_version` and send to it with `send`, unconfirmed. `read_ack` usually
   raises `ReplyMismatch` for such a device, but one that echoes the opcode
   with bytes that happen to form a valid record is not caught. `decode_ack` and `classify` are the same steps for a
   caller with its own transport.

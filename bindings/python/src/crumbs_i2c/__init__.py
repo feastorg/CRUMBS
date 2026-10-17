@@ -34,8 +34,10 @@ from crumbs_i2c._controller import (
     Controller,
     ReplyMismatch,
     SetOutcome,
+    Version,
     classify,
     decode_ack,
+    decode_version,
 )
 from crumbs_i2c._frame import (
     GET_ACK,
@@ -85,10 +87,12 @@ __all__ = [
     "Message",
     "ReplyMismatch",
     "SetOutcome",
+    "Version",
     "classify",
     "crc8",
     "decode",
     "decode_ack",
+    "decode_version",
     "encode",
     "frame_length",
 ]
