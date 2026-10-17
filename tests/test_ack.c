@@ -966,6 +966,31 @@ static int test_send_confirmed_checks_the_version(void)
     return 0;
 }
 
+/* A peripheral built from this tree answers opcode 0x00 with
+   crumbs_build_version_reply(), which reports this build's CRUMBS_VERSION;
+   a controller built from the same tree must accept it. */
+static int test_send_confirmed_accepts_this_build(void)
+{
+    const char *t = "send_confirmed_accepts_this_build";
+    crumbs_context_t periph, ctrl;
+    bus_t bus;
+    crumbs_device_t dev;
+    crumbs_ack_t a;
+    crumbs_message_t m = command(OP_APPLY);
+
+    setup(&periph, &ctrl, &bus, &dev);
+    bus.version = 0; /* the peripheral answers opcode 0x00 itself */
+    crumbs_set_callbacks(&periph, CRUMBS_MAX_HANDLERS > 0 ? NULL : refusing_on_message,
+                         version_on_request, NULL);
+    g_applied = 0;
+    TEST_ASSERT_EQ(t, crumbs_controller_send_confirmed(&dev, &m, 3, &a), CRUMBS_SET_APPLIED,
+                   "this build's CRUMBS_VERSION is accepted");
+    TEST_ASSERT_EQ(t, g_applied, 1, "applied once");
+    TEST_ASSERT(t, strcmp(bus.log, "SRSRCSR") == 0, "version, baseline, one send, one ack read");
+    printf("  %s: PASS\n", t);
+    return 0;
+}
+
 static int test_send_confirmed_another_command_counted(void)
 {
     const char *t = "send_confirmed_another_command_counted";
@@ -1018,6 +1043,7 @@ int main(void)
     failures += test_send_confirmed_echoing_old_peripheral();
     failures += test_send_confirmed_another_command_counted();
     failures += test_send_confirmed_checks_the_version();
+    failures += test_send_confirmed_accepts_this_build();
     if (failures)
     {
         fprintf(stderr, "test_ack: %d failed\n", failures);
