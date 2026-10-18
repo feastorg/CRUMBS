@@ -6,6 +6,10 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- The Python binding's `send_confirmed` now raises `ReplyMismatch` with a message that names the cause against a device built before GET_ACK — "device reports CRUMBS version N, below `ACK_MIN_VERSION` 1600: it has no GET_ACK support" — rather than one that read as though a `0xFD` reply had been expected; `ReplyMismatch` gained an optional `detail`. `bindings/python/README.md` now also records that `read_ack` against such a device raises `FrameError`, not only `ReplyMismatch`, since real pre-0.16.0 firmware returns `0xFF` bytes. (#117)
+
 ## [0.16.0] - 2026-10-18
 
 ### Added
