@@ -75,10 +75,13 @@ class ReplyMismatch(CrumbsError):
     reply, or another device type at the address. The CRC cannot catch
     this."""
 
-    def __init__(self, reply: Message, type_id: int, opcode: int):
+    def __init__(self, reply: Message, type_id: int, opcode: int, *, detail: str | None = None):
         super().__init__(
-            f"expected type 0x{type_id:02X} opcode 0x{opcode:02X}, "
-            f"got type 0x{reply.type_id:02X} opcode 0x{reply.opcode:02X}"
+            detail
+            or (
+                f"expected type 0x{type_id:02X} opcode 0x{opcode:02X}, "
+                f"got type 0x{reply.type_id:02X} opcode 0x{reply.opcode:02X}"
+            )
         )
         self.reply = reply
         self.type_id = type_id
@@ -312,8 +315,17 @@ class Controller:
         ACK_MIN_VERSION. An older device's echo of GET_ACK can form a valid
         record whose counter never moves; its version reply cannot."""
         reply = self.query(address, type_id=TYPE_ID_ANY, opcode=0x00)
-        if decode_version(reply).crumbs_version < ACK_MIN_VERSION:
-            raise ReplyMismatch(reply, TYPE_ID_ANY, GET_ACK)
+        version = decode_version(reply).crumbs_version
+        if version < ACK_MIN_VERSION:
+            raise ReplyMismatch(
+                reply,
+                TYPE_ID_ANY,
+                GET_ACK,
+                detail=(
+                    f"device reports CRUMBS version {version}, below "
+                    f"ACK_MIN_VERSION {ACK_MIN_VERSION}: it has no GET_ACK support"
+                ),
+            )
 
     def send_confirmed(
         self, address: int, message: Message, *, sends: int = CONFIRMED_SENDS

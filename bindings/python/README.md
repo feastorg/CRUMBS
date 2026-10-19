@@ -77,9 +77,13 @@ build and read `data`.
   `CRUMBS_VERSION` below `ACK_MIN_VERSION`, and `send_confirmed` sends it
   nothing and raises `ReplyMismatch`, as it does when the version reply
   does not decode (`decode_version`); send to it with `send`, unconfirmed.
-  `read_ack` alone does not check the version: it usually raises
-  `ReplyMismatch` for such a device, but one that echoes the opcode with
-  bytes that happen to form a valid record is not caught. `decode_ack` and `classify` are the same steps for a
+  `read_ack` alone does not check the version. A device built before GET_ACK
+  may raise `ReplyMismatch` (it answered another opcode's reply) or, if it has
+  nothing staged for `0xFD` and returns `0xFF` bytes as real pre-0.16.0
+  firmware does, `FrameError` once the read keeps failing; to tell ack-capable
+  devices apart, check the version (`send_confirmed` does) rather than catch
+  `read_ack`. One that echoes the opcode with bytes that happen to form a valid
+  record is not caught. `decode_ack` and `classify` are the same steps for a
   caller with its own transport.
 - `Controller.scan` reads each address once and writes nothing. An address
   with no device, or one that answers with something that is not a frame, is
