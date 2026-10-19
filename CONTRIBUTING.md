@@ -45,6 +45,33 @@ version, not your checkout. To build a PlatformIO project against the tree,
 set `lib_deps = symlink:///path/to/CRUMBS` in a scratch copy; CI does the
 same rewrite before its `platformio` job, so that job tests the tree.
 
+## Python binding
+
+`crumbs-i2c` lives under `bindings/python/`: the package in
+`bindings/python/src/crumbs_i2c/`, its tests in `bindings/python/tests/`, and
+its README in `bindings/python/README.md`. Its checks run from the repo root,
+as the `python` CI job runs them:
+
+```sh
+uv sync --locked            # the locked dev environment
+uv run ruff format --check  # format
+uv run ruff check           # lint
+uv run pyright              # strict types on bindings/python/src
+uv run pytest               # the binding's tests
+uv build                    # the sdist and wheel
+```
+
+`pyproject.toml` sits at the repo root, not in `bindings/python/`. The package
+version is the C library's (`src/crumbs_version.h`), a test checks the two
+match, and the release step bumps it there alongside `CMakeLists.txt`,
+`library.json`, `library.properties` and the header — one version, at the top
+with the other package files. The manifest also points at the repo-root
+`LICENSE` and the nested README, and holds the `ruff`, `pyright` and `pytest`
+configuration for the binding, so those tools run from the root over
+`bindings/python/`. `uv_build`'s `module-root = "bindings/python/src"` and
+`module-name = "crumbs_i2c"` are what let the manifest stay at the repo root
+while the imported package stays nested.
+
 ## Documentation checks
 
 ```sh
