@@ -26,7 +26,7 @@ Scanning I2C bus for CRUMBS devices (0x08-0x77)...
 Found 1 device(s):
 --------------------------------------------
 [0x20] LED
-       CRUMBS: v0.16.1 (controller: v0.16.1)
+       CRUMBS: v0.16.2 (controller: v0.16.2)
        Module: v1.0.0 (expected: v1.0.x)
        OK Compatible
 --------------------------------------------
