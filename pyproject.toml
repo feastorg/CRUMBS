@@ -5,7 +5,7 @@ version = "0.16.1"
 description = "CRUMBS for Python: the frame, its CRC, and a controller over Linux I2C"
 readme = "bindings/python/README.md"
 requires-python = ">=3.11"
-license = "AGPL-3.0-or-later"
+license = "MPL-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Cameron K. Brooks" }]
 maintainers = [{ name = "Cameron K. Brooks", email = "cambrooks3393@gmail.com" }]
