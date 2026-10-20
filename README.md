@@ -83,6 +83,9 @@ Details, wiring and troubleshooting: [docs/platform-setup.md](docs/platform-setu
 
 ## Documentation
 
+The docs below are also published as a searchable site:
+<https://feastorg.github.io/projects/crumbs/>.
+
 | | |
 | --- | --- |
 | [docs/index.md](docs/index.md) | The map of everything below |
