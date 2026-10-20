@@ -3,7 +3,7 @@
 [![CI](https://github.com/feastorg/CRUMBS/actions/workflows/ci.yml/badge.svg)](https://github.com/feastorg/CRUMBS/actions/workflows/ci.yml)
 [![PlatformIO Registry](https://badges.registry.platformio.org/packages/cameronbrooks11/library/CRUMBS.svg)](https://registry.platformio.org/libraries/cameronbrooks11/CRUMBS)
 [![PyPI](https://img.shields.io/pypi/v/crumbs-i2c)](https://pypi.org/project/crumbs-i2c/)
-[![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](./LICENSE)
+[![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-blue.svg)](./LICENSE)
 
 CRUMBS (Communications Router and Unified Message Broker System) is a small C
 library for framed, CRC-checked messages between one I²C controller and any
@@ -98,4 +98,4 @@ The docs below are also published as a searchable site:
 
 ## License
 
-AGPL-3.0-or-later — see [LICENSE](LICENSE).
+MPL-2.0 — see [LICENSE](LICENSE).

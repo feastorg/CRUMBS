@@ -113,4 +113,4 @@ The package version is the CRUMBS library version it matches.
 
 ## Licence
 
-AGPL-3.0-or-later, like CRUMBS.
+MPL-2.0, like CRUMBS.

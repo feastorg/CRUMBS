@@ -6,6 +6,10 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Relicensed from AGPL-3.0-or-later to MPL-2.0 (`LICENSE`, `library.json`, `library.properties`, `pyproject.toml`), together with linux-wire and bread-crumbs-contracts (feastorg/linux-wire#8). MPL-2.0 is file-level copyleft: changes to CRUMBS's own files stay open, and firmware that links CRUMBS can carry any licence. Versions released before this change remain under AGPL-3.0-or-later.
+
 ## [0.16.1] - 2026-10-19
 
 ### Changed
