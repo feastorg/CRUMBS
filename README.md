@@ -1,7 +1,6 @@
 # CRUMBS
 
 [![CI](https://github.com/feastorg/CRUMBS/actions/workflows/ci.yml/badge.svg)](https://github.com/feastorg/CRUMBS/actions/workflows/ci.yml)
-[![Pages](https://github.com/feastorg/feastorg.github.io/actions/workflows/pages.yml/badge.svg)](https://feastorg.github.io/crumbs/)
 [![PlatformIO Registry](https://badges.registry.platformio.org/packages/cameronbrooks11/library/CRUMBS.svg)](https://registry.platformio.org/libraries/cameronbrooks11/CRUMBS)
 [![PyPI](https://img.shields.io/pypi/v/crumbs-i2c)](https://pypi.org/project/crumbs-i2c/)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](./LICENSE)
