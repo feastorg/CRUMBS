@@ -131,19 +131,18 @@ The controller must therefore tolerate clock stretching. The generated getters
 pause `CRUMBS_DEFAULT_QUERY_DELAY_US` (10 ms) between the SET_REPLY write and
 the read, so the SET_REPLY's processing has normally finished before the read
 starts. A transfer sent straight after a write waits for that write's
-processing in the stretch. Two library paths do that:
-`crumbs_i2c_dev_write_then_read()`, which reads straight after its write with
-or without a repeated start, and `crumbs_controller_send_confirmed()` (and the
-Python binding's `send_confirmed`), whose SET_REPLY staging write follows the
-SET it confirms with no pause. The pause is margin, chosen conservatively;
-the header says to reduce it only with an oscilloscope on the bus.
+processing in the stretch: for example the SET_REPLY staging write that
+`crumbs_controller_send_confirmed()` and the Python binding's
+`Controller.send_confirmed()` send, with no pause, after the SET they confirm.
+The pause is margin, chosen conservatively; the header says to reduce it only
+with an oscilloscope on the bus.
 
 Two limits apply. SMBus, whose CRC this protocol shares, caps a target's
 cumulative stretching at 25 ms per message (T_LOW:SEXT) and a controller's at
-10 ms per byte (T_LOW:MEXT). A combined transfer is stretched for receive
-processing as well as reply construction, so keeping the receive and reply
-handlers well inside 25 ms between them keeps CRUMBS usable on SMBus-timed
-controllers.
+10 ms per byte (T_LOW:MEXT). A read sent straight after a write is stretched
+for receive processing as well as reply construction, so keeping the receive
+and reply handlers well inside 25 ms between them keeps CRUMBS usable on
+SMBus-timed controllers.
 
 And a Raspberry Pi 4 controller (`i2c-bcm2835`) loses bytes around a
 peripheral's clock stretch unless the bus is slow. Measured on one rig on

@@ -8,7 +8,7 @@ All notable changes to CRUMBS are documented in this file.
 
 ### Changed
 
-- Documentation: `protocol.md` now says where a transfer that arrives during receive processing is stretched: after its address is acknowledged on the ATmega328P core, before it on the megaAVR core (Nano Every), where after a repeated start the receive callback runs entirely inside the read's stretch. It also names the library paths that send straight after a write, and counts receive processing in the SMBus stretch budget. `architecture.md` links to it. (#125)
+- Documentation: `protocol.md` now says where a transfer that arrives during receive processing is stretched: after its address is acknowledged on the ATmega328P core, before it on the megaAVR core (Nano Every), where after a repeated start the receive callback runs entirely inside the read's stretch. It also says that a transfer sent straight after a write, such as `send_confirmed`'s SET_REPLY staging write, waits for that write's processing, and counts receive processing in the SMBus stretch budget. `architecture.md` links to it. (#125)
 
 ## [0.16.2] - 2026-10-19
 
