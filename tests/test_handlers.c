@@ -468,8 +468,12 @@ static int test_has_handler(void)
         return 1;
     }
 
-    crumbs_register_handler(&ctx, 0x42, test_handler, NULL);
-    crumbs_register_handler(&ctx, 0x43, test_handler, NULL);
+    if (crumbs_register_handler(&ctx, 0x42, test_handler, NULL) != 0 ||
+        crumbs_register_handler(&ctx, 0x43, test_handler, NULL) != 0)
+    {
+        fprintf(stderr, "has_handler: registration failed\n");
+        return 1;
+    }
     if (crumbs_has_handler(&ctx, 0x42) != 1 || crumbs_has_handler(&ctx, 0x43) != 1)
     {
         fprintf(stderr, "has_handler: registered opcodes should report 1\n");
@@ -481,7 +485,8 @@ static int test_has_handler(void)
         return 1;
     }
 
-    /* Removing 0x42 swaps 0x43 into its slot; both answers must follow. */
+    /* Removing 0x42, the first slot, swaps 0x43 into it; both answers must
+       follow. */
     crumbs_unregister_handler(&ctx, 0x42);
     if (crumbs_has_handler(&ctx, 0x42) != 0 || crumbs_has_handler(&ctx, 0x43) != 1)
     {
@@ -490,7 +495,11 @@ static int test_has_handler(void)
     }
 
     /* Removing the last slot leaves its old opcode past handler_count. */
-    crumbs_register_handler(&ctx, 0x44, test_handler, NULL);
+    if (crumbs_register_handler(&ctx, 0x44, test_handler, NULL) != 0)
+    {
+        fprintf(stderr, "has_handler: registration failed\n");
+        return 1;
+    }
     crumbs_unregister_handler(&ctx, 0x44);
     if (crumbs_has_handler(&ctx, 0x44) != 0)
     {
@@ -499,7 +508,11 @@ static int test_has_handler(void)
     }
 
     /* A reply handler is not a command handler. */
-    crumbs_register_reply_handler(&ctx, 0x80, test_reply, NULL);
+    if (crumbs_register_reply_handler(&ctx, 0x80, test_reply, NULL) != 0)
+    {
+        fprintf(stderr, "has_handler: reply registration failed\n");
+        return 1;
+    }
     if (crumbs_has_handler(&ctx, 0x80) != 0)
     {
         fprintf(stderr, "has_handler: reply table should not count\n");
@@ -521,9 +534,20 @@ static int test_has_handler(void)
 int main(void)
 {
 #if CRUMBS_MAX_HANDLERS == 0
-    /* The handler table is compiled out; nothing here can run. Exit with the
-       CTest skip code (see SKIP_RETURN_CODE in CMakeLists.txt) so the
-       configuration reports "skipped", not a vacuous pass. */
+    /* The handler table is compiled out. The one thing left to check is that
+       crumbs_has_handler() then reports no handler. */
+    crumbs_context_t ctx = {0};
+    crumbs_init(&ctx, CRUMBS_ROLE_PERIPHERAL, 0x10);
+    if (crumbs_register_handler(&ctx, 0x42, test_handler, NULL) != -1 ||
+        crumbs_has_handler(&ctx, 0x42) != 0)
+    {
+        fprintf(stderr, "has_handler: should report 0 with the table compiled out\n");
+        return 1;
+    }
+
+    /* Nothing else here can run. Exit with the CTest skip code (see
+       SKIP_RETURN_CODE in CMakeLists.txt) so the configuration reports
+       "skipped", not a vacuous pass. */
     printf("SKIP: CRUMBS_MAX_HANDLERS == 0, handler table compiled out\n");
     return 77;
 #else
