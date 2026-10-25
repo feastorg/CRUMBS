@@ -112,20 +112,23 @@ controller has addressed it for reading and before the first byte is clocked
 out. On AVR that callback runs in the TWI interrupt with SCL held low by the
 hardware (clock stretching), so the controller's read waits for the reply to
 be encoded. Incoming frames are processed in the receive interrupt the same
-way, and a read that arrives while that is still running is address-ACKed by
-the hardware and stretched until the interrupt returns. On the megaAVR core
-(Nano Every, 1.8.8) a write followed by a repeated-start read goes further:
-the receive callback runs in that read's address-match interrupt, before the
-address is acknowledged (`twi.c` calls `onReceive` at line 561 and releases the
-clock at line 620), so the read is stretched through receive processing as
-well as reply construction. The library's own SET_REPLY write ends with a STOP
-on both HALs, so its getters don't hit this; a controller that combines the
-write and the read, such as `crumbs_i2c_dev_write_then_read()` with
-`require_repeated_start` set, does. The controller must therefore tolerate
-clock stretching. `CRUMBS_DEFAULT_QUERY_DELAY_US` (10 ms),
-the pause the generated getters insert between the SET_REPLY write and the
-read, is margin on top of that, chosen conservatively; the header says to
-reduce it only with an oscilloscope on the bus.
+way, and a read that arrives while that is still running is stretched until the
+interrupt returns. Where the stretch starts depends on the core. The ATmega328P
+core releases the bus before it calls the receive callback, so the hardware
+acknowledges the read's address and then holds SCL. The megaAVR core (Nano
+Every; Arduino megaAVR core 1.8.8, `TWI_SlaveInterruptHandler` in the Wire
+library's `utility/twi.c`) calls the receive callback from the interrupt that
+reports the STOP or the next address, and acknowledges an address in software
+after it returns. After a repeated start, or when the next address arrives
+before the STOP has been serviced, the whole of receive processing therefore
+runs inside the read's stretch, before its address is acknowledged.
+
+The controller must therefore tolerate clock stretching. The generated getters
+pause `CRUMBS_DEFAULT_QUERY_DELAY_US` (10 ms) between the SET_REPLY write and
+the read, so receive processing has normally finished before the read starts;
+a controller that reads straight after writing, with or without a repeated
+start, waits for it in the stretch. The pause is margin, chosen conservatively;
+the header says to reduce it only with an oscilloscope on the bus.
 
 Two limits apply. SMBus, whose CRC this protocol shares, caps a target's
 cumulative stretching at 25 ms per message (T_LOW:SEXT) and a controller's at
