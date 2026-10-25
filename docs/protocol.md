@@ -175,7 +175,8 @@ from a peripheral without GET_ACK.
 "Applied" is the library's view: the frame reached `on_message` or a handler
 and neither called `crumbs_refuse()`. A peripheral that dispatches only
 through `on_message` therefore reports every frame it receives as applied,
-including opcodes it ignores, unless it calls `crumbs_refuse()` for them; and
+including opcodes it ignores, unless it calls `crumbs_refuse()` for them
+(`crumbs_has_handler()` tells it which opcodes it registered handlers for); and
 a handler that only queues work reports the command applied when it returns.
 
 The reply's `type_id` is the peripheral's declared type, or `0x00` if it has
