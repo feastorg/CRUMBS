@@ -85,10 +85,19 @@ reads:
 Whatever the handler leaves in the reply message is encoded — including an
 untouched, all-zero message, which goes out as the 4-byte frame `00 00 00 00`.
 
-On the AVR core both entry points run inside the TWI interrupt: reception
-after the STOP (or repeated start) ending the controller's write, reply
-construction while the controller's read is held off by clock stretching. Keep
-handlers short and avoid anything that waits on another interrupt.
+On AVR both entry points run inside the TWI interrupt. Reply construction runs
+while the controller's read is held off by clock stretching. Reception runs once
+the controller's write ends, and when it runs differs by core:
+
+- ATmega328P (Arduino AVR core): at the STOP or repeated start, after the bus
+  is released, so it does not stretch the clock.
+- megaAVR (Nano Every, Arduino megaAVR core 1.8.8): at the next address-match
+  or STOP interrupt. When the write ends in a repeated-start read, that is the
+  read's address match, with SCL already held, so reception stretches the
+  clock just as reply construction does
+  ([protocol.md](protocol.md#when-the-reply-is-built)).
+
+Keep handlers short and avoid anything that waits on another interrupt.
 
 ### Controller
 

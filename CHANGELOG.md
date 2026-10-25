@@ -6,6 +6,10 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Documentation: `architecture.md` and `protocol.md` now say that on the megaAVR core (Nano Every) the receive callback for a write followed by a repeated-start read runs with the clock held, so it stretches the read like reply construction; on the ATmega328P core it runs after the bus is released. (#125)
+
 ## [0.16.2] - 2026-10-19
 
 ### Changed

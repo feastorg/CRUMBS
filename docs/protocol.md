@@ -113,8 +113,16 @@ out. On AVR that callback runs in the TWI interrupt with SCL held low by the
 hardware (clock stretching), so the controller's read waits for the reply to
 be encoded. Incoming frames are processed in the receive interrupt the same
 way, and a read that arrives while that is still running is address-ACKed by
-the hardware and stretched until the interrupt returns. The controller must
-therefore tolerate clock stretching. `CRUMBS_DEFAULT_QUERY_DELAY_US` (10 ms),
+the hardware and stretched until the interrupt returns. On the megaAVR core
+(Nano Every, 1.8.8) a write followed by a repeated-start read goes further:
+the receive callback runs in that read's address-match interrupt, before the
+address is acknowledged (`twi.c` calls `onReceive` at line 561 and releases the
+clock at line 620), so the read is stretched through receive processing as
+well as reply construction. The library's own SET_REPLY write ends with a STOP
+on both HALs, so its getters don't hit this; a controller that combines the
+write and the read, such as `crumbs_i2c_dev_write_then_read()` with
+`require_repeated_start` set, does. The controller must therefore tolerate
+clock stretching. `CRUMBS_DEFAULT_QUERY_DELAY_US` (10 ms),
 the pause the generated getters insert between the SET_REPLY write and the
 read, is margin on top of that, chosen conservatively; the header says to
 reduce it only with an oscilloscope on the bus.
