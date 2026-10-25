@@ -450,6 +450,72 @@ static int test_handler_wrong_command_not_called(void)
     return 0;
 }
 
+static void test_reply(crumbs_context_t *ctx, crumbs_message_t *reply, void *user_data)
+{
+    (void)ctx;
+    (void)reply;
+    (void)user_data;
+}
+
+static int test_has_handler(void)
+{
+    crumbs_context_t ctx = {0};
+    crumbs_init(&ctx, CRUMBS_ROLE_PERIPHERAL, 0x10);
+
+    if (crumbs_has_handler(&ctx, 0x42) != 0)
+    {
+        fprintf(stderr, "has_handler: empty table should report 0\n");
+        return 1;
+    }
+
+    crumbs_register_handler(&ctx, 0x42, test_handler, NULL);
+    crumbs_register_handler(&ctx, 0x43, test_handler, NULL);
+    if (crumbs_has_handler(&ctx, 0x42) != 1 || crumbs_has_handler(&ctx, 0x43) != 1)
+    {
+        fprintf(stderr, "has_handler: registered opcodes should report 1\n");
+        return 1;
+    }
+    if (crumbs_has_handler(&ctx, 0x44) != 0)
+    {
+        fprintf(stderr, "has_handler: unregistered opcode should report 0\n");
+        return 1;
+    }
+
+    /* Removing 0x42 swaps 0x43 into its slot; both answers must follow. */
+    crumbs_unregister_handler(&ctx, 0x42);
+    if (crumbs_has_handler(&ctx, 0x42) != 0 || crumbs_has_handler(&ctx, 0x43) != 1)
+    {
+        fprintf(stderr, "has_handler: wrong answer after unregister\n");
+        return 1;
+    }
+
+    /* Removing the last slot leaves its old opcode past handler_count. */
+    crumbs_register_handler(&ctx, 0x44, test_handler, NULL);
+    crumbs_unregister_handler(&ctx, 0x44);
+    if (crumbs_has_handler(&ctx, 0x44) != 0)
+    {
+        fprintf(stderr, "has_handler: stale slot past handler_count reported\n");
+        return 1;
+    }
+
+    /* A reply handler is not a command handler. */
+    crumbs_register_reply_handler(&ctx, 0x80, test_reply, NULL);
+    if (crumbs_has_handler(&ctx, 0x80) != 0)
+    {
+        fprintf(stderr, "has_handler: reply table should not count\n");
+        return 1;
+    }
+
+    if (crumbs_has_handler(NULL, 0x43) != 0)
+    {
+        fprintf(stderr, "has_handler: NULL ctx should report 0\n");
+        return 1;
+    }
+
+    printf("  has_handler: PASS\n");
+    return 0;
+}
+
 /* ---- Main ------------------------------------------------------------- */
 
 int main(void)
@@ -469,6 +535,7 @@ int main(void)
     failures += test_register_handler_null_ctx();
     failures += test_unregister_handler();
     failures += test_unregister_nonexistent();
+    failures += test_has_handler();
     failures += test_handler_table_full();
     failures += test_handler_overwrite();
     failures += test_handler_dispatch();
