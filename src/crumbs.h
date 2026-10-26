@@ -476,6 +476,21 @@ extern "C"
                                   uint8_t opcode);
 
     /**
+     * @brief Report whether a command handler is registered for an opcode.
+     *
+     * Checks the command handler table only, not the reply handler table.
+     * Safe to call from on_message, so a peripheral can refuse an opcode
+     * with no handler from its registrations instead of a separate list.
+     *
+     * @param ctx Context to query; may be NULL.
+     * @param opcode The command type to look up.
+     * @return 1 if a handler is registered for opcode, 0 if not, if ctx is
+     *         NULL, or if CRUMBS_MAX_HANDLERS is 0.
+     */
+    int crumbs_has_handler(const crumbs_context_t *ctx,
+                           uint8_t opcode);
+
+    /**
      * @brief Register a reply handler for a specific GET opcode.
      *
      * The handler is invoked by crumbs_peripheral_build_reply() when

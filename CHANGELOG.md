@@ -6,6 +6,10 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `crumbs_has_handler(ctx, opcode)` reports whether a SET handler is registered for an opcode, so a peripheral's `on_message` can refuse an opcode with no handler from its registrations instead of keeping a separate list. (#124)
+
 ## [0.16.2] - 2026-10-19
 
 ### Changed

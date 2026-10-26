@@ -63,6 +63,7 @@ bytes; every read fails with `-1` when `offset + width > len`.
 | `crumbs_peripheral_build_reply(ctx, out_buf, out_buf_len, *out_len)` | The acknowledgement for `0xFD`, else the reply handler for the requested opcode, else `on_request`, else nothing (`*out_len = 0`, returns 0). `-1` bad args, `-2` encode failed. The HAL calls this from its request callback. |
 | `crumbs_register_handler(ctx, opcode, fn, user_data)` | Add or replace the SET handler for `opcode`; `fn == NULL` removes it. `-1` when the table is full, `ctx` is `NULL`, or tables are compiled out. |
 | `crumbs_unregister_handler(ctx, opcode)` | Same as registering `NULL`. |
+| `crumbs_has_handler(ctx, opcode)` | `1` if a SET handler is registered for `opcode`, else `0` (also for `NULL` or tables compiled out). For refusing unhandled opcodes in `on_message`. |
 | `crumbs_register_reply_handler(ctx, opcode, fn, user_data)` | Same contract for the reply-handler table; `fn == NULL` removes. |
 | `crumbs_handler_fn` | `fn(ctx, opcode, data, data_len, user_data)`. `data` is never `NULL`. |
 | `crumbs_reply_fn` | `fn(ctx, reply, user_data)`: fill `reply`; an untouched reply goes out as `00 00 00 00`. |
