@@ -85,10 +85,13 @@ reads:
 Whatever the handler leaves in the reply message is encoded — including an
 untouched, all-zero message, which goes out as the 4-byte frame `00 00 00 00`.
 
-On the AVR core both entry points run inside the TWI interrupt: reception
-after the STOP (or repeated start) ending the controller's write, reply
-construction while the controller's read is held off by clock stretching. Keep
-handlers short and avoid anything that waits on another interrupt.
+On AVR both entry points run inside the TWI interrupt: reception once the
+controller's write ends, reply construction while the controller's read is held
+off by clock stretching. A transfer that addresses the peripheral while reception
+is still running is stretched too; where that stretch starts differs by core
+([protocol.md](protocol.md#when-the-reply-is-built)).
+
+Keep handlers short and avoid anything that waits on another interrupt.
 
 ### Controller
 

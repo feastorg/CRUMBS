@@ -111,18 +111,38 @@ The peripheral builds its reply inside the I²C request callback — after the
 controller has addressed it for reading and before the first byte is clocked
 out. On AVR that callback runs in the TWI interrupt with SCL held low by the
 hardware (clock stretching), so the controller's read waits for the reply to
-be encoded. Incoming frames are processed in the receive interrupt the same
-way, and a read that arrives while that is still running is address-ACKed by
-the hardware and stretched until the interrupt returns. The controller must
-therefore tolerate clock stretching. `CRUMBS_DEFAULT_QUERY_DELAY_US` (10 ms),
-the pause the generated getters insert between the SET_REPLY write and the
-read, is margin on top of that, chosen conservatively; the header says to
-reduce it only with an oscilloscope on the bus.
+be encoded.
+
+Incoming frames are processed in the receive callback, also in the TWI
+interrupt, once the controller's write has ended. A transfer that addresses the
+peripheral while that is still running, whether the read or the next write, is
+stretched until the interrupt returns. Where the stretch starts depends on the
+core. The ATmega328P core releases the bus before it calls the receive callback,
+so the hardware acknowledges the next address and then holds SCL. The megaAVR
+core (Nano Every; `TWI_SlaveInterruptHandler` in the Wire library's
+`utility/twi.c`) acknowledges an address in software, after the callback
+returns, so it holds SCL before the acknowledgement. It also calls the receive
+callback from the interrupt for the STOP or for the next address. After a
+repeated start that is the read's own address match, so the whole of receive
+processing runs inside the read's stretch. The megaAVR description is of core
+version 1.8.8, from `version=` in that core's `platform.txt`.
+
+The controller must therefore tolerate clock stretching. The generated getters
+pause `CRUMBS_DEFAULT_QUERY_DELAY_US` (10 ms) between the SET_REPLY write and
+the read, so the SET_REPLY's processing has normally finished before the read
+starts. A transfer sent straight after a write waits for that write's
+processing in the stretch: for example the SET_REPLY staging write that
+`crumbs_controller_send_confirmed()` and the Python binding's
+`Controller.send_confirmed()` send, with no pause, after the SET they confirm.
+The pause is margin, chosen conservatively; the header says to reduce it only
+with an oscilloscope on the bus.
 
 Two limits apply. SMBus, whose CRC this protocol shares, caps a target's
 cumulative stretching at 25 ms per message (T_LOW:SEXT) and a controller's at
-10 ms per byte (T_LOW:MEXT); a reply handler that finishes well inside 25 ms
-keeps CRUMBS usable on SMBus-timed controllers.
+10 ms per byte (T_LOW:MEXT). A read sent straight after a write is stretched
+for receive processing as well as reply construction, so keeping the receive
+and reply handlers well inside 25 ms between them keeps CRUMBS usable on
+SMBus-timed controllers.
 
 And a Raspberry Pi 4 controller (`i2c-bcm2835`) loses bytes around a
 peripheral's clock stretch unless the bus is slow. Measured on one rig on
