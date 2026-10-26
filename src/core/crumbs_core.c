@@ -199,6 +199,32 @@ int crumbs_unregister_handler(crumbs_context_t *ctx,
 }
 
 /**
+ * @brief Report whether a command handler is registered for an opcode.
+ */
+int crumbs_has_handler(const crumbs_context_t *ctx,
+                       uint8_t opcode)
+{
+#if CRUMBS_MAX_HANDLERS == 0
+    (void)ctx;
+    (void)opcode;
+    return 0;
+#else
+    if (!ctx)
+    {
+        return 0;
+    }
+    for (uint8_t i = 0; i < ctx->handler_count; i++)
+    {
+        if (ctx->handler_opcode[i] == opcode)
+        {
+            return 1;
+        }
+    }
+    return 0;
+#endif
+}
+
+/**
  * @brief Register a reply handler for a specific GET opcode.
  *
  * Uses identical slot management logic to crumbs_register_handler.

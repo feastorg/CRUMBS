@@ -6,6 +6,10 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `crumbs_has_handler(ctx, opcode)` reports whether a SET handler is registered for an opcode, so a peripheral's `on_message` can refuse an opcode with no handler from its registrations instead of keeping a separate list. (#124)
+
 ### Changed
 
 - Documentation: `protocol.md` now says where a transfer that arrives during receive processing is stretched: after its address is acknowledged on the ATmega328P core, before it on the megaAVR core (Nano Every), where after a repeated start the receive callback runs entirely inside the read's stretch. It also says that a transfer sent straight after a write, such as `send_confirmed`'s SET_REPLY staging write, waits for that write's processing, and counts receive processing in the SMBus stretch budget. `architecture.md` links to it. (#125)
