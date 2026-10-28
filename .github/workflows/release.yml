@@ -82,7 +82,7 @@ jobs:
           tar -czf "${ARTIFACT}" -C "${{ github.workspace }}/staging" .
           echo "artifact=${ARTIFACT}" >> "$GITHUB_OUTPUT"
 
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: astral-sh/setup-uv@v10.3.2
         with:
           python-version: "3.11"
 
@@ -162,7 +162,7 @@ jobs:
           name: python-dist
           path: dist/
 
-      - uses: pypa/gh-action-pypi-publish@v1.14.2
+      - uses: pypa/gh-action-pypi-publish@v1.14.3
 
   # The published package, installed the way a consumer installs it: no
   # checkout, a fresh venv, the release pinned by version.
@@ -175,7 +175,7 @@ jobs:
     env:
       VERSION: ${{ needs.release-linux-x86_64.outputs.version }}
     steps:
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: astral-sh/setup-uv@v10.3.2
         with:
           python-version: "3.11"
 
