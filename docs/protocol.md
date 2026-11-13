@@ -14,12 +14,9 @@ everything inside the transaction is one CRUMBS frame.
 
 ## Frame
 
-```text
-┌─────────┬────────┬──────────┬──────────────────┬──────┐
-│ type_id │ opcode │ data_len │ data[0..data_len)│ crc8 │
-│ 1 byte  │ 1 byte │ 1 byte   │ 0–27 bytes       │ 1 B  │
-└─────────┴────────┴──────────┴──────────────────┴──────┘
-```
+![The CRUMBS frame: type_id, opcode and data_len of one byte each at offsets 0 to 2, then 0 to 27 data bytes from offset 3, then the crc8 byte at offset 3 + data_len. The CRC covers every byte before it; the frame is 4 + data_len bytes, 4 to 31.](figures/frame.svg)
+
+*The frame. Offsets above, sizes below.*
 
 | Field      | Meaning                                                          |
 | ---------- | ---------------------------------------------------------------- |
@@ -71,11 +68,11 @@ needs to know the SET arrived reads the acknowledgement afterwards
 
 **GET** — a write, then a read.
 
-```text
-controller ─ write ─▶ [type][0xFE][0x01][op][crc]   SET_REPLY: stage opcode `op`
-           (wait)
-controller ─ read  ─▶ up to 31 bytes                 the peripheral's reply frame
-```
+![A GET on the bus. The controller writes the five-byte SET_REPLY frame type, 0xFE, 0x01, op, crc; the peripheral's receive callback decodes it and stores op. After a 10 ms pause the controller reads 31 bytes: after the address, SCL is held low while the peripheral's request callback builds the reply; then come the reply frame of 4 + len bytes, which is decoded, and a tail of 0xFF bytes, which the controller trims first.](figures/get-transaction.svg)
+
+*A GET, not to scale. A is the 7-bit address; S and P are start and stop. The
+10 ms pause is the generated getters'; where the receive callback runs on
+megaAVR is described [below](#when-the-reply-is-built).*
 
 The peripheral stores `op` as its *requested opcode* and builds the reply when
 the read arrives. The requested opcode persists until the next SET_REPLY, so a

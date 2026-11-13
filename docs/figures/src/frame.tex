@@ -1,0 +1,30 @@
+% The CRUMBS frame (docs/protocol.md#frame).
+\documentclass[border=6pt]{standalone}
+\usepackage{crumbs-fig}
+\begin{document}
+\begin{tikzpicture}
+  % x positions of the field edges, in cm
+  \def\w{1.7}
+  \node[field, fill=crumbsHeader, minimum width=\w cm, anchor=south west] at (0,0)      {type\_id};
+  \node[field, fill=crumbsHeader, minimum width=\w cm, anchor=south west] at (\w,0)     {opcode};
+  \node[field, fill=crumbsHeader, minimum width=\w cm, anchor=south west] at (2*\w,0)   {data\_len};
+  \node[field, fill=crumbsData,   minimum width=6cm,   anchor=south west] at (3*\w,0)   {data[0..data\_len)};
+  \node[field, fill=crumbsCrc,    minimum width=\w cm, anchor=south west] at (3*\w+6,0) {crc8};
+
+  % byte offsets
+  \foreach \x/\t in {0/0, \w/1, 2*\w/2, 3*\w/3, 3*\w+6/3\,+\,data\_len}
+    \node[note, font=\ttfamily\scriptsize, anchor=south west] at (\x, 0.95) {\t};
+
+  % field sizes
+  \foreach \x/\t in {0.5*\w/1 byte, 1.5*\w/1 byte, 2.5*\w/1 byte,
+                     3*\w+3/0--27 bytes, 3.5*\w+6/1 byte}
+    \node[note, anchor=north] at (\x, -0.05) {\t};
+
+  % coverage
+  \draw[brace, decoration={mirror}] (0,-0.5) -- (3*\w+6,-0.5)
+    node[midway, below=6pt, note] {CRC-8/SMBUS over these \texttt{3\,+\,data\_len} bytes};
+  \draw[brace, decoration={mirror}] (0,-1.35) -- (4*\w+6,-1.35)
+    node[midway, below=6pt, note] {frame: \texttt{4\,+\,data\_len} bytes, 4 to 31
+      (\texttt{CRUMBS\_MESSAGE\_MAX\_SIZE}), one I\textsuperscript{2}C transaction};
+\end{tikzpicture}
+\end{document}
