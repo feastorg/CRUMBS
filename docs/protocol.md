@@ -233,6 +233,21 @@ So the first SET to a peripheral that has counted nothing since it started is
 never re-sent. A restart that brings the record back to exactly the baseline
 still reads as not advanced; the counter cannot rule that out.
 
+```mermaid
+flowchart TD
+    A{"status after the SET<br/>0x00, none?"} -- yes --> U1["unknown: do not re-send"]
+    A -- no --> B{"counter equal<br/>to the baseline's?"}
+    B -- yes --> C{"opcode, status and reason<br/>equal too?"}
+    C -- yes --> N["not advanced: send it again"]
+    C -- no --> U2["unknown: do not re-send"]
+    B -- no --> D{"opcode the SET's?"}
+    D -- no --> M["another frame came between:<br/>unknown, do not re-send"]
+    D -- yes --> S["the status says: applied,<br/>refused or rejected"]
+```
+
+*The table above in the order `crumbs_ack_classify()` and the Python
+binding's `classify()` test it.*
+
 A failed read of the acknowledgement is read again, never answered by sending
 the SET again, so a frame is not applied twice because a read failed.
 `crumbs_controller_send_confirmed()` and the Python binding's
