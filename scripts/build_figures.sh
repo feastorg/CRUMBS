@@ -23,7 +23,7 @@ else
 fi
 
 for name in "${names[@]}"; do
-    if [ -z "$name" ] || [ ! -f "$src/$name.tex" ]; then
+    if [ -z "$name" ] || [[ $name == */* ]] || [ ! -f "$src/$name.tex" ]; then
         echo "build_figures: no $src/$name.tex (give a name such as frame, not a path)" >&2
         exit 1
     fi

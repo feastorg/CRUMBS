@@ -71,7 +71,7 @@ needs to know the SET arrived reads the acknowledgement afterwards
 ![A GET on the bus. The controller writes the five-byte SET_REPLY frame 0x00, 0xFE, 0x01, op, crc; the peripheral's receive callback decodes it and stores op. After a 10 ms pause the controller reads 31 bytes: after the address, on AVR, SCL is held low while the peripheral's request callback builds the reply; then come the reply frame of 4 + len bytes, which is decoded, and a tail of 0xFF bytes, which the controller trims first.](figures/get-transaction.svg)
 
 *A GET as the generated getters send it, not to scale: type `0x00`, then the
-10 ms pause. A is the 7-bit address; S and P are start and stop. The clock
+pause `CRUMBS_DEFAULT_QUERY_DELAY_US`. A is the 7-bit address; S and P are start and stop. The clock
 stretch and where the receive callback runs on megaAVR are described
 [below](#when-the-reply-is-built).*
 
