@@ -16,7 +16,7 @@ everything inside the transaction is one CRUMBS frame.
 
 ![The CRUMBS frame: type_id, opcode and data_len of one byte each at offsets 0 to 2, then 0 to 27 data bytes from offset 3, then the crc8 byte at offset 3 + data_len. The CRC covers every byte before it; the frame is 4 + data_len bytes, 4 to 31.](figures/frame.svg)
 
-*The frame. Offsets above, sizes below.*
+*The frame.*
 
 | Field      | Meaning                                                          |
 | ---------- | ---------------------------------------------------------------- |
@@ -68,12 +68,13 @@ needs to know the SET arrived reads the acknowledgement afterwards
 
 **GET** — a write, then a read.
 
-![A GET on the bus. The controller writes the five-byte SET_REPLY frame 0x00, 0xFE, 0x01, op, crc; the peripheral's receive callback decodes it and stores op. After a 10 ms pause the controller reads 31 bytes: after the address, on AVR, SCL is held low while the peripheral's request callback builds the reply; then come the reply frame of 4 + len bytes, which is decoded, and a tail of 0xFF bytes, which the controller trims first.](figures/get-transaction.svg)
+![A GET in two steps. Step 1, write: the controller sends the five-byte SET_REPLY frame 0x00, 0xFE, 0x01, op, crc; after the stop, the peripheral's receive callback decodes it and stores op. Then the controller waits 10 ms. Step 2, read: the controller reads 31 bytes. After the address, on AVR, SCL is held low while the peripheral's request callback builds the reply; then come the reply frame of 4 + len bytes, which is decoded, and a tail of 0xFF bytes, which the controller trims first.](figures/get-transaction.svg)
 
-*A GET as the generated getters send it, not to scale: type `0x00`, then the
-pause `CRUMBS_DEFAULT_QUERY_DELAY_US`. A is the 7-bit address; S and P are start and stop. The clock
-stretch and where the receive callback runs on megaAVR are described
-[below](#when-the-reply-is-built).*
+*A GET as the generated getters send it: two I2C transactions, one after the
+other, each read left to right and not to scale. The wait is
+`CRUMBS_DEFAULT_QUERY_DELAY_US`. A is the 7-bit address; S and P are start and
+stop. The clock stretch and where the receive callback runs on megaAVR are
+described [below](#when-the-reply-is-built).*
 
 The peripheral stores `op` as its *requested opcode* and builds the reply when
 the read arrives. The requested opcode persists until the next SET_REPLY, so a
@@ -233,14 +234,15 @@ still reads as not advanced; the counter cannot rule that out.
 
 ```mermaid
 flowchart TD
-    A{{"status after<br/>is none?"}} -- yes --> U["unknown:<br/>do not re-send"]
-    A -- no --> B{{"counter<br/>unchanged?"}}
-    B -- yes --> C{{"whole record<br/>unchanged?"}}
+    S(["ACK record read<br/>after the SET,<br/>vs. the baseline"]) --> A{{"status is<br/>none (0x00)?"}}
+    A -- yes --> U["unknown:<br/>do not re-send"]
+    A -- no --> B{{"counter same<br/>as baseline?"}}
+    B -- yes --> C{{"all four bytes<br/>same as baseline?"}}
     C -- yes --> N["not advanced:<br/>send again"]
     C -- no --> U
-    B -- no --> D{{"opcode<br/>the SET's?"}}
+    B -- no --> D{{"opcode is<br/>the SET's?"}}
     D -- no --> M["mismatch:<br/>do not re-send"]
-    D -- yes --> S["applied,<br/>refused or<br/>rejected"]
+    D -- yes --> SS["SET counted:<br/>the status says<br/>applied, refused<br/>or rejected"]
 ```
 
 *The table above, for two valid records, in the order `crumbs_ack_classify()`
