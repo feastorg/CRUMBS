@@ -87,6 +87,15 @@ convention it does not enforce: `@brief`, `@param` for every parameter,
 Internal `static` functions in `.c` files get ordinary comments that say why,
 not what.
 
+Figures that need exact placement (byte layouts, bus timing) are TikZ:
+one `standalone` file per figure in `docs/figures/src/`, sharing
+`crumbs-fig.sty`, built to the committed `docs/figures/<name>.svg` by
+`scripts/build_figures.sh [name]` (pdflatex and `pdftocairo`, from
+poppler-utils). Commit the source and the SVG together. CI's `figures` job
+checks that every source has an SVG and compiles, but does not diff the
+SVGs, since their bytes depend on the TeX and poppler versions. Diagrams of flow or
+structure go inline as Mermaid, which GitHub renders.
+
 The docs follow two rules. **One home per fact**: signatures and return codes
 live in the headers; the wire format lives in `docs/protocol.md`; everything
 else links to them. **They describe HEAD**: not the last release, and not
@@ -133,6 +142,7 @@ changed, why, and how it was verified. Add a `[Unreleased]` entry to
 | `build-configs` | Core and Arduino-HAL host tests under ASan+UBSan and with `CRUMBS_MAX_HANDLERS=0`, the flags given to both languages |
 | `doxygen` | `doccheck.sh` and `check_api_index.py` (pinned to `ubuntu-24.04` for a fixed Doxygen) |
 | `docs-links` | `check_docs_links.py` |
+| `figures` | Every `docs/figures/src/*.tex` has a committed SVG and compiles with `build_figures.sh` |
 | `crc-regen` | Committed CRC source matches the pycrc output |
 | `python` | `tests/golden_vectors/vectors.json` is what `crumbs_gen_vectors` writes from the core today; the Python binding is formatted, lint-clean, strictly typed and passes its tests against those vectors on 3.11 and 3.13, and its sdist and wheel build, with the tests passing again against the sdist installed alone into a fresh environment |
 

@@ -1,0 +1,33 @@
+% House style for the CRUMBS documentation figures.
+% Each figure is a `standalone` document; scripts/build_figures.sh turns it
+% into the SVG next to this directory.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{crumbs-fig}
+
+% T1 + Latin Modern: a real underscore glyph in typewriter labels
+% (OT1 draws \_ as a detached rule) and vector fonts in the SVG.
+\RequirePackage[T1]{fontenc}
+\RequirePackage{lmodern}
+\RequirePackage{xcolor}
+\RequirePackage{tikz}
+\usetikzlibrary{arrows.meta,decorations.pathreplacing,patterns,positioning}
+
+% A white page, so the figure stays readable on a dark-themed viewer.
+\pagecolor{white}
+
+\definecolor{crumbsHeader}{HTML}{DCE6F2}
+\definecolor{crumbsData}{HTML}{F2F2F2}
+\definecolor{crumbsCrc}{HTML}{FBE3C8}
+\definecolor{crumbsBus}{HTML}{E8E8E8}
+\definecolor{crumbsStretch}{HTML}{C0392B}
+\definecolor{crumbsIsr}{HTML}{E3F1E0}
+\definecolor{crumbsNote}{HTML}{555555}
+
+\tikzset{
+  field/.style={draw, minimum height=0.9cm, inner sep=0pt, font=\ttfamily\small},
+  cell/.style={draw, minimum height=0.65cm, inner sep=0pt, font=\ttfamily\footnotesize},
+  isr/.style={draw, fill=crumbsIsr, rounded corners=2pt, align=center,
+              font=\footnotesize, inner sep=3pt},
+  note/.style={font=\footnotesize, text=crumbsNote, align=center},
+  brace/.style={decorate, decoration={brace, amplitude=5pt}},
+}
