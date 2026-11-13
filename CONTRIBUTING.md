@@ -93,7 +93,7 @@ one `standalone` file per figure in `docs/figures/src/`, sharing
 `scripts/build_figures.sh [name]` (pdflatex and `pdftocairo`, from
 poppler-utils). Commit the source and the SVG together. CI's `figures` job
 checks that every source has an SVG and compiles, but does not diff the
-SVGs, since their bytes depend on the TeX version. Diagrams of flow or
+SVGs, since their bytes depend on the TeX and poppler versions. Diagrams of flow or
 structure go inline as Mermaid, which GitHub renders.
 
 The docs follow two rules. **One home per fact**: signatures and return codes

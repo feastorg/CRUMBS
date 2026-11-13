@@ -68,11 +68,12 @@ needs to know the SET arrived reads the acknowledgement afterwards
 
 **GET** — a write, then a read.
 
-![A GET on the bus. The controller writes the five-byte SET_REPLY frame type, 0xFE, 0x01, op, crc; the peripheral's receive callback decodes it and stores op. After a 10 ms pause the controller reads 31 bytes: after the address, SCL is held low while the peripheral's request callback builds the reply; then come the reply frame of 4 + len bytes, which is decoded, and a tail of 0xFF bytes, which the controller trims first.](figures/get-transaction.svg)
+![A GET on the bus. The controller writes the five-byte SET_REPLY frame 0x00, 0xFE, 0x01, op, crc; the peripheral's receive callback decodes it and stores op. After a 10 ms pause the controller reads 31 bytes: after the address, on AVR, SCL is held low while the peripheral's request callback builds the reply; then come the reply frame of 4 + len bytes, which is decoded, and a tail of 0xFF bytes, which the controller trims first.](figures/get-transaction.svg)
 
-*A GET, not to scale. A is the 7-bit address; S and P are start and stop. The
-10 ms pause is the generated getters'; where the receive callback runs on
-megaAVR is described [below](#when-the-reply-is-built).*
+*A GET as the generated getters send it, not to scale: type `0x00`, then the
+10 ms pause. A is the 7-bit address; S and P are start and stop. The clock
+stretch and where the receive callback runs on megaAVR are described
+[below](#when-the-reply-is-built).*
 
 The peripheral stores `op` as its *requested opcode* and builds the reply when
 the read arrives. The requested opcode persists until the next SET_REPLY, so a

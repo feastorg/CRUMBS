@@ -8,7 +8,7 @@
 
   % ---- row 1: the SET_REPLY write --------------------------------------
   \node[anchor=east, font=\small] at (-0.2, 0.33) {Bus};
-  \foreach \i/\t/\c in {0/S/crumbsBus, 1/A+W/crumbsBus, 2/type/crumbsHeader,
+  \foreach \i/\t/\c in {0/S/crumbsBus, 1/A+W/crumbsBus, 2/0x00/crumbsHeader,
                         3/0xFE/crumbsHeader, 4/0x01/crumbsHeader, 5/op/crumbsData,
                         6/crc/crumbsCrc, 7/P/crumbsBus}
     \node[cell, fill=\c, minimum width=\w cm, anchor=south west] at (\i*\w, 0) {\t};
@@ -22,14 +22,14 @@
 
   % ---- row 2: the read, after the pause --------------------------------
   \begin{scope}[yshift=-4.4cm]
-    \def\sw{2.7}
+    \def\sw{3.1}
     \node[anchor=east, font=\small] at (-0.2, 0.33) {Bus};
     \node[cell, fill=crumbsBus, minimum width=\w cm, anchor=south west] at (0, 0)  {S};
     \node[cell, fill=crumbsBus, minimum width=\w cm, anchor=south west] at (\w, 0) {A+R};
     \node[cell, minimum width=\sw cm, anchor=south west, pattern=north east lines,
           pattern color=crumbsStretch!45] (stretch) at (2*\w, 0) {};
     \node[fill=white, inner sep=1.5pt, font=\footnotesize, text=crumbsStretch]
-      at (stretch.center) {SCL held low};
+      at (stretch.center) {SCL held low (AVR)};
     \def\r{2*\w+\sw}
     \foreach \i/\t/\c in {0/type/crumbsHeader, 1/op/crumbsHeader, 2/len/crumbsHeader}
       \node[cell, fill=\c, minimum width=\w cm, anchor=south west] at (\r+\i*\w, 0) {\t};

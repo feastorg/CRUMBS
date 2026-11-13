@@ -23,6 +23,10 @@ else
 fi
 
 for name in "${names[@]}"; do
+    if [ -z "$name" ] || [ ! -f "$src/$name.tex" ]; then
+        echo "build_figures: no $src/$name.tex (give a name such as frame, not a path)" >&2
+        exit 1
+    fi
     if ! TEXINPUTS="$src:" pdflatex -interaction=nonstopmode -halt-on-error \
         -output-directory "$tmp" "$src/$name.tex" >"$tmp/$name.stdout"; then
         cat "$tmp/$name.stdout" >&2
