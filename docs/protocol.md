@@ -225,11 +225,28 @@ restarts starts again from all zeros:
 | status `0x00` | unknown: the peripheral has counted nothing since it started, which is both a lost first frame and a frame applied before a restart; do not re-send |
 | counter equal to the baseline, record different | unknown: the counter came round, or the peripheral restarted and counted back to it; do not re-send |
 | counter changed, same opcode | the status says applied, refused or rejected |
-| counter changed, another opcode | another frame was dispatched in between; unknown, do not re-send |
+| counter changed, another opcode | mismatch: another frame was dispatched in between; do not re-send |
 
 So the first SET to a peripheral that has counted nothing since it started is
 never re-sent. A restart that brings the record back to exactly the baseline
 still reads as not advanced; the counter cannot rule that out.
+
+```mermaid
+flowchart TD
+    A{{"status after<br/>is none?"}} -- yes --> U["unknown:<br/>do not re-send"]
+    A -- no --> B{{"counter<br/>unchanged?"}}
+    B -- yes --> C{{"whole record<br/>unchanged?"}}
+    C -- yes --> N["not advanced:<br/>send again"]
+    C -- no --> U
+    B -- no --> D{{"opcode<br/>the SET's?"}}
+    D -- no --> M["mismatch:<br/>do not re-send"]
+    D -- yes --> S["applied,<br/>refused or<br/>rejected"]
+```
+
+*The table above, for two valid records, in the order `crumbs_ack_classify()`
+and the Python binding's `classify()` test it. Unknown is
+`CRUMBS_RX_ACK_UNKNOWN` (Python raises `AckUnknown`), mismatch is
+`CRUMBS_RX_ACK_MISMATCH` (`AckMismatch`).*
 
 A failed read of the acknowledgement is read again, never answered by sending
 the SET again, so a frame is not applied twice because a read failed.
