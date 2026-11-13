@@ -311,7 +311,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-pictures poppler-utils
+          sudo apt-get install -y --no-install-recommends texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-pictures lmodern poppler-utils
 
       # Compiles only: the SVG bytes depend on the TeX and poppler versions,
       # so they are not diffed against the tree.

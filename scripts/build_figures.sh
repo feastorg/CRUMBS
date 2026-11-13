@@ -30,26 +30,27 @@ for name in "${names[@]}"; do
         exit 1
     fi
     pdftocairo -svg "$tmp/$name.pdf" "$tmp/$name.svg"
-    # pdftocairo gives the root a unitless width and height equal to the
-    # size in points, so a browser shows 1 pt as 1 px and the labels come
-    # out at 7-9 px. Double the declared size; the viewBox keeps the
-    # drawing, and a page narrower than the figure scales it down.
+    # The SVG's viewBox is the figure in points. pdftocairo versions write
+    # the root's width and height differently (poppler 25.03 writes unitless
+    # points, which a browser draws as 1 px per pt, with labels at 7-9 px).
+    # Set both to twice the viewBox, in px, so every poppler gives the same
+    # size; a page narrower than the figure scales it down.
     python3 -I - "$tmp/$name.svg" "$out/$name.svg" <<'EOF'
 import re
 import sys
 
 src, dst = sys.argv[1], sys.argv[2]
 svg = open(src, encoding="utf-8").read()
-
-
-def double(m):
-    return f'{m.group(1)}="{float(m.group(2)) * 2:g}"'
-
-
 root = re.search(r"<svg\b[^>]*>", svg)
-new_root, n = re.subn(r'\b(width|height)="([0-9.]+)"', double, root.group(0))
+box = re.search(r'\bviewBox="[-0-9.]+ [-0-9.]+ ([0-9.]+) ([0-9.]+)"', root.group(0))
+if box is None:
+    sys.exit(f"build_figures: no viewBox in {src}: {root.group(0)}")
+size = {"width": float(box.group(1)) * 2, "height": float(box.group(2)) * 2}
+new_root, n = re.subn(
+    r'\b(width|height)="[^"]*"', lambda m: f'{m.group(1)}="{size[m.group(1)]:g}"', root.group(0)
+)
 if n != 2:
-    sys.exit(f"build_figures: expected a unitless width and height on <svg> in {src}")
+    sys.exit(f"build_figures: no width and height in {src}: {root.group(0)}")
 open(dst, "w", encoding="utf-8").write(svg[: root.start()] + new_root + svg[root.end() :])
 EOF
     echo "build_figures: $out/$name.svg"

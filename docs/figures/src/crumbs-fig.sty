@@ -4,6 +4,10 @@
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesPackage{crumbs-fig}
 
+% T1 + Latin Modern: a real underscore glyph in typewriter labels
+% (OT1 draws \_ as a detached rule) and vector fonts in the SVG.
+\RequirePackage[T1]{fontenc}
+\RequirePackage{lmodern}
 \RequirePackage{xcolor}
 \RequirePackage{tikz}
 \usetikzlibrary{arrows.meta,decorations.pathreplacing,patterns,positioning}
