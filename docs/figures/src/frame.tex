@@ -11,6 +11,10 @@
   \node[field, fill=crumbsData,   minimum width=6cm,   anchor=south west] at (3*\w,0)   {data[0..data\_len)};
   \node[field, fill=crumbsCrc,    minimum width=\w cm, anchor=south west] at (3*\w+6,0) {crc8};
 
+  % row labels, left of the frame
+  \node[note, anchor=south east] at (-0.15, 0.95) {byte offset};
+  \node[note, anchor=north east] at (-0.15, -0.05) {size};
+
   % byte offsets
   \foreach \x/\t in {0/0, \w/1, 2*\w/2, 3*\w/3, 3*\w+6/3\,+\,data\_len}
     \node[note, font=\ttfamily\scriptsize, anchor=south west] at (\x, 0.95) {\t};
