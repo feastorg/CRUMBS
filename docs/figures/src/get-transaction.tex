@@ -1,29 +1,35 @@
 % A GET on the wire (docs/protocol.md#when-the-reply-is-built). Not to scale.
-% Two rows: the SET_REPLY write, then the read.
+% Two I2C transactions, one after the other, each read left to right in time.
 \documentclass[border=6pt]{standalone}
 \usepackage{crumbs-fig}
 \begin{document}
 \begin{tikzpicture}
   \def\w{0.9}
+  \tikzset{stephead/.style={anchor=south west, font=\small, inner sep=0pt}}
 
-  % ---- row 1: the SET_REPLY write --------------------------------------
-  \node[anchor=east, font=\small] at (-0.2, 0.33) {Bus};
+  % ---- step 1: the SET_REPLY write -------------------------------------
+  \node[stephead] at (0, 1.85)
+    {\textbf{1.\ Write:} the controller sends SET\_REPLY, naming opcode \texttt{op}};
   \foreach \i/\t/\c in {0/S/crumbsBus, 1/A+W/crumbsBus, 2/0x00/crumbsHeader,
                         3/0xFE/crumbsHeader, 4/0x01/crumbsHeader, 5/op/crumbsData,
                         6/crc/crumbsCrc, 7/P/crumbsBus}
     \node[cell, fill=\c, minimum width=\w cm, anchor=south west] at (\i*\w, 0) {\t};
   \draw[brace] (2*\w, 0.8) -- (7*\w, 0.8)
-    node[midway, above=6pt, note] {1.\ SET\_REPLY write, 5 bytes: stage opcode \texttt{op}};
+    node[midway, above=6pt, note] {SET\_REPLY frame, 5 bytes};
 
-  \node[anchor=east, font=\small, align=right] at (-0.2, -1.45) {Peripheral};
-  \node[isr, anchor=north west] (rx) at (8*\w, -1.0)
-    {receive callback:\\decode, store \texttt{op}};
+  \node[isr, anchor=north west] (rx) at (8*\w, -0.9)
+    {peripheral's receive callback:\\decodes it, stores \texttt{op}};
   \draw[densely dashed, crumbsNote] (8*\w, 0) -- (rx.north west);
 
-  % ---- row 2: the read, after the pause --------------------------------
-  \begin{scope}[yshift=-4.4cm]
+  % ---- between the steps -----------------------------------------------
+  \draw[-{Stealth[length=5pt]}, crumbsNote, thick] (0.5*\w, -0.2) -- (0.5*\w, -2.2)
+    node[midway, right=4pt, note, align=left] {wait 10\,ms};
+
+  % ---- step 2: the read ------------------------------------------------
+  \begin{scope}[yshift=-4.6cm]
     \def\sw{3.1}
-    \node[anchor=east, font=\small] at (-0.2, 0.33) {Bus};
+    \node[stephead] at (0, 1.85)
+      {\textbf{2.\ Read:} the controller reads 31 bytes; the peripheral answers for \texttt{op}};
     \node[cell, fill=crumbsBus, minimum width=\w cm, anchor=south west] at (0, 0)  {S};
     \node[cell, fill=crumbsBus, minimum width=\w cm, anchor=south west] at (\w, 0) {A+R};
     \node[cell, minimum width=\sw cm, anchor=south west, pattern=north east lines,
@@ -39,16 +45,15 @@
     \node[cell, minimum width=2.2cm, anchor=south west] at (\t, 0) {0xFF\ldots0xFF};
     \node[cell, fill=crumbsBus, minimum width=\w cm, anchor=south west] at (\t+2.2, 0) {P};
     \draw[brace] (\r, 0.8) -- (\t+2.2, 0.8)
-      node[midway, above=6pt, note] {2.\ after a 10\,ms pause, read 31 bytes};
+      node[midway, above=6pt, note] {31 bytes};
 
     \draw[brace, decoration={mirror}] (\r, -0.1) -- (\t, -0.1)
       node[midway, below=6pt, note] {reply frame, \texttt{4\,+\,len} bytes:\\decoded};
     \draw[brace, decoration={mirror}] (\t, -0.1) -- (\t+2.2, -0.1)
       node[midway, below=6pt, note] {tail:\\trimmed first};
 
-    \node[anchor=east, font=\small] at (-0.2, -1.45) {Peripheral};
-    \node[isr, minimum width=\sw cm, anchor=north west] (tx) at (2*\w, -1.0)
-      {request callback:\\builds the reply};
+    \node[isr, minimum width=\sw cm, anchor=north west] (tx) at (2*\w, -0.9)
+      {peripheral's\\request callback:\\builds the reply};
     \draw[densely dashed, crumbsNote] (stretch.south west) -- (tx.north west);
     \draw[densely dashed, crumbsNote] (stretch.south east) -- (tx.north east);
   \end{scope}
