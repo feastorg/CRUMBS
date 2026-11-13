@@ -74,7 +74,7 @@ the status is written. The record is five bytes in the context.
 flowchart TD
     B{{"decodes?"}} -- no --> X1["return -1,<br/>-2 for a CRC<br/>mismatch"]
     B -- yes --> C{{"type<br/>check?"}}
-    C -- fails --> X3["return<br/>CRUMBS_RX_TYPE_MISMATCH<br/>record: rejected"]
+    C -- fails --> X3["return<br/>CRUMBS_RX_TYPE_MISMATCH<br/>record: rejected,<br/>unless 0xFE"]
     C -- passes --> D{{"opcode?"}}
     D -- "0xFE" --> X4["store data[0]<br/>as requested<br/>opcode"]
     D -- other --> E["record:<br/>applied"]
@@ -87,12 +87,9 @@ flowchart TD
 ```
 
 *`crumbs_peripheral_handle_receive()`, run from the receive callback.
-"Record" is the [acknowledgement](protocol.md#get_ack-0xfd-the-set-acknowledgement):
-applied while user code runs, refused if either calls `crumbs_refuse()`, and the
-counter moves last. A CRC mismatch adds one to the CRC error count. Frames
-that do not decode, and SET_REPLY (`0xFE`), are not counted, and a SET_REPLY
-that fails the type check is not recorded. A SET_REPLY with no payload stores
-nothing. Every frame that decodes returns `0` unless it fails the type check.*
+"Record" is the acknowledgement described above. A SET_REPLY with no payload
+stores nothing. Every frame that decodes returns `0` unless it fails the type
+check.*
 
 ### Peripheral: replying
 
@@ -124,7 +121,7 @@ flowchart TD
 
 *`crumbs_peripheral_build_reply()`, run from the request callback. The
 requested opcode is whatever the last SET_REPLY stored, `0x00` after
-initialisation. With nothing written, `out_len` is `0`.*
+initialisation.*
 
 On AVR both entry points run inside the TWI interrupt: reception once the
 controller's write ends, reply construction while the controller's read is held
@@ -182,7 +179,7 @@ sequenceDiagram
     participant P as Peripheral
     C->>P: GET 0x00: version reply
     opt too old, or a short payload
-        Note over C,P: return -7, nothing sent
+        Note over C,P: return CRUMBS_RX_REPLY_MISMATCH,<br/>nothing sent
     end
     C->>P: GET 0xFD: baseline
     loop up to max_sends
@@ -191,7 +188,7 @@ sequenceDiagram
         alt the read fails
             Note over C,P: return the read's code,<br/>never re-send
         else any result but not advanced
-            Note over C,P: return applied, refused,<br/>rejected, -9 or -10
+            Note over C,P: return applied, refused, rejected,<br/>CRUMBS_RX_ACK_MISMATCH<br/>or CRUMBS_RX_ACK_UNKNOWN
         else not advanced
             Note over C,P: send again
         end
@@ -200,12 +197,10 @@ sequenceDiagram
 ```
 
 *`crumbs_controller_send_confirmed()`. "Too old" is a version reply below
-`CRUMBS_ACK_MIN_VERSION`, and a short payload is one under 5 bytes; both
-return `CRUMBS_RX_REPLY_MISMATCH` (`-7`). Each GET is staged with SET_REPLY
-and read up to `CRUMBS_ACK_READ_ATTEMPTS` times; if the version reply or the
-baseline cannot be read, it returns that code with nothing sent. A failed
-write is not taken as a lost frame: the acknowledgement decides. The
-classification is [GET_ACK](protocol.md#get_ack-0xfd-the-set-acknowledgement)'s.*
+`CRUMBS_ACK_MIN_VERSION`, and a short payload is one under 5 bytes. If the
+version reply or the baseline cannot be read, it returns that read's code with
+nothing sent. The classification is
+[GET_ACK](protocol.md#get_ack-0xfd-the-set-acknowledgement)'s.*
 
 ## The family contract
 
@@ -225,11 +220,12 @@ flowchart TD
     H --> F["CRUMBS_DEFINE_FAMILY<br/>type, opcodes"]
     H --> PL["CRUMBS_DEFINE_PAYLOAD<br/>struct, pack,<br/>unpack"]
     H --> W["CRUMBS_DEFINE_SEND_OP<br/>_SEND_OP_0, _GET_OP<br/>wrappers"]
+    F --> W
     PL --> W
     W --> CTRL["controller<br/>firmware"]
     F --> PER["peripheral<br/>firmware"]
     PL --> PER
-    CTRL <-->|"I2C frames"| PER
+    CTRL <-. "I2C frames" .-> PER
 ```
 
 *One header, compiled into both sides. What the compiler checks is below.*

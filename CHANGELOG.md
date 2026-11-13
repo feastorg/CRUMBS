@@ -9,6 +9,7 @@ All notable changes to CRUMBS are documented in this file.
 ### Changed
 
 - The PlatformIO examples' `esp32dev` envs pin `platform = espressif32@7.1.3` (Arduino-ESP32 core 2.0.17). espressif32 8.0.0 moved to core 3, where the `Servo` library the lhwit servo peripheral uses does not build (`ledcSetup` was removed).
+- Documentation: `architecture.md` draws the receive and reply paths, a generated getter, `crumbs_controller_send_confirmed()` and the family contract as Mermaid diagrams, and `protocol.md` draws the GET_ACK classification as a decision tree. The "After the SET" table now calls a changed counter with another opcode a mismatch, as `crumbs_ack_classify()` returns. (#135)
 
 ## [0.17.0] - 2026-10-26
 

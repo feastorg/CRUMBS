@@ -227,7 +227,7 @@ restarts starts again from all zeros:
 | status `0x00` | unknown: the peripheral has counted nothing since it started, which is both a lost first frame and a frame applied before a restart; do not re-send |
 | counter equal to the baseline, record different | unknown: the counter came round, or the peripheral restarted and counted back to it; do not re-send |
 | counter changed, same opcode | the status says applied, refused or rejected |
-| counter changed, another opcode | another frame was dispatched in between; unknown, do not re-send |
+| counter changed, another opcode | mismatch: another frame was dispatched in between; do not re-send |
 
 So the first SET to a peripheral that has counted nothing since it started is
 never re-sent. A restart that brings the record back to exactly the baseline
