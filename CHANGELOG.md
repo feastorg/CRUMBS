@@ -6,6 +6,10 @@ All notable changes to CRUMBS are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- The PlatformIO examples' `esp32dev` envs pin `platform = espressif32@7.1.3` (Arduino-ESP32 core 2.0.17). espressif32 8.0.0 moved to core 3, where the `Servo` library the lhwit servo peripheral uses does not build (`ledcSetup` was removed).
+
 ## [0.17.0] - 2026-10-26
 
 ### Added
