@@ -235,19 +235,20 @@ still reads as not advanced; the counter cannot rule that out.
 
 ```mermaid
 flowchart TD
-    A{"status after the SET<br/>0x00, none?"} -- yes --> U1["unknown, CRUMBS_RX_ACK_UNKNOWN:<br/>do not re-send"]
-    A -- no --> B{"counter equal<br/>to the baseline's?"}
-    B -- yes --> C{"opcode, status and reason<br/>equal too?"}
-    C -- yes --> N["not advanced: send it again"]
-    C -- no --> U2["unknown, CRUMBS_RX_ACK_UNKNOWN:<br/>do not re-send"]
-    B -- no --> D{"opcode the SET's?"}
-    D -- no --> M["another frame came between,<br/>CRUMBS_RX_ACK_MISMATCH: do not re-send"]
-    D -- yes --> S["the status says: applied,<br/>refused or rejected"]
+    A{{"status after<br/>is none?"}} -- yes --> U["unknown:<br/>do not re-send"]
+    A -- no --> B{{"counter<br/>unchanged?"}}
+    B -- yes --> C{{"whole record<br/>unchanged?"}}
+    C -- yes --> N["not advanced:<br/>send again"]
+    C -- no --> U
+    B -- no --> D{{"opcode<br/>the SET's?"}}
+    D -- no --> M["mismatch:<br/>do not re-send"]
+    D -- yes --> S["applied,<br/>refused or<br/>rejected"]
 ```
 
 *The table above, for two valid records, in the order `crumbs_ack_classify()`
-and the Python binding's `classify()` test it (Python raises `AckUnknown` and
-`AckMismatch`).*
+and the Python binding's `classify()` test it. Unknown is
+`CRUMBS_RX_ACK_UNKNOWN` (Python raises `AckUnknown`), mismatch is
+`CRUMBS_RX_ACK_MISMATCH` (`AckMismatch`).*
 
 A failed read of the acknowledgement is read again, never answered by sending
 the SET again, so a frame is not applied twice because a read failed.

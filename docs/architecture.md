@@ -72,25 +72,27 @@ the status is written. The record is five bytes in the context.
 
 ```mermaid
 flowchart TD
-    A["receive callback: the frame's bytes"] --> B{"decodes?"}
-    B -- "no: bad length or header" --> X1["return -1<br/>not counted"]
-    B -- "no: CRC mismatch" --> X2["return -2, CRC error count + 1<br/>not counted"]
-    B -- yes --> C{"type check passes?"}
-    C -- no --> X3["return CRUMBS_RX_TYPE_MISMATCH<br/>counted rejected, reason 0x02<br/>(SET_REPLY is not counted)"]
-    C -- yes --> D{"opcode 0xFE?"}
-    D -- "yes: SET_REPLY" --> X4["data[0], if any, becomes the requested opcode<br/>return 0, not counted"]
-    D -- no --> E["record: applied, provisionally"]
-    E --> F["on_message, if set"]
-    F --> G["SET handler for the opcode, if registered"]
-    G --> H{"did either run?"}
-    H -- no --> I["record: rejected, reason 0x01"]
-    H -- yes --> J["record: applied,<br/>or refused if crumbs_refuse() was called"]
-    I --> K["counter + 1, return 0"]
+    B{{"decodes?"}} -- no --> X1["return -1,<br/>-2 for a CRC<br/>mismatch"]
+    B -- yes --> C{{"type<br/>check?"}}
+    C -- fails --> X3["return<br/>CRUMBS_RX_TYPE_MISMATCH<br/>record: rejected"]
+    C -- passes --> D{{"opcode?"}}
+    D -- "0xFE" --> X4["store data[0]<br/>as requested<br/>opcode"]
+    D -- other --> E["record:<br/>applied"]
+    E --> F["on_message,<br/>then handler"]
+    F --> H{{"either<br/>ran?"}}
+    H -- no --> I["record:<br/>rejected"]
+    H -- yes --> J["applied, or<br/>refused"]
+    I --> K["counter + 1"]
     J --> K
 ```
 
-*`crumbs_peripheral_handle_receive()`. "Counted" is the acknowledgement's
-counter ([GET_ACK](protocol.md#get_ack-0xfd-the-set-acknowledgement)).*
+*`crumbs_peripheral_handle_receive()`, run from the receive callback.
+"Record" is the [acknowledgement](protocol.md#get_ack-0xfd-the-set-acknowledgement):
+applied while user code runs, refused if either calls `crumbs_refuse()`, and the
+counter moves last. A CRC mismatch adds one to the CRC error count. Frames
+that do not decode, and SET_REPLY (`0xFE`), are not counted, and a SET_REPLY
+that fails the type check is not recorded. A SET_REPLY with no payload stores
+nothing. Every frame that decodes returns `0` unless it fails the type check.*
 
 ### Peripheral: replying
 
@@ -109,20 +111,20 @@ untouched, all-zero message, which goes out as the 4-byte frame `00 00 00 00`.
 
 ```mermaid
 flowchart TD
-    A["request callback: the controller is reading"] --> B{"requested opcode 0xFD?"}
-    B -- "yes: GET_ACK" --> R1["the library writes the record:<br/>counter, opcode, status, reason"]
-    B -- no --> C{"reply handler registered<br/>for the requested opcode?"}
-    C -- yes --> R2["the reply handler fills the message"]
-    C -- no --> D{"on_request set?"}
-    D -- yes --> R3["on_request fills the message"]
-    D -- no --> R4["nothing to write: out_len = 0"]
-    R1 --> E["encode: 4 + data_len bytes"]
+    B{{"requested<br/>opcode?"}} -- "0xFD" --> R1["library writes<br/>ACK record"]
+    B -- other --> C{{"reply<br/>handler?"}}
+    C -- yes --> R2["handler fills<br/>the reply"]
+    C -- no --> D{{"on_request?"}}
+    D -- yes --> R3["on_request<br/>fills it"]
+    D -- no --> R4["nothing<br/>written"]
+    R1 --> E["encode<br/>4 + data_len"]
     R2 --> E
     R3 --> E
 ```
 
-*`crumbs_peripheral_build_reply()`. The requested opcode is whatever the last
-SET_REPLY stored, `0x00` after initialisation.*
+*`crumbs_peripheral_build_reply()`, run from the request callback. The
+requested opcode is whatever the last SET_REPLY stored, `0x00` after
+initialisation. With nothing written, `out_len` is `0`.*
 
 On AVR both entry points run inside the TWI interrupt: reception once the
 controller's write ends, reply construction while the controller's read is held
@@ -147,57 +149,60 @@ bytes equal the baseline and the status is not none, up to its bound.
 
 ```mermaid
 sequenceDiagram
-    participant App as Application
+    participant App
     participant Ops as family_get_name()
-    participant Core as Core
-    participant HAL as HAL
+    participant Core
+    participant HAL
     participant P as Peripheral
-    App->>Ops: family_get_name(dev, out)
-    Ops->>Core: crumbs_controller_send(): SET_REPLY, type 0x00, data[0] = the GET opcode
-    Core->>HAL: write_fn(addr, 5-byte frame)
+    App->>Ops: call
+    Ops->>Core: send SET_REPLY<br/>type 0x00, data[0] = opcode
+    Core->>HAL: write_fn: 5 bytes
     HAL->>P: I2C write
-    Note over P: receive callback stores the requested opcode
-    Ops->>HAL: delay_fn(CRUMBS_DEFAULT_QUERY_DELAY_US)
-    Ops->>Core: crumbs_controller_read_expect(type, opcode)
-    Core->>HAL: read_fn(addr, 31 bytes)
+    Note over P: receive callback:<br/>store the opcode
+    Ops->>HAL: delay_fn(query delay)
+    Ops->>Core: read_expect(type, opcode)
+    Core->>HAL: read_fn: 31 bytes
     HAL->>P: I2C read
-    Note over P: request callback builds the reply while SCL is held low
-    P-->>HAL: reply frame, then 0xFF bytes
+    Note over P: request callback:<br/>build the reply<br/>(AVR: SCL held low)
+    P-->>HAL: frame, then 0xFF
     HAL-->>Core: 31 bytes
-    Note over Core: trim to the header's length, decode, check opcode and type
-    Core-->>Ops: the reply message
-    Ops->>Ops: parse_fn(data, data_len, out), usually the payload's unpack
-    Ops-->>App: parse_fn's result, or the first failing step's code
+    Note over Core: trim, decode,<br/>check opcode and type
+    Core-->>Ops: the reply
+    Ops->>Ops: parse_fn(data)
+    Ops-->>App: parse_fn's result,<br/>or the first error
 ```
 
-*A getter generated by `CRUMBS_DEFINE_GET_OP`. A failing step returns at
-once; nothing is retried.*
+*A getter generated by `CRUMBS_DEFINE_GET_OP`. The pause is
+`CRUMBS_DEFAULT_QUERY_DELAY_US`. A failing step returns at once; nothing is
+retried.*
 
 ```mermaid
 sequenceDiagram
-    participant C as crumbs_controller_send_confirmed()
+    participant C as send_confirmed()
     participant P as Peripheral
-    C->>P: GET opcode 0x00: the version reply
-    opt version below CRUMBS_ACK_MIN_VERSION, or a payload under 5 bytes
-        Note over C: return -7, nothing sent
+    C->>P: GET 0x00: version reply
+    opt too old, or a short payload
+        Note over C,P: return -7, nothing sent
     end
-    C->>P: GET 0xFD: the baseline acknowledgement
+    C->>P: GET 0xFD: baseline
     loop up to max_sends
-        C->>P: the SET frame, its write result ignored
-        C->>P: GET 0xFD: the acknowledgement after it
-        alt the acknowledgement cannot be read
-            Note over C: return the read's code, never re-send
-        else classified other than not advanced
-            Note over C: return applied, refused, rejected, -9 or -10
+        C->>P: the SET (write result ignored)
+        C->>P: GET 0xFD: after
+        alt the read fails
+            Note over C,P: return the read's code,<br/>never re-send
+        else any result but not advanced
+            Note over C,P: return applied, refused,<br/>rejected, -9 or -10
         else not advanced
-            Note over C: send again
+            Note over C,P: send again
         end
     end
-    Note over C: return CRUMBS_SET_NOT_ADVANCED
+    Note over C,P: return CRUMBS_SET_NOT_ADVANCED
 ```
 
-*`crumbs_controller_send_confirmed()`. Each GET is staged with SET_REPLY and
-read up to `CRUMBS_ACK_READ_ATTEMPTS` times; if the version reply or the
+*`crumbs_controller_send_confirmed()`. "Too old" is a version reply below
+`CRUMBS_ACK_MIN_VERSION`, and a short payload is one under 5 bytes; both
+return `CRUMBS_RX_REPLY_MISMATCH` (`-7`). Each GET is staged with SET_REPLY
+and read up to `CRUMBS_ACK_READ_ATTEMPTS` times; if the version reply or the
 baseline cannot be read, it returns that code with nothing sent. A failed
 write is not taken as a lost frame: the acknowledgement decides. The
 classification is [GET_ACK](protocol.md#get_ack-0xfd-the-set-acknowledgement)'s.*
@@ -215,22 +220,19 @@ A family is one header shared by controller and peripheral firmware:
   over a `crumbs_device_t` that binds context, address and bus functions.
 
 ```mermaid
-flowchart LR
-    H["family header, e.g. lhwit_family/led_ops.h"]
-    H --> F["CRUMBS_DEFINE_FAMILY<br/>type_id and opcode constants"]
-    H --> PL["CRUMBS_DEFINE_PAYLOAD<br/>struct, wire size, pack, unpack"]
-    H --> W["CRUMBS_DEFINE_SEND_OP, _SEND_OP_0, _GET_OP<br/>one function per operation"]
-    F -.- CF["build fails: type outside 0x01-0xFF,<br/>opcode outside 0x00-0xFF, 0xFD, 0xFE, a duplicate"]
-    PL -.- CP["build fails: fields do not sum<br/>to the size, size 0 or over 27"]
-    F --> W
+flowchart TD
+    H["family header<br/>(led_ops.h)"]
+    H --> F["CRUMBS_DEFINE_FAMILY<br/>type, opcodes"]
+    H --> PL["CRUMBS_DEFINE_PAYLOAD<br/>struct, pack,<br/>unpack"]
+    H --> W["CRUMBS_DEFINE_SEND_OP<br/>_SEND_OP_0, _GET_OP<br/>wrappers"]
     PL --> W
-    W --> CTRL["controller firmware"]
-    F --> PER["peripheral firmware:<br/>handlers registered per opcode"]
+    W --> CTRL["controller<br/>firmware"]
+    F --> PER["peripheral<br/>firmware"]
     PL --> PER
-    CTRL <-->|"frames on I2C"| PER
+    CTRL <-->|"I2C frames"| PER
 ```
 
-*One header, compiled into both sides. Dotted lines are compile-time checks.*
+*One header, compiled into both sides. What the compiler checks is below.*
 
 What the compiler enforces: the type is `0x01`–`0xFF`; every opcode is
 `0x00`–`0xFF`, not `0xFD` or `0xFE`, and distinct from the others (a duplicate would
