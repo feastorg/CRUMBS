@@ -1,60 +1,56 @@
 % A GET on the wire (docs/protocol.md#when-the-reply-is-built). Not to scale.
+% Two rows: the SET_REPLY write, then the read.
 \documentclass[border=6pt]{standalone}
 \usepackage{crumbs-fig}
 \begin{document}
 \begin{tikzpicture}
-  \def\w{0.75}
+  \def\w{0.9}
 
-  % lane labels
-  \node[anchor=east, font=\small] at (-0.2, 0.3)  {Bus};
-  \node[anchor=east, font=\small] at (-0.2, -1.6) {Peripheral};
-  \node[anchor=east, note]        at (-0.2, -2.0) {(TWI interrupt)};
-
-  % SET_REPLY write: S, address+W, the five-byte frame, P
+  % ---- row 1: the SET_REPLY write --------------------------------------
+  \node[anchor=east, font=\small] at (-0.2, 0.33) {Bus};
   \foreach \i/\t/\c in {0/S/crumbsBus, 1/A+W/crumbsBus, 2/type/crumbsHeader,
                         3/0xFE/crumbsHeader, 4/0x01/crumbsHeader, 5/op/crumbsData,
                         6/crc/crumbsCrc, 7/P/crumbsBus}
     \node[cell, fill=\c, minimum width=\w cm, anchor=south west] at (\i*\w, 0) {\t};
-  \draw[brace] (0, 0.75) -- (8*\w, 0.75)
-    node[midway, above=6pt, note] {SET\_REPLY write: stage opcode \texttt{op}};
+  \draw[brace] (0, 0.8) -- (8*\w, 0.8)
+    node[midway, above=6pt, note] {1.\ SET\_REPLY write: stage opcode \texttt{op}};
 
-  % the pause
-  \draw[{Latex}-{Latex}] (8*\w+0.1, 0.3) -- (8.6-0.1, 0.3)
-    node[midway, above, note] {pause}
-    node[midway, below, note, font=\ttfamily\scriptsize] {10 ms};
-
-  % the read: S, address+R, the stretch, the reply frame, the 0xFF tail, P
-  \node[cell, fill=crumbsBus, minimum width=\w cm, anchor=south west] at (8.6, 0)        {S};
-  \node[cell, fill=crumbsBus, minimum width=\w cm, anchor=south west] at (8.6+\w, 0)     {A+R};
-  \def\sw{2.6}
-  \node[cell, minimum width=\sw cm, anchor=south west, pattern=north east lines,
-        pattern color=crumbsStretch!45] (stretch) at (8.6+2*\w, 0) {};
-  \node[fill=white, inner sep=1.5pt, font=\scriptsize, text=crumbsStretch]
-    at (stretch.center) {SCL held low};
-  \def\r{8.6+2*\w+\sw}
-  \foreach \i/\t/\c in {0/type/crumbsHeader, 1/op/crumbsHeader, 2/len/crumbsHeader}
-    \node[cell, fill=\c, minimum width=\w cm, anchor=south west] at (\r+\i*\w, 0) {\t};
-  \node[cell, fill=crumbsData, minimum width=1.5cm, anchor=south west] at (\r+3*\w, 0) {data\ldots};
-  \node[cell, fill=crumbsCrc, minimum width=\w cm, anchor=south west] at (\r+3*\w+1.5, 0) {crc};
-  \def\t{\r+4*\w+1.5}
-  \node[cell, minimum width=2cm, anchor=south west] at (\t, 0) {0xFF\ldots0xFF};
-  \node[cell, fill=crumbsBus, minimum width=\w cm, anchor=south west] at (\t+2, 0) {P};
-  \draw[brace] (8.6, 0.75) -- (\t+2+\w, 0.75)
-    node[midway, above=6pt, note] {read of 31 bytes};
-
-  \draw[brace, decoration={mirror}] (\r, -0.1) -- (\t, -0.1)
-    node[midway, below=6pt, note] {reply frame, \texttt{4\,+\,len} bytes:\\decoded};
-  \draw[brace, decoration={mirror}] (\t, -0.1) -- (\t+2, -0.1)
-    node[midway, below=6pt, note] {tail:\\trimmed first};
-
-  % peripheral interrupt work
-  \node[isr, minimum width=1.9cm, anchor=north west] (rx) at (8*\w, -1.15)
-    {receive callback\\decode, store \texttt{op}};
+  \node[anchor=east, font=\small, align=right] at (-0.2, -1.45) {Peripheral};
+  \node[isr, anchor=north west] (rx) at (8*\w, -1.0)
+    {receive callback:\\decode, store \texttt{op}};
   \draw[densely dashed, crumbsNote] (8*\w, 0) -- (rx.north west);
 
-  \node[isr, minimum width=\sw cm, anchor=north west] (tx) at (8.6+2*\w, -1.15)
-    {request callback\\builds the reply};
-  \draw[densely dashed, crumbsNote] (stretch.south west) -- (tx.north west);
-  \draw[densely dashed, crumbsNote] (stretch.south east) -- (tx.north east);
+  % ---- row 2: the read, after the pause --------------------------------
+  \begin{scope}[yshift=-4.4cm]
+    \def\sw{2.7}
+    \node[anchor=east, font=\small] at (-0.2, 0.33) {Bus};
+    \node[cell, fill=crumbsBus, minimum width=\w cm, anchor=south west] at (0, 0)  {S};
+    \node[cell, fill=crumbsBus, minimum width=\w cm, anchor=south west] at (\w, 0) {A+R};
+    \node[cell, minimum width=\sw cm, anchor=south west, pattern=north east lines,
+          pattern color=crumbsStretch!45] (stretch) at (2*\w, 0) {};
+    \node[fill=white, inner sep=1.5pt, font=\footnotesize, text=crumbsStretch]
+      at (stretch.center) {SCL held low};
+    \def\r{2*\w+\sw}
+    \foreach \i/\t/\c in {0/type/crumbsHeader, 1/op/crumbsHeader, 2/len/crumbsHeader}
+      \node[cell, fill=\c, minimum width=\w cm, anchor=south west] at (\r+\i*\w, 0) {\t};
+    \node[cell, fill=crumbsData, minimum width=1.6cm, anchor=south west] at (\r+3*\w, 0) {data\ldots};
+    \node[cell, fill=crumbsCrc, minimum width=\w cm, anchor=south west] at (\r+3*\w+1.6, 0) {crc};
+    \def\t{\r+4*\w+1.6}
+    \node[cell, minimum width=2.2cm, anchor=south west] at (\t, 0) {0xFF\ldots0xFF};
+    \node[cell, fill=crumbsBus, minimum width=\w cm, anchor=south west] at (\t+2.2, 0) {P};
+    \draw[brace] (0, 0.8) -- (\t+2.2+\w, 0.8)
+      node[midway, above=6pt, note] {2.\ after a 10\,ms pause, read 31 bytes};
+
+    \draw[brace, decoration={mirror}] (\r, -0.1) -- (\t, -0.1)
+      node[midway, below=6pt, note] {reply frame, \texttt{4\,+\,len} bytes:\\decoded};
+    \draw[brace, decoration={mirror}] (\t, -0.1) -- (\t+2.2, -0.1)
+      node[midway, below=6pt, note] {tail:\\trimmed first};
+
+    \node[anchor=east, font=\small] at (-0.2, -1.45) {Peripheral};
+    \node[isr, minimum width=\sw cm, anchor=north west] (tx) at (2*\w, -1.0)
+      {request callback:\\builds the reply};
+    \draw[densely dashed, crumbsNote] (stretch.south west) -- (tx.north west);
+    \draw[densely dashed, crumbsNote] (stretch.south east) -- (tx.north east);
+  \end{scope}
 \end{tikzpicture}
 \end{document}

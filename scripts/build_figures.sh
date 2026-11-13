@@ -29,6 +29,28 @@ for name in "${names[@]}"; do
         echo "build_figures: $name.tex failed" >&2
         exit 1
     fi
-    pdftocairo -svg "$tmp/$name.pdf" "$out/$name.svg"
+    pdftocairo -svg "$tmp/$name.pdf" "$tmp/$name.svg"
+    # pdftocairo gives the root a unitless width and height equal to the
+    # size in points, so a browser shows 1 pt as 1 px and the labels come
+    # out at 7-9 px. Double the declared size; the viewBox keeps the
+    # drawing, and a page narrower than the figure scales it down.
+    python3 -I - "$tmp/$name.svg" "$out/$name.svg" <<'EOF'
+import re
+import sys
+
+src, dst = sys.argv[1], sys.argv[2]
+svg = open(src, encoding="utf-8").read()
+
+
+def double(m):
+    return f'{m.group(1)}="{float(m.group(2)) * 2:g}"'
+
+
+root = re.search(r"<svg\b[^>]*>", svg)
+new_root, n = re.subn(r'\b(width|height)="([0-9.]+)"', double, root.group(0))
+if n != 2:
+    sys.exit(f"build_figures: expected a unitless width and height on <svg> in {src}")
+open(dst, "w", encoding="utf-8").write(svg[: root.start()] + new_root + svg[root.end() :])
+EOF
     echo "build_figures: $out/$name.svg"
 done
