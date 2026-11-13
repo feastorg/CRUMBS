@@ -12,8 +12,8 @@
                         3/0xFE/crumbsHeader, 4/0x01/crumbsHeader, 5/op/crumbsData,
                         6/crc/crumbsCrc, 7/P/crumbsBus}
     \node[cell, fill=\c, minimum width=\w cm, anchor=south west] at (\i*\w, 0) {\t};
-  \draw[brace] (0, 0.8) -- (8*\w, 0.8)
-    node[midway, above=6pt, note] {1.\ SET\_REPLY write: stage opcode \texttt{op}};
+  \draw[brace] (2*\w, 0.8) -- (7*\w, 0.8)
+    node[midway, above=6pt, note] {1.\ SET\_REPLY write, 5 bytes: stage opcode \texttt{op}};
 
   \node[anchor=east, font=\small, align=right] at (-0.2, -1.45) {Peripheral};
   \node[isr, anchor=north west] (rx) at (8*\w, -1.0)
@@ -38,7 +38,7 @@
     \def\t{\r+4*\w+1.6}
     \node[cell, minimum width=2.2cm, anchor=south west] at (\t, 0) {0xFF\ldots0xFF};
     \node[cell, fill=crumbsBus, minimum width=\w cm, anchor=south west] at (\t+2.2, 0) {P};
-    \draw[brace] (0, 0.8) -- (\t+2.2+\w, 0.8)
+    \draw[brace] (\r, 0.8) -- (\t+2.2, 0.8)
       node[midway, above=6pt, note] {2.\ after a 10\,ms pause, read 31 bytes};
 
     \draw[brace, decoration={mirror}] (\r, -0.1) -- (\t, -0.1)
