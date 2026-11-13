@@ -234,14 +234,15 @@ still reads as not advanced; the counter cannot rule that out.
 
 ```mermaid
 flowchart TD
-    A{{"status after<br/>is none?"}} -- yes --> U["unknown:<br/>do not re-send"]
-    A -- no --> B{{"counter<br/>unchanged?"}}
-    B -- yes --> C{{"whole record<br/>unchanged?"}}
+    S(["ACK record read<br/>after the SET,<br/>vs. the baseline"]) --> A{{"status is<br/>none (0x00)?"}}
+    A -- yes --> U["unknown:<br/>do not re-send"]
+    A -- no --> B{{"counter same<br/>as baseline?"}}
+    B -- yes --> C{{"all four bytes<br/>same as baseline?"}}
     C -- yes --> N["not advanced:<br/>send again"]
     C -- no --> U
-    B -- no --> D{{"opcode<br/>the SET's?"}}
+    B -- no --> D{{"opcode is<br/>the SET's?"}}
     D -- no --> M["mismatch:<br/>do not re-send"]
-    D -- yes --> S["applied,<br/>refused or<br/>rejected"]
+    D -- yes --> SS["SET counted:<br/>the status says<br/>applied, refused<br/>or rejected"]
 ```
 
 *The table above, for two valid records, in the order `crumbs_ack_classify()`
