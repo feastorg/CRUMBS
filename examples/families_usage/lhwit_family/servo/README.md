@@ -5,10 +5,13 @@ autonomous sweep.
 
 ## Hardware
 
-Arduino Nano; servo signal on D9 (index 0) and D10 (index 1); A4/A5 to the
-bus. **Power the servos from a separate 5 V supply** with ground common to the
-Nano. `SERVO_PIN_0/1`, `NUM_SERVOS` and `UPDATE_INTERVAL_MS` in `src/main.cpp`;
-uses the Arduino `Servo` library.
+Arduino Nano: servo signal on D9 (index 0) and D10 (index 1); A4/A5 to the
+bus. ESP32 dev module (env `esp32dev`): servo signal on GPIO 18 and 19, since
+GPIO 9 and 10 belong to the module's flash; GPIO 21/22 to the bus. **Power the
+servos from a separate 5 V supply** with ground common to the board.
+`SERVO_PIN_0/1`, `NUM_SERVOS` and `UPDATE_INTERVAL_MS` in `src/main.cpp`. The
+AVR envs use the Arduino `Servo` library; `esp32dev` uses `ESP32Servo`, because
+`Servo` does not build on Arduino-ESP32 core 3.
 
 ## Protocol (`../servo_ops.h`)
 
@@ -33,7 +36,7 @@ Wrappers, each taking a pointer to its payload struct:
 ## Serial
 
 115200 baud. Boot prints `=== CRUMBS Servo Controller Peripheral ===`, the
-address, type, `Servos: 2 (D9, D10)`, a power warning and `Servo controller
+address, type, `Servos: 2 (D9, D10)` (`GPIO18, GPIO19` on ESP32), a power warning and `Servo controller
 peripheral ready!`. Each SET prints one line, e.g.
 `SET_POS: Servo 0 target=45 (current=90, speed=0)`, or `SET_POS: Invalid
 servo index 2`.
