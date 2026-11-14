@@ -5,16 +5,15 @@
  * This peripheral demonstrates a position-control interface with:
  * - SET operations (0x01-0x03): Control servo positions, speed, and sweep
  * - GET operations (0x80-0x81): Query current positions and settings
- * - 2 servo motors on PWM pins D9-D10
+ * - 2 servo motors on PWM pins
  * - Speed-limited smooth movement
  * - Sweep patterns for automated testing
  *
  * Hardware:
- * - Arduino Nano (ATmega328P)
+ * - Arduino Nano (ATmega328P): servos on D9 and D10, I2C on A4 (SDA), A5 (SCL)
+ * - ESP32 dev module: servos on GPIO 18 and 19 (GPIO 9 and 10 belong to the
+ *   module's flash), I2C on GPIO 21 (SDA), 22 (SCL)
  * - I2C address: 0x30
- * - Servo 0: Pin 9 (D9)
- * - Servo 1: Pin 10 (D10)
- * - I2C pins: A4 (SDA), A5 (SCL)
  *
  * **IMPORTANT:** Servos draw significant current. Use external 5V power supply
  * for reliable operation, especially when controlling multiple servos.
@@ -29,7 +28,11 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#if defined(ARDUINO_ARCH_ESP32)
+#include <ESP32Servo.h> /* Arduino's Servo does not build on Arduino-ESP32 core 3 */
+#else
 #include <Servo.h>
+#endif
 #include <crumbs.h>
 #include <crumbs_arduino.h>
 #include <crumbs_message_helpers.h>
@@ -44,9 +47,16 @@
 #define PERIPHERAL_ADDR 0x30
 #define NUM_SERVOS 2
 
-/* Servo pins (PWM-capable on Arduino Nano) */
+/* Servo pins (PWM-capable) */
+#if defined(ARDUINO_ARCH_ESP32)
+#define SERVO_PIN_0 18
+#define SERVO_PIN_1 19
+#define SERVO_PINS_TEXT "GPIO18, GPIO19"
+#else
 #define SERVO_PIN_0 9
 #define SERVO_PIN_1 10
+#define SERVO_PINS_TEXT "D9, D10"
+#endif
 
 /* Update interval for smooth movement and sweep */
 #define UPDATE_INTERVAL_MS 20
@@ -382,7 +392,7 @@ void setup()
     Serial.println(PERIPHERAL_ADDR, HEX);
     Serial.print(F("Type ID: 0x"));
     Serial.println(SERVO_TYPE_ID, HEX);
-    Serial.println(F("Servos: 2 (D9, D10)"));
+    Serial.println(F("Servos: 2 (" SERVO_PINS_TEXT ")"));
     Serial.println(F("WARNING: Use external 5V power for servos!"));
     Serial.println();
 
