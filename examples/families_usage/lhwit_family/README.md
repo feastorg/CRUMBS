@@ -24,6 +24,29 @@ onboard pull-ups are enough, and the bus runs at 3.3 V — do not add pull-ups
 to 5 V. Servos need their own 5 V supply sharing ground with the Nano; the
 Nano's 5 V pin cannot source them.
 
+```mermaid
+flowchart TB
+    PI["Raspberry Pi or<br/>Linux host: the<br/>controller, with<br/>its pull-ups"]
+    BUS["I²C bus at 3.3 V:<br/>SDA, SCL and a<br/>common ground"]
+    LED["LED array<br/>address 0x20<br/>type_id 0x01"]
+    SRV["Servo<br/>address 0x30<br/>type_id 0x02"]
+    CAL["Calculator<br/>address 0x10<br/>type_id 0x03"]
+    DSP["Display<br/>address 0x40<br/>type_id 0x04"]
+    MOT["2 servos<br/>on D9, D10"]
+    PSU["separate 5 V<br/>supply"]
+
+    PI --- BUS
+    BUS --- LED
+    BUS --- SRV
+    BUS --- CAL
+    BUS --- DSP
+    SRV -- "signal" --- MOT
+    PSU -- "power" --- MOT
+    PSU -. "ground shared<br/>with the Nano" .- SRV
+```
+
+*Each peripheral is a Nano on A4 (SDA) and A5 (SCL).*
+
 ## Build and flash the peripherals
 
 Each device is a PlatformIO project with envs `nanoatmega328new` (default),
