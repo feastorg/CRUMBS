@@ -298,7 +298,11 @@ expected type is `0x00`.
 
 CRUMBS uses 7-bit addressing. I²C reserves `0x00`–`0x07` and `0x78`–`0x7F`,
 leaving `0x08`–`0x77`. Within it,
-avoid addresses another standard on the same bus may drive, worst first:
+avoid addresses another standard on the same bus may drive.
+
+![The 7-bit address space 0x00 to 0x7F as a strip. 0x00–0x07 and 0x78–0x7F are reserved by I²C. Bands to avoid: 0x08–0x0B SMBus host, charger, battery; 0x0C SMBus Alert Response; 0x48–0x4B SMBus prototype; 0x50–0x57 EEPROM and DIMM SPD; 0x61 SMBus ARP default. 0x10–0x17 are the examples' defaults. The rest is free.](figures/address-map.svg)
+
+Why each band is one to avoid, worst first:
 
 | Avoid          | Why                                                             |
 | -------------- | --------------------------------------------------------------- |
@@ -321,12 +325,13 @@ told apart by address. Each type owns an independent opcode space.
 
 ### `opcode`
 
-| Value         | Status                                                     |
-| ------------- | ---------------------------------------------------------- |
-| `0xFE`        | Reserved: SET_REPLY.                                       |
-| `0xFD`        | Reserved: GET_ACK, the SET acknowledgement (protocol 1.1). |
-| `0x00`        | Convention: version information (below).                   |
-| all others    | Free per type. Convention: SET commands low, GET queries from `0x80` up, so a reply's opcode says what it is. |
+![The opcode space of one type, not to scale: 0x00 version; 0x01–0x7F SET commands; 0x80–0xFC GET queries; 0xFD GET_ACK and 0xFE SET_REPLY, reserved by the library; 0xFF a GET query. Everything but 0xFD and 0xFE is free per type, and the names are the convention.](figures/opcode-map.svg)
+
+`0xFE` (SET_REPLY) and `0xFD` (GET_ACK, the SET acknowledgement, since
+protocol 1.1) are reserved. Every other opcode is free per type. By
+convention `0x00` is [version information](#opcode-0x00-version-information),
+SET commands sit low and GET queries from `0x80` up, so a reply's opcode says
+what it is.
 
 `0x00` is an ordinary opcode to the library; only the convention gives it
 meaning.

@@ -1,0 +1,27 @@
+% The opcode space of one type_id (docs/protocol.md#opcode). Not to scale.
+\documentclass[border=6pt]{standalone}
+\usepackage{crumbs-fig}
+\begin{document}
+\begin{tikzpicture}
+  \tikzset{seg/.style={draw, minimum height=1.2cm, inner sep=1pt, anchor=south west,
+                       align=center, font=\footnotesize}}
+  \colorlet{resv}{black!30}
+  % \seg{x}{width}{fill}{range}{meaning}
+  \newcommand\seg[5]{\node[seg, fill=#3, minimum width=#2 cm] at (#1, 0)
+    {\texttt{#4}\\[2pt]#5};}
+
+  \seg{0}{1.6}{crumbsHeader}{0x00}{version}
+  \seg{1.6}{3.9}{crumbsData}{0x01--0x7F}{SET commands}
+  \seg{5.5}{3.9}{crumbsIsr}{0x80--0xFC}{GET queries}
+  \seg{9.4}{1.9}{resv}{0xFD}{GET\_ACK}
+  \seg{11.3}{1.9}{resv}{0xFE}{SET\_REPLY}
+  \seg{13.2}{1.6}{crumbsIsr}{0xFF}{GET query}
+
+  \draw[brace, decoration={mirror}] (9.4,-0.1) -- (13.2,-0.1)
+    node[midway, below=6pt, note] {reserved by the library};
+  \draw[brace, decoration={mirror}] (0,-0.1) -- (9.4,-0.1)
+    node[midway, below=6pt, note] {free per type; the names are the convention};
+  \draw[brace, decoration={mirror}] (13.2,-0.1) -- (14.8,-0.1)
+    node[midway, below=6pt, note] {free};
+\end{tikzpicture}
+\end{document}

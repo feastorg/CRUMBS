@@ -1,0 +1,59 @@
+% The 7-bit I2C address space (docs/protocol.md#ic-address).
+\documentclass[border=6pt]{standalone}
+\usepackage{crumbs-fig}
+\begin{document}
+\begin{tikzpicture}
+  \def\u{0.11}  % cm per address
+  \tikzset{
+    band/.style={draw, minimum height=0.7cm, inner sep=0pt, anchor=south west},
+    lab/.style={note, anchor=north west, align=left, inner sep=1pt},
+    lead/.style={crumbsNote, thin},
+    key/.style={draw, minimum width=0.35cm, minimum height=0.3cm, inner sep=0pt},
+  }
+  % \band{first}{count}{fill}
+  \newcommand\band[3]{\node[band, fill=#3, minimum width=#2*\u cm] at (#1*\u, 0) {};}
+  % \lab{first}{depth}{text}: a label below the strip, its leader at the band's start
+  \newcommand\lab[3]{%
+    \draw[lead] (#1*\u+0.04, 0) -- (#1*\u+0.04, -#2);
+    \node[lab] at (#1*\u, -#2) {#3};}
+  \colorlet{resv}{black!45}
+  \colorlet{avoid}{crumbsStretch!35}
+  \colorlet{dflt}{green!45!black!35}
+
+  \node[band, fill=white, minimum width=128*\u cm] at (0, 0) {};
+  \band{0}{8}{resv}
+  \band{8}{4}{avoid}
+  \band{12}{1}{avoid}
+  \band{16}{8}{dflt}
+  \band{72}{4}{avoid}
+  \band{80}{8}{avoid}
+  \band{97}{1}{avoid}
+  \band{120}{8}{resv}
+
+  % address ticks above the strip
+  \foreach \a/\t in {0/0x00, 16/0x10, 32/0x20, 48/0x30, 64/0x40, 80/0x50, 96/0x60, 112/0x70}
+    \draw (\a*\u, 0.7) -- (\a*\u, 0.85) node[above, note, font=\ttfamily\scriptsize] {\t};
+  \draw (127.5*\u, 0.7) -- (127.5*\u, 0.85) node[above, note, font=\ttfamily\scriptsize] {0x7F};
+
+  % labels, deeper for the bands further left so no leader crosses a label
+  \lab{0}{2.05}{\texttt{0x00}--\texttt{0x07} reserved by I\textsuperscript{2}C}
+  \lab{8}{1.6}{\texttt{0x08}--\texttt{0x0B} SMBus host, charger, battery}
+  \lab{12}{1.15}{\texttt{0x0C} SMBus Alert Response}
+  \lab{16}{0.7}{\texttt{0x10}--\texttt{0x17} the examples' defaults}
+  \lab{72}{1.15}{\texttt{0x48}--\texttt{0x4B} SMBus prototype}
+  \lab{80}{0.7}{\texttt{0x50}--\texttt{0x57} EEPROM, DIMM SPD}
+  \draw[lead] (97*\u+0.04, 0) -- (97*\u+0.04, -1.6);
+  \node[lab, anchor=north east] at (97*\u+0.08, -1.6) {\texttt{0x61} SMBus ARP default};
+  \draw[lead] (127.6*\u, 0) -- (127.6*\u, -2.05);
+  \node[lab, anchor=north east] at (128*\u, -2.05)
+    {\texttt{0x78}--\texttt{0x7F} reserved by I\textsuperscript{2}C};
+
+  % key
+  \begin{scope}[shift={(0, -3.1)}]
+    \foreach \x/\c/\t in {0/resv/reserved by I\textsuperscript{2}C, 3.6/avoid/avoid: another standard may drive it,
+                          9.4/dflt/the examples' defaults, 13.0/white/free}
+      { \node[key, fill=\c, anchor=west] at (\x, 0) {};
+        \node[note, anchor=west] at (\x+0.4, 0) {\t}; }
+  \end{scope}
+\end{tikzpicture}
+\end{document}
