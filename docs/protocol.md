@@ -179,9 +179,7 @@ Since protocol 1.1 (library 0.16.0) a peripheral keeps a record of the command
 frames it receives, and the library answers the reserved query `0xFD` with it.
 A controller stages `0xFD` with SET_REPLY like any GET and reads:
 
-```text
-[type][0xFD][0x04][counter][opcode][status][reason][crc]
-```
+![The GET_ACK reply, eight bytes: type_id at offset 0 (the peripheral's type, or 0x00), 0xFD, 0x04, then the four-byte ACK record — counter, opcode, status, reason — at offsets 3 to 6, and crc8 at offset 7 over bytes 0 to 6.](figures/get-ack-reply.svg)
 
 | Byte | Content |
 | --- | --- |
@@ -335,14 +333,11 @@ meaning.
 
 ### Opcode `0x00`: version information
 
-A peripheral should answer opcode `0x00` with five bytes:
+A peripheral should answer opcode `0x00` with five bytes: the
+`CRUMBS_VERSION` of the library it was built with, little-endian, then its
+module version as major, minor and patch.
 
-| Byte  | Content                                                 |
-| ----- | ------------------------------------------------------- |
-| 0–1   | `CRUMBS_VERSION` of the library the peripheral was built with, little-endian |
-| 2     | module major                                            |
-| 3     | module minor                                            |
-| 4     | module patch                                            |
+![The version reply, nine bytes: type_id, 0x00, 0x05, then the five-byte payload — CRUMBS_VERSION low byte and high byte at offsets 3 and 4, then the module's major, minor and patch at offsets 5 to 7 — and crc8 at offset 8 over bytes 0 to 7.](figures/version-reply.svg)
 
 `crumbs_build_version_reply(reply, type_id, major, minor, patch)` produces
 exactly this frame. A controller that reads it can tell the device's type,
