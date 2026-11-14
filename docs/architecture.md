@@ -217,6 +217,28 @@ version reply or the baseline cannot be read, it returns that read's code with
 nothing sent. The classification is
 [GET_ACK](protocol.md#get_ack-0xfd-the-set-acknowledgement)'s.*
 
+A generated C getter (`CRUMBS_DEFINE_GET_OP`) tries once. The Python
+binding's `Controller.query` repeats the
+whole GET when asking again can fix it; its reasons are in the
+[binding's README](../bindings/python/README.md#what-it-does).
+
+```mermaid
+flowchart TD
+    S(["Controller.query()"]) --> W["write SET_REPLY,<br/>wait 10 ms,<br/>read 31 bytes"]
+    W --> R{{"what came<br/>back?"}}
+    R -- "the reply asked for" --> OK["return it"]
+    R -- "corrupt:<br/>FrameError" --> T{{"three attempts<br/>made?"}}
+    R -- "same device,<br/>another opcode:<br/>ReplyMismatch" --> T
+    R -- "no answer:<br/>ENXIO, EREMOTEIO,<br/>EIO, ETIMEDOUT,<br/>EAGAIN" --> T
+    R -- "another type_id:<br/>ReplyMismatch" --> X["raise it<br/>at once"]
+    R -- "any other<br/>OSError" --> X
+    T -- no --> W
+    T -- yes --> L["raise the<br/>last error"]
+```
+
+*`Controller.query()` in `crumbs_i2c`. Three is the default `query_attempts`;
+"another type_id" applies only when `type_id=` names one.*
+
 ## The family contract
 
 A family is one header shared by controller and peripheral firmware:
