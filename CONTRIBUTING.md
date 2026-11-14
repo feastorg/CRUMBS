@@ -96,6 +96,18 @@ checks that every source has an SVG and compiles, but does not diff the
 SVGs, since their bytes depend on the TeX and poppler versions. Diagrams of flow or
 structure go inline as Mermaid, which GitHub renders.
 
+A figure has to read without the code beside it. Name what each row, lane or
+step is in the figure itself: a heading per step, an arrow and a label for
+order, a start node that says what triggers a flowchart, and questions a
+reader can answer yes or no. Nothing CI runs looks at a figure, so render each
+one before committing: `mmdc -i f.mmd -o f.png` for Mermaid (CI does not
+render it; GitHub is the first renderer), the built SVG for TikZ. Mermaid
+wraps a box's text by width, at roughly 15 characters a line by eye, which can
+break a phrase mid-way: split lines yourself with `<br/>`, and prefer the
+hexagon `{{"…"}}` to the diamond for a decision, since it is shorter. Keep each
+figure narrower than github.com's content column (about 880 px); a wider one
+is scaled down until its text is small.
+
 The docs follow two rules. **One home per fact**: signatures and return codes
 live in the headers; the wire format lives in `docs/protocol.md`; everything
 else links to them. **They describe HEAD**: not the last release, and not
