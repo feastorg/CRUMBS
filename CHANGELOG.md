@@ -14,6 +14,7 @@ All notable changes to CRUMBS are documented in this file.
 - Documentation: `protocol.md` draws where the clock stretch starts when a transfer addresses a peripheral whose receive callback is still running: after the address ACK on the ATmega328P core, before it on the megaAVR core, and around all of receive processing for a megaAVR repeated-start read. (#139)
 - Documentation: `protocol.md` draws the GET_ACK reply and the version reply byte by byte, in place of the GET_ACK text line and the version reply's offset table. (#139)
 - Documentation: `protocol.md` draws the I²C address map, with the reserved bands, the bands to avoid and the examples' defaults, and the opcode map of a type, in place of the opcode table. (#139)
+- Documentation: `architecture.md` draws its layers as a Mermaid diagram in place of the ASCII one, with the core calling the HAL through the function pointers it is given and the Arduino HAL's bus callbacks calling back into it. (#139)
 - Documentation: `architecture.md` draws the receive and reply paths, a generated getter, `crumbs_controller_send_confirmed()` and the family contract as Mermaid diagrams, and `protocol.md` draws the GET_ACK classification as a decision tree. The "After the SET" table now calls a changed counter with another opcode a mismatch, as `crumbs_ack_classify()` returns. (#135)
 
 ## [0.17.0] - 2026-10-26

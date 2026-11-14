@@ -13,16 +13,28 @@ in [roadmap.md](roadmap.md).
 
 ## Layers
 
-```text
- application / family header      what a type_id, opcode and payload mean
- ─────────────────────────────────────────────────────────────────────────
- crumbs_ops.h                     family identity, payload codecs, generated wrappers
- crumbs.h  crumbs_message_helpers.h   core: encode, decode, dispatch, scan
- ─────────────────────────────────────────────────────────────────────────
- crumbs_arduino.h  crumbs_linux.h HAL: put bytes on the bus, run callbacks
- ─────────────────────────────────────────────────────────────────────────
- Wire (Arduino)   linux-wire → i2c-dev (Linux)
+```mermaid
+flowchart TB
+    APP["application and<br/>family header:<br/>what each<br/>message means"]
+    OPS["crumbs_ops.h:<br/>family identity,<br/>payload codecs,<br/>generated<br/>wrappers"]
+    CORE["core: crumbs.h and<br/>crumbs_message_helpers.h<br/>encode, decode, dispatch,<br/>scan; plain C11"]
+    subgraph HAL["HAL"]
+        ARD["crumbs_arduino.h<br/>controller and peripheral"]
+        LNX["crumbs_linux.h<br/>controller only"]
+    end
+    WIRE["Wire"]
+    LW["linux-wire,<br/>i2c-dev"]
+
+    APP --> OPS
+    APP --> CORE
+    OPS --> CORE
+    CORE -- "through the write, read<br/>and delay function<br/>pointers it is given" --> HAL
+    ARD -. "peripheral: the bus<br/>callbacks call receive<br/>and reply" .-> CORE
+    ARD --> WIRE
+    LNX --> LW
 ```
+
+*Each arrow is a call. The core reaches the bus only through function pointers.*
 
 | Layer | Files | Depends on |
 | --- | --- | --- |
