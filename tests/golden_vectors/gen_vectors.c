@@ -15,6 +15,14 @@
 #include "crumbs.h"
 #include "crumbs_crc.h"
 #include "crumbs_message.h"
+#include "crumbs_ops.h"
+
+/* The alarm payload of docs/create-a-family.md's therm family, as written
+   there; its encode case below is the frame that doc's figure draws. */
+#define THERM_ALARM_FIELDS(X) \
+    X(u8, ch)                 \
+    X(i16, limit)
+CRUMBS_DEFINE_PAYLOAD(therm_alarm, 3, THERM_ALARM_FIELDS)
 
 static FILE *out;
 static int first;
@@ -267,6 +275,14 @@ int main(int argc, char **argv)
     }
     encode_case(0x01, 0x10, buf, CRUMBS_MAX_PAYLOAD);
     encode_case(0xFF, 0xFF, buf, 5);
+    {
+        /* therm_send_alarm(dev, &v): THERM_TYPE_ID 0x07, THERM_OP_SET_ALARM 0x02 */
+        crumbs_message_t m;
+        const therm_alarm_t v = {1, 3000};
+        crumbs_msg_init(&m, 0x07, 0x02);
+        therm_alarm_pack(&m, &v);
+        encode_case(m.type_id, m.opcode, m.data, m.data_len);
+    }
     for (int n = 0; n < 60; n++)
     {
         uint8_t type_id = next_byte();

@@ -53,6 +53,7 @@
     {"type_id": 0, "opcode": 254, "data": "80", "frame": "00fe0180dc"},
     {"type_id": 1, "opcode": 16, "data": "000102030405060708090a0b0c0d0e0f101112131415161718191a", "frame": "01101b000102030405060708090a0b0c0d0e0f101112131415161718191a84"},
     {"type_id": 255, "opcode": 255, "data": "0001020304", "frame": "ffff050001020304f1"},
+    {"type_id": 7, "opcode": 2, "data": "01b80b", "frame": "07020301b80b9c"},
     {"type_id": 89, "opcode": 211, "data": "afb6442a7eaa611bf9440314319eb315", "frame": "59d310afb6442a7eaa611bf9440314319eb315f4"},
     {"type_id": 60, "opcode": 69, "data": "5d7d3d27be0000de", "frame": "3c45085d7d3d27be0000deeb"},
     {"type_id": 111, "opcode": 93, "data": "3620", "frame": "6f5d0236202f"},
