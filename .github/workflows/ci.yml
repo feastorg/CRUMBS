@@ -308,6 +308,13 @@ jobs:
             git ls-files --error-unmatch "docs/figures/$(basename "$f" .tex).svg"
           done
 
+      # The python job checks vectors.json against the core; this checks the
+      # figure source against vectors.json.
+      - name: The therm frame figure matches the golden vectors
+        run: |
+          python3 scripts/generate_therm_frame.py
+          git diff --exit-code -- docs/figures/src/therm-frame.tex
+
       - name: Install dependencies
         run: |
           sudo apt-get update -y

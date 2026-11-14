@@ -61,6 +61,10 @@ little-endian. The byte count beside the field list is checked against it,
 so an edit to either without the other fails the build, and so does a layout
 over 27 bytes.
 
+![therm_send_alarm(dev, &v) with v.ch = 1 and v.limit = 3000 sends seven bytes: 0x07 (type_id, THERM_TYPE_ID), 0x02 (opcode, THERM_OP_SET_ALARM), 0x03 (data_len), 0x01 (ch, channel 1), 0xB8 and 0x0B (limit, low byte first: 0x0BB8 = 3000, so 30.00 °C), and 0x9C, the CRC-8/SMBUS of the six bytes before it.](figures/therm-frame.svg)
+
+*One SET on the wire. The bytes come from the core: `scripts/generate_therm_frame.py` draws the `therm_alarm_pack()` case in `tests/golden_vectors/vectors.json`, and CI fails if either drifts. The frame format is in [protocol.md](protocol.md#frame).*
+
 ## 2. Controller side: generated wrappers
 
 Three more macros produce the `static inline` functions a controller calls,
