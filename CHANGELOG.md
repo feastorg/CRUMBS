@@ -16,6 +16,7 @@ All notable changes to CRUMBS are documented in this file.
 - Documentation: `protocol.md` draws the I²C address map, with the reserved bands, the bands to avoid and the examples' defaults, and the opcode map of a type, in place of the opcode table. (#139)
 - Documentation: `architecture.md` draws its layers as a Mermaid diagram in place of the ASCII one, with the core calling the HAL through the function pointers it is given and the Arduino HAL's bus callbacks calling back into it. (#139)
 - Documentation: `architecture.md` draws the Python binding's `Controller.query` retry rules, which failures retry and which raise, and the binding's README links to it. (#139)
+- Documentation: `CONTRIBUTING.md` draws the release order: the version bump, the tag, `release.yml` and the PyPI approval on one path, and the PlatformIO publish, merge, checks and consumer pin bumps on the other. (#139)
 - Documentation: `architecture.md` draws the receive and reply paths, a generated getter, `crumbs_controller_send_confirmed()` and the family contract as Mermaid diagrams, and `protocol.md` draws the GET_ACK classification as a decision tree. The "After the SET" table now calls a changed counter with another opcode a mismatch, as `crumbs_ack_classify()` returns. (#135)
 
 ## [0.17.0] - 2026-10-26
