@@ -1,0 +1,30 @@
+% The version reply frame (docs/protocol.md#opcode-0x00-version-information).
+\documentclass[border=6pt]{standalone}
+\usepackage{crumbs-fig}
+\begin{document}
+\begin{tikzpicture}
+  \def\w{1.4}
+
+  % row labels, left of the frame
+  \node[note, anchor=south east] at (-0.15, 0.95) {byte offset};
+  \node[note, anchor=north east] at (-0.15, -0.05) {content};
+
+  \foreach \i/\t/\c in {0/type\_id/crumbsHeader, 1/0x00/crumbsHeader, 2/0x05/crumbsHeader,
+                        3/low/crumbsData, 4/high/crumbsData, 5/major/crumbsData,
+                        6/minor/crumbsData, 7/patch/crumbsData, 8/crc8/crumbsCrc} {
+    \node[field, fill=\c, minimum width=\w cm, anchor=south west] at (\i*\w, 0) {\t};
+    \node[note, font=\ttfamily\scriptsize, anchor=south] at (\i*\w+0.5*\w, 0.95) {\i};
+  }
+
+  \foreach \i/\t in {0/{type}, 1/{version\\opcode}, 2/{5 bytes\\follow},
+                     8/{bytes\\0 to 7}}
+    \node[note, anchor=north] at (\i*\w+0.5*\w, -0.05) {\t};
+  \node[note, anchor=north] at (4*\w, -0.05)
+    {\texttt{CRUMBS\_VERSION},\\little-endian};
+  \node[note, anchor=north] at (6.5*\w, -0.05)
+    {the peripheral's\\module version};
+
+  \draw[brace, decoration={mirror}] (3*\w,-1.0) -- (8*\w,-1.0)
+    node[midway, below=6pt, note] {payload, 5 bytes};
+\end{tikzpicture}
+\end{document}

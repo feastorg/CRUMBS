@@ -1,0 +1,26 @@
+% The GET_ACK reply frame (docs/protocol.md#get_ack-0xfd-the-set-acknowledgement).
+\documentclass[border=6pt]{standalone}
+\usepackage{crumbs-fig}
+\begin{document}
+\begin{tikzpicture}
+  \def\w{1.4}
+
+  % row labels, left of the frame
+  \node[note, anchor=south east] at (-0.15, 0.95) {byte offset};
+  \node[note, anchor=north east] at (-0.15, -0.05) {content};
+
+  \foreach \i/\t/\c in {0/type\_id/crumbsHeader, 1/0xFD/crumbsHeader, 2/0x04/crumbsHeader,
+                        3/counter/crumbsData, 4/opcode/crumbsData, 5/status/crumbsData,
+                        6/reason/crumbsData, 7/crc8/crumbsCrc} {
+    \node[field, fill=\c, minimum width=\w cm, anchor=south west] at (\i*\w, 0) {\t};
+    \node[note, font=\ttfamily\scriptsize, anchor=south] at (\i*\w+0.5*\w, 0.95) {\i};
+  }
+
+  \foreach \i/\t in {0/{type,\\or 0x00}, 1/{GET\_ACK}, 2/{4 bytes\\follow},
+                     3/{frames\\counted}, 4/{of the last\\command}, 5/{what\\happened}, 6/{why}, 7/{bytes\\0 to 6}}
+    \node[note, anchor=north] at (\i*\w+0.5*\w, -0.05) {\t};
+
+  \draw[brace, decoration={mirror}] (3*\w,-0.95) -- (7*\w,-0.95)
+    node[midway, below=6pt, note] {the ACK record: the table below gives each byte's values};
+\end{tikzpicture}
+\end{document}
