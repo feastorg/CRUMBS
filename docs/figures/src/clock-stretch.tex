@@ -1,0 +1,72 @@
+% Where the clock stretch starts (docs/protocol.md#when-the-reply-is-built).
+% Not to scale. Three cases, each read left to right in time.
+\documentclass[border=6pt]{standalone}
+\usepackage{crumbs-fig}
+\begin{document}
+\begin{tikzpicture}
+  \def\w{0.9}
+  \tikzset{stephead/.style={anchor=south west, font=\small, inner sep=0pt}}
+  % \cellat{x}{text}{fill}{width}: one bus cell
+  \newcommand\cellat[4]{\node[cell, fill=#3, minimum width=#4 cm, anchor=south west] at (#1, 0) {#2};}
+  \newcommand\held[3]{%
+    \node[cell, minimum width=#2 cm, anchor=south west, pattern=north east lines,
+          pattern color=crumbsStretch!45] (#3) at (#1, 0) {};
+    \node[fill=white, inner sep=1.5pt, font=\footnotesize, text=crumbsStretch]
+      at (#3.center) {SCL held low};}
+  \newcommand\callback[3]{%
+    \node[isr, minimum width=#2 cm, anchor=north west] (#3) at (#1, -0.5)
+      {receive callback runs\\(TWI interrupt)};
+    \draw[densely dashed, crumbsNote] (#1, 0) -- (#3.north west);}
+
+  % ---- ATmega328P --------------------------------------------------------
+  \node[stephead] at (0, 1.0)
+    {\textbf{ATmega328P}, a write, STOP, then the next transfer:
+     the hardware ACKs the address, then holds SCL};
+  \cellat{0}{S}{crumbsBus}{\w}
+  \cellat{\w}{A+W}{crumbsBus}{\w}
+  \cellat{2*\w}{frame\ldots}{crumbsData}{2*\w}
+  \cellat{4*\w}{P}{crumbsBus}{\w}
+  \cellat{6*\w}{S}{crumbsBus}{\w}
+  \cellat{7*\w}{A+R/W}{crumbsBus}{1.2*\w}
+  \cellat{8.2*\w}{ACK}{crumbsBus}{\w}
+  \held{9.2*\w}{3.2*\w}{h1}
+  \cellat{12.4*\w}{\ldots}{white}{\w}
+  \callback{5*\w}{7.4*\w}{cb1}
+  \draw[densely dashed, crumbsNote] (h1.south east) -- (cb1.north east);
+
+  % ---- megaAVR, STOP -----------------------------------------------------
+  \begin{scope}[yshift=-3.2cm]
+    \node[stephead] at (0, 1.0)
+      {\textbf{megaAVR}, the same sequence: the callback starts at the STOP,
+       and SCL is held \emph{before} the ACK};
+    \cellat{0}{S}{crumbsBus}{\w}
+    \cellat{\w}{A+W}{crumbsBus}{\w}
+    \cellat{2*\w}{frame\ldots}{crumbsData}{2*\w}
+    \cellat{4*\w}{P}{crumbsBus}{\w}
+    \cellat{6*\w}{S}{crumbsBus}{\w}
+    \cellat{7*\w}{A+R/W}{crumbsBus}{1.2*\w}
+    \held{8.2*\w}{3.2*\w}{h2}
+    \cellat{11.4*\w}{ACK}{crumbsBus}{\w}
+    \cellat{12.4*\w}{\ldots}{white}{\w}
+    \callback{5*\w}{6.4*\w}{cb2}
+    \draw[densely dashed, crumbsNote] (h2.south east) -- (cb2.north east);
+  \end{scope}
+
+  % ---- megaAVR, repeated start -------------------------------------------
+  \begin{scope}[yshift=-6.4cm]
+    \node[stephead] at (0, 1.0)
+      {\textbf{megaAVR}, a write, then a repeated-start read: all of receive
+       processing is inside the read's stretch};
+    \cellat{0}{S}{crumbsBus}{\w}
+    \cellat{\w}{A+W}{crumbsBus}{\w}
+    \cellat{2*\w}{frame\ldots}{crumbsData}{2*\w}
+    \cellat{4*\w}{Sr}{crumbsBus}{\w}
+    \cellat{5*\w}{A+R}{crumbsBus}{\w}
+    \held{6*\w}{4.4*\w}{h3}
+    \cellat{10.4*\w}{ACK}{crumbsBus}{\w}
+    \cellat{11.4*\w}{\ldots}{white}{\w}
+    \callback{6*\w}{4.4*\w}{cb3}
+    \draw[densely dashed, crumbsNote] (h3.south east) -- (cb3.north east);
+  \end{scope}
+\end{tikzpicture}
+\end{document}

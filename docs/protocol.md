@@ -126,6 +126,10 @@ repeated start that is the read's own address match, so the whole of receive
 processing runs inside the read's stretch. The megaAVR description is of core
 version 1.8.8, from `version=` in that core's `platform.txt`.
 
+![Three cases, each read left to right. ATmega328P, a write, STOP, then the next transfer: the receive callback starts after the STOP; the hardware ACKs the next address, then holds SCL low until the callback returns. megaAVR, the same sequence: the callback starts at the STOP, and SCL is held low after the address, before the ACK, until the callback returns. megaAVR, a write then a repeated-start read: the callback starts at the read's address match, so SCL is held low for all of it, then the ACK.](figures/clock-stretch.svg)
+
+*Where the stretch starts, when a transfer addresses the peripheral before its receive callback has returned. Not to scale.*
+
 The controller must therefore tolerate clock stretching. The generated getters
 pause `CRUMBS_DEFAULT_QUERY_DELAY_US` (10 ms) between the SET_REPLY write and
 the read, so the SET_REPLY's processing has normally finished before the read
