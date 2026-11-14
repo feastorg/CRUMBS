@@ -51,7 +51,8 @@ build and read `data`.
 
   Another device type at the address raises `ReplyMismatch` at once, and any
   other bus error is raised as the `OSError` it is. `send` is never retried,
-  since a SET need not be safe to repeat.
+  since a SET need not be safe to repeat. The rules are drawn in
+  [architecture.md](https://github.com/feastorg/CRUMBS/blob/main/docs/architecture.md#controller).
 - `Controller.get_version` queries opcode `0x00` and returns a `Version`:
   the `CRUMBS_VERSION` the device was built with, then its module's major,
   minor and patch, as `crumbs_build_version_reply` builds them
