@@ -171,6 +171,24 @@ The order matters (#18): the tag must point at the commit that carries the
 version, and the examples' `platformio.ini` pin that version for users, so the
 package must be published before the merge.
 
+```mermaid
+flowchart TD
+    S(["release vX.Y.Z"]) --> B["1. on a branch:<br/>bump every<br/>version, date<br/>the changelog,<br/>open the PR"]
+    B --> T["2. tag that<br/>commit, push<br/>the tag"]
+    T -- "CI" --> R["release.yml:<br/>check the tag,<br/>build the<br/>release"]
+    R --> A["a reviewer<br/>approves the<br/>PyPI upload"]
+    A --> PY["crumbs-i2c<br/>published and<br/>installed back"]
+    T -- "by hand" --> P["3. pack from<br/>the tag, pio<br/>pkg publish"]
+    P --> W["wait until it<br/>resolves; build<br/>an example<br/>with its pin"]
+    W --> M["4. merge the<br/>PR with a<br/>merge commit"]
+    M --> C["5. check the<br/>assets; the tag<br/>is an ancestor<br/>of main"]
+    C --> N["6. bump the<br/>consumers'<br/>pins"]
+```
+
+*The numbers are the steps below. The tag starts two paths: CI's, which
+waits for a reviewer before it uploads to PyPI, and the PlatformIO publish,
+which must resolve before the PR merges.*
+
 1. On a branch, bump the version in `CMakeLists.txt`, `library.json`,
    `library.properties`, `src/crumbs_version.h`, `pyproject.toml` (then run
    `uv lock`, which records it, and regenerate
